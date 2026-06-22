@@ -171,6 +171,50 @@ function Verifications() {
   );
 }
 
+// ---- Reports (البلاغات) ----
+function Reports() {
+  const [rows, setRows] = useState(null);
+  const [filter, setFilter] = useState('review');
+  const [msg, setMsg] = useState('');
+  const load = async () => {
+    setRows(null);
+    let q = SB.from('reports').select('*').order('created_at', { ascending: false });
+    if (filter !== 'all') q = q.eq('status', filter);
+    const { data, error } = await q;
+    setRows(error ? [] : (data || []));
+  };
+  useEffect(() => { load(); }, [filter]);
+  const reply = async (r) => {
+    const txt = prompt('الرد على البلاغ:', r.reply || '');
+    if (txt === null) return;
+    const { error } = await SB.from('reports').update({ reply: txt, status: 'resolved' }).eq('id', r.id);
+    if (error) return setMsg('خطأ: ' + error.message);
+    setMsg('تم الرد والإغلاق ✓'); setTimeout(() => setMsg(''), 1500); load();
+  };
+  const TYPE = { farmer: 'مزارع', retail: 'تجزئة', wholesale: 'جملة', general: 'عام' };
+  return (
+    <div>
+      <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
+        {['review', 'resolved', 'all'].map((f) =>
+          <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{{ review: 'قيد المراجعة', resolved: 'مغلقة', all: 'الكل' }[f]}</button>)}
+      </div>
+      {msg && <div className="ok" style={{ marginBottom: 10 }}>{msg}</div>}
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !rows.length ? <div className="empty">لا توجد بلاغات.</div>
+          : rows.map((r) => (
+            <div className="card" key={r.id}>
+              <div className="v-head"><strong>{r.subject || 'بلاغ'}</strong><span className={`tag ${r.status === 'resolved' ? 'approved' : 'pending'}`}>{r.status === 'resolved' ? 'مغلقة' : 'مراجعة'}</span></div>
+              <div className="kv"><b>النوع:</b> {TYPE[r.type_id] || r.type_id || '—'}{r.target ? ' · ' + r.target : ''}{r.order_id ? ' · طلب #' + r.order_id : ''}</div>
+              <div className="kv"><b>من:</b> {r.reporter_name || '—'} · {r.reporter_phone || '—'}</div>
+              <div className="kv" style={{ marginTop: 6 }}>{r.description}</div>
+              {r.reply && <div className="kv" style={{ marginTop: 6, color: 'var(--green-deep)' }}><b>الرد:</b> {r.reply}</div>}
+              <div className="acts"><button className="btn sm" onClick={() => reply(r)}>{r.status === 'resolved' ? 'تعديل الرد' : 'رد وإغلاق'}</button></div>
+            </div>
+          ))}
+    </div>
+  );
+}
+
 // ---- Number activation ----
 function Numbers() {
   const [phone, setPhone] = useState('');
@@ -283,13 +327,14 @@ function Admin() {
   }, []);
   if (user === undefined) return <div className="empty">جارٍ التحميل…</div>;
   if (!user) return <Login onIn={setUser} />;
-  const TABS = [['verif', 'التحقق من البائعين'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات والشارات']];
+  const TABS = [['verif', 'التحقق من البائعين'], ['reports', 'البلاغات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات والشارات']];
   return (
     <div>
       <div className="topbar"><h1>لوزي · لوحة الإدارة</h1><button onClick={() => { SB.auth.signOut(); setUser(null); }}>خروج</button></div>
       <div className="tabs">{TABS.map(([id, label]) => <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>)}</div>
       <div className="wrap">
         {tab === 'verif' && <Verifications />}
+        {tab === 'reports' && <Reports />}
         {tab === 'numbers' && <Numbers />}
         {tab === 'del' && <Deletions />}
         {tab === 'settings' && <SettingsTab />}
