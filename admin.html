@@ -215,6 +215,34 @@ function Reports() {
   );
 }
 
+// ---- Reviews moderation (التقييمات) ----
+function ReviewsMod() {
+  const [rows, setRows] = useState(null);
+  const load = async () => { setRows(null); const { data, error } = await SB.from('reviews').select('*').order('created_at', { ascending: false }); setRows(error ? [] : (data || [])); };
+  useEffect(() => { load(); }, []);
+  const toggle = async (r) => { const { error } = await SB.from('reviews').update({ hidden: !r.hidden }).eq('id', r.id); if (!error) load(); };
+  const del = async (r) => { if (!confirm('حذف هذا التقييم نهائياً؟')) return; const { error } = await SB.from('reviews').delete().eq('id', r.id); if (!error) load(); };
+  const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
+  return (
+    <div>
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !rows.length ? <div className="empty">لا توجد تقييمات.</div>
+          : rows.map((r) => (
+            <div className="card" key={r.id}>
+              <div className="v-head"><strong>{r.reviewer_name || 'عميل'}</strong><span style={{ color: 'var(--gold-deep)', fontWeight: 900 }}>{stars(r.rating)}</span>{r.hidden && <span className="tag rejected">مخفي</span>}</div>
+              {r.comment && <div className="kv" style={{ marginTop: 4 }}>{r.comment}</div>}
+              {r.reply && <div className="kv" style={{ color: 'var(--green-deep)' }}><b>ردّ المتجر:</b> {r.reply}</div>}
+              <div className="kv"><b>متجر:</b> <span style={{ fontSize: 11 }}>{r.store_vendor_id}</span></div>
+              <div className="acts">
+                <button className="btn sm ghost" onClick={() => toggle(r)}>{r.hidden ? 'إظهار' : 'إخفاء'}</button>
+                <button className="btn sm danger" onClick={() => del(r)}>حذف</button>
+              </div>
+            </div>
+          ))}
+    </div>
+  );
+}
+
 // ---- Number activation ----
 function Numbers() {
   const [phone, setPhone] = useState('');
@@ -327,7 +355,7 @@ function Admin() {
   }, []);
   if (user === undefined) return <div className="empty">جارٍ التحميل…</div>;
   if (!user) return <Login onIn={setUser} />;
-  const TABS = [['verif', 'التحقق من البائعين'], ['reports', 'البلاغات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات والشارات']];
+  const TABS = [['verif', 'التحقق من البائعين'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات والشارات']];
   return (
     <div>
       <div className="topbar"><h1>لوزي · لوحة الإدارة</h1><button onClick={() => { SB.auth.signOut(); setUser(null); }}>خروج</button></div>
@@ -335,6 +363,7 @@ function Admin() {
       <div className="wrap">
         {tab === 'verif' && <Verifications />}
         {tab === 'reports' && <Reports />}
+        {tab === 'reviews' && <ReviewsMod />}
         {tab === 'numbers' && <Numbers />}
         {tab === 'del' && <Deletions />}
         {tab === 'settings' && <SettingsTab />}
