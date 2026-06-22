@@ -303,20 +303,12 @@ function Deletions() {
 function SettingsTab() {
   const [wa, setWa] = useState('');
   const [waMsg, setWaMsg] = useState('');
-  const [stores, setStores] = useState(null);
   useEffect(() => {
     SB.from('settings').select('value').eq('key', 'support_wa').maybeSingle().then(({ data }) => { if (data) setWa(data.value || ''); });
-    SB.from('stores').select('vendor_id,name,shahti_free').then(({ data }) => setStores(data || []));
   }, []);
   const saveWa = async () => {
     const { error } = await SB.from('settings').upsert({ key: 'support_wa', value: wa, updated_at: new Date().toISOString() }, { onConflict: 'key' });
     setWaMsg(error ? 'خطأ: ' + error.message : 'تم الحفظ ✓'); setTimeout(() => setWaMsg(''), 1500);
-  };
-  const toggleShahti = async (s) => {
-    const next = !s.shahti_free;
-    setStores((ls) => ls.map((x) => x.vendor_id === s.vendor_id ? { ...x, shahti_free: next } : x));
-    const { error } = await SB.from('stores').update({ shahti_free: next }).eq('vendor_id', s.vendor_id);
-    if (error) { alert('خطأ: ' + error.message); }
   };
   return (
     <div>
@@ -327,17 +319,54 @@ function SettingsTab() {
         <button className="btn sm" onClick={saveWa}>حفظ الرقم</button>
         {waMsg && <div className={waMsg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{waMsg}</div>}
       </div>
-      <div className="card">
-        <div className="secttl">منح شارة «خالٍ من المرارة»</div>
-        {stores === null ? <div className="muted">جارٍ التحميل…</div>
-          : !stores.length ? <div className="muted">لا توجد متاجر بعد.</div>
-            : stores.map((s) => (
-              <div className="store-row" key={s.vendor_id}>
-                <span className="sr-name">{s.name || 'متجر بلا اسم'}</span>
-                <span className={`switch ${s.shahti_free ? 'on' : ''}`} onClick={() => toggleShahti(s)}><i></i></span>
-              </div>
-            ))}
+    </div>
+  );
+}
+
+// ---- Shahti (خالٍ من المرارة) per-product requests ----
+function ShahtiReqs() {
+  const [rows, setRows] = useState(null);
+  const [filter, setFilter] = useState('pending');
+  const [msg, setMsg] = useState('');
+  const load = async () => {
+    setRows(null);
+    let q = SB.from('products').select('id,name,data,status,shahti_status,vendor_id').order('created_at', { ascending: false });
+    if (filter !== 'all') q = q.eq('shahti_status', filter); else q = q.not('shahti_status', 'is', null);
+    const { data, error } = await q;
+    setRows(error ? [] : (data || []));
+  };
+  useEffect(() => { load(); }, [filter]);
+  const decide = async (r, status) => {
+    const data = Object.assign({}, r.data || {}); data.shahtiStatus = status;
+    const { error } = await SB.from('products').update({ shahti_status: status, data: data }).eq('id', r.id);
+    if (error) return setMsg('خطأ: ' + error.message);
+    setMsg(status === 'approved' ? 'تم القبول ✓' : 'تم الرفض'); setTimeout(() => setMsg(''), 1500); load();
+  };
+  return (
+    <div>
+      <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
+        {['pending', 'approved', 'rejected', 'all'].map((f) =>
+          <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{{ pending: 'منتظر', approved: 'مقبول', rejected: 'مرفوض', all: 'الكل' }[f]}</button>)}
       </div>
+      {msg && <div className="ok" style={{ marginBottom: 10 }}>{msg}</div>}
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !rows.length ? <div className="empty">لا توجد طلبات شارة.</div>
+          : rows.map((r) => {
+            const nm = (r.name) || (r.data && r.data.name && r.data.name.ar) || 'منتج';
+            const insp = r.data && r.data.inspect && (r.data.inspect.ar || r.data.inspect);
+            return (
+              <div className="card" key={r.id}>
+                <div className="v-head"><strong>{nm}</strong><span className={`tag ${r.shahti_status === 'approved' ? 'approved' : r.shahti_status === 'rejected' ? 'rejected' : 'pending'}`}>{{ pending: 'منتظر', approved: 'مقبول', rejected: 'مرفوض' }[r.shahti_status] || r.shahti_status}</span>{r.status === 'hidden' && <span className="tag">مخفي/مُباع</span>}</div>
+                {insp && <div className="kv"><b>الفحص:</b> {insp}</div>}
+                <div className="kv"><b>المتجر:</b> <span style={{ fontSize: 11 }}>{r.vendor_id}</span></div>
+                {r.shahti_status !== 'approved' &&
+                  <div className="acts">
+                    <button className="btn sm" onClick={() => decide(r, 'approved')}>✓ قبول</button>
+                    {r.shahti_status !== 'rejected' && <button className="btn sm danger" onClick={() => decide(r, 'rejected')}>رفض</button>}
+                  </div>}
+              </div>
+            );
+          })}
     </div>
   );
 }
@@ -355,13 +384,14 @@ function Admin() {
   }, []);
   if (user === undefined) return <div className="empty">جارٍ التحميل…</div>;
   if (!user) return <Login onIn={setUser} />;
-  const TABS = [['verif', 'التحقق من البائعين'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات والشارات']];
+  const TABS = [['verif', 'التحقق من البائعين'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
   return (
     <div>
       <div className="topbar"><h1>لوزي · لوحة الإدارة</h1><button onClick={() => { SB.auth.signOut(); setUser(null); }}>خروج</button></div>
       <div className="tabs">{TABS.map(([id, label]) => <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>)}</div>
       <div className="wrap">
         {tab === 'verif' && <Verifications />}
+        {tab === 'shahti' && <ShahtiReqs />}
         {tab === 'reports' && <Reports />}
         {tab === 'reviews' && <ReviewsMod />}
         {tab === 'numbers' && <Numbers />}
