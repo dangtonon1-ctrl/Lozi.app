@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>لوزي · لوحة الإدارة</title>
+<style>
+  :root{
+    --green:#2F5E3E; --green-deep:#264B32; --green-soft:#E7F0EA;
+    --gold:#C08A43; --gold-deep:#9A6B2E; --brown:#5A4124;
+    --bg:#FAF7F2; --surface:#FFFFFF; --ink:#241F1A; --muted:#8A8276;
+    --line:#ECE4D7; --sand:#F4ECDC; --danger:#D62638;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:"Segoe UI",Tahoma,system-ui,sans-serif;background:var(--bg);color:var(--ink);}
+  #root{max-width:760px;margin:0 auto;min-height:100vh;}
+  .topbar{display:flex;align-items:center;gap:10px;padding:16px 20px;background:var(--green-deep);color:#fff;position:sticky;top:0;z-index:10;}
+  .topbar h1{font-size:17px;margin:0;font-weight:900;flex:1;}
+  .topbar button{background:rgba(255,255,255,.16);color:#fff;border:none;border-radius:10px;padding:8px 12px;font-weight:800;font-size:13px;cursor:pointer;}
+  .wrap{padding:18px 18px 60px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.03);}
+  .login{max-width:380px;margin:8vh auto;padding:0 20px;text-align:center;}
+  .login .logo{width:72px;height:72px;border-radius:20px;background:var(--green-deep);color:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;margin:0 auto 16px;}
+  .login h2{margin:0 0 4px;font-size:22px;font-weight:900;}
+  .login p{margin:0 0 22px;color:var(--muted);font-size:14px;}
+  label.fld{display:block;text-align:start;margin-bottom:12px;}
+  label.fld span{display:block;font-size:13px;font-weight:800;margin-bottom:6px;}
+  input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:13px 14px;font-size:15px;font-family:inherit;background:var(--surface);color:var(--ink);}
+  input:focus,select,textarea:focus{outline:none;border-color:var(--green);}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:50px;border:none;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer;background:var(--green-deep);color:#fff;}
+  .btn:disabled{opacity:.5;}
+  .btn.gold{background:var(--gold);color:var(--brown);}
+  .btn.danger{background:var(--danger);color:#fff;}
+  .btn.ghost{background:var(--sand);color:var(--ink);}
+  .btn.sm{height:42px;font-size:13.5px;border-radius:11px;}
+  .row2{display:flex;gap:10px;}
+  .tabs{display:flex;gap:8px;overflow-x:auto;padding:0 18px 4px;background:var(--bg);position:sticky;top:56px;z-index:9;}
+  .tabs button{flex-shrink:0;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:9px 15px;font-size:13.5px;font-weight:800;color:var(--muted);cursor:pointer;}
+  .tabs button.on{background:var(--green-deep);color:#fff;border-color:var(--green-deep);}
+  .err{color:var(--danger);font-size:13px;font-weight:700;margin-top:8px;}
+  .ok{color:var(--green-deep);font-size:13px;font-weight:700;margin-top:8px;}
+  .muted{color:var(--muted);font-size:13px;}
+  .empty{text-align:center;color:var(--muted);padding:40px 10px;font-size:14px;}
+  .v-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .v-head strong{font-size:16px;font-weight:900;}
+  .tag{display:inline-block;font-size:11px;font-weight:800;padding:3px 9px;border-radius:8px;background:var(--sand);color:var(--brown);}
+  .tag.pending{background:#FBF1DE;color:var(--gold-deep);}
+  .tag.approved{background:var(--green-soft);color:var(--green-deep);}
+  .tag.rejected{background:#FBE3E5;color:var(--danger);}
+  .kv{font-size:13.5px;margin:3px 0;color:var(--ink);}
+  .kv b{color:var(--muted);font-weight:700;}
+  .docs{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;}
+  .docs a{font-size:12.5px;font-weight:800;color:var(--green-deep);background:var(--green-soft);padding:8px 12px;border-radius:10px;text-decoration:none;}
+  .acts{display:flex;gap:8px;margin-top:10px;}
+  .secttl{font-size:15px;font-weight:900;margin:0 0 12px;}
+  .store-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);}
+  .store-row:first-child{border-top:none;}
+  .store-row .sr-name{flex:1;font-weight:800;font-size:14px;}
+  .switch{width:46px;height:27px;border-radius:20px;background:var(--line);position:relative;cursor:pointer;flex-shrink:0;transition:.2s;}
+  .switch.on{background:var(--green);}
+  .switch i{position:absolute;top:3px;inset-inline-start:3px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.2s;}
+  .switch.on i{inset-inline-start:22px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  window.LOZI_SUPABASE_URL = "https://niloddwnllhsvrmuxfxw.supabase.co";
+  window.LOZI_SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pbG9kZHdubGxoc3ZybXV4Znh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMjk0MzcsImV4cCI6MjA5NjYwNTQzN30.JSI56mSLPxNK591fJY-vFFsgwjILfD6MU6-oobImGjc";
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script>var SB = window.supabase.createClient(window.LOZI_SUPABASE_URL, window.LOZI_SUPABASE_ANON);</script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect } = React;
+
+function Login({ onIn }) {
+  const [email, setEmail] = useState('');
+  const [pass, setPass] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const go = async () => {
+    if (!email.trim() || !pass) return;
+    setBusy(true); setErr('');
+    const { data, error } = await SB.auth.signInWithPassword({ email: email.trim(), password: pass });
+    if (error) { setBusy(false); return setErr('بيانات الدخول غير صحيحة'); }
+    const { data: a } = await SB.from('admins').select('user_id').eq('user_id', data.user.id).maybeSingle();
+    setBusy(false);
+    if (!a) { await SB.auth.signOut(); return setErr('هذا الحساب غير مصرّح له بالدخول للوحة الإدارة.'); }
+    onIn(data.user);
+  };
+  return (
+    <div className="login">
+      <div className="logo">لوزي</div>
+      <h2>لوحة الإدارة</h2>
+      <p>أدخل اسم الأدمن (البريد) والرمز السري.</p>
+      <label className="fld"><span>اسم الأدمن (البريد)</span>
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@lozi.ye" inputMode="email" autoCapitalize="off" /></label>
+      <label className="fld"><span>الرمز السري</span>
+        <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••••" onKeyDown={(e) => e.key === 'Enter' && go()} /></label>
+      {err && <div className="err">{err}</div>}
+      <button className="btn" disabled={busy || !email.trim() || !pass} onClick={go} style={{ marginTop: 8 }}>{busy ? 'جارٍ الدخول…' : 'دخول'}</button>
+    </div>
+  );
+}
+
+// ---- Verifications ----
+function Verifications() {
+  const [rows, setRows] = useState(null);
+  const [filter, setFilter] = useState('pending');
+  const [msg, setMsg] = useState('');
+  const load = async () => {
+    setRows(null);
+    let q = SB.from('vendor_verifications').select('*').order('submitted_at', { ascending: false });
+    if (filter !== 'all') q = q.eq('status', filter);
+    const { data, error } = await q;
+    setRows(error ? [] : (data || []));
+  };
+  useEffect(() => { load(); }, [filter]);
+  const openDoc = async (path) => {
+    if (!path) return;
+    const { data, error } = await SB.storage.from('vendor-docs').createSignedUrl(path, 3600);
+    if (error) return alert('تعذّر فتح المستند: ' + error.message);
+    window.open(data.signedUrl, '_blank');
+  };
+  const setStatus = async (r, status) => {
+    let note = null;
+    if (status === 'rejected') { note = prompt('سبب الرفض (اختياري):') || null; }
+    const { error } = await SB.from('vendor_verifications').update({ status, note, reviewed_at: new Date().toISOString() }).eq('user_id', r.user_id);
+    if (error) return setMsg('خطأ: ' + error.message);
+    setMsg(status === 'approved' ? 'تم التفعيل ✓' : 'تم الرفض');
+    setTimeout(() => setMsg(''), 1500);
+    load();
+  };
+  const ROLE = { farmer_almond: 'مزارع لوز', farmer_raisin: 'مزارع زبيب', retail: 'تاجر تجزئة', wholesale: 'تاجر جملة', farmer: 'مزارع' };
+  return (
+    <div>
+      <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
+        {['pending', 'approved', 'rejected', 'all'].map((f) =>
+          <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{{ pending: 'منتظر', approved: 'مفعّل', rejected: 'مرفوض', all: 'الكل' }[f]}</button>)}
+      </div>
+      {msg && <div className="ok" style={{ marginBottom: 10 }}>{msg}</div>}
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !rows.length ? <div className="empty">لا توجد طلبات.</div>
+          : rows.map((r) => {
+            const d = r.docs || {};
+            return (
+              <div className="card" key={r.user_id}>
+                <div className="v-head"><strong>{r.name || 'بدون اسم'}</strong><span className={`tag ${r.status}`}>{{ pending: 'منتظر', approved: 'مفعّل', rejected: 'مرفوض' }[r.status] || r.status}</span></div>
+                <div className="kv"><b>الهاتف:</b> {r.phone || '—'}</div>
+                <div className="kv"><b>العنوان:</b> {r.address || '—'}</div>
+                <div className="kv"><b>المعرّف:</b> <span style={{ fontSize: 11 }}>{r.user_id}</span></div>
+                <div className="docs">
+                  {d.id_front && <a onClick={() => openDoc(d.id_front)}>البطاقة (أمام)</a>}
+                  {d.id_back && <a onClick={() => openDoc(d.id_back)}>البطاقة (خلف)</a>}
+                  {d.commercial && <a onClick={() => openDoc(d.commercial)}>السجل التجاري</a>}
+                  {d.shop && <a onClick={() => openDoc(d.shop)}>صورة المحل</a>}
+                </div>
+                {r.note && <div className="kv"><b>ملاحظة:</b> {r.note}</div>}
+                {r.status !== 'approved' &&
+                  <div className="acts">
+                    <button className="btn sm" onClick={() => setStatus(r, 'approved')}>✓ تفعيل</button>
+                    {r.status !== 'rejected' && <button className="btn sm danger" onClick={() => setStatus(r, 'rejected')}>رفض</button>}
+                  </div>}
+              </div>
+            );
+          })}
+    </div>
+  );
+}
+
+// ---- Number activation ----
+function Numbers() {
+  const [phone, setPhone] = useState('');
+  const [msg, setMsg] = useState('');
+  const norm = (p) => { let d = String(p).replace(/[^0-9]/g, ''); if (d.indexOf('967') !== 0) d = '967' + d.replace(/^0+/, ''); return '+' + d; };
+  const activate = async () => {
+    if (!phone.trim()) return;
+    const ph = norm(phone);
+    const { error } = await SB.from('vendor_authorizations').upsert({ phone: ph, status: 'active' }, { onConflict: 'phone' });
+    setMsg(error ? 'خطأ: ' + error.message : 'تم تفعيل الرقم ' + ph + ' ✓');
+  };
+  const resetOtp = async () => {
+    if (!phone.trim()) return;
+    const ph = norm(phone);
+    const { error } = await SB.from('otp_attempts').delete().eq('phone', ph);
+    setMsg(error ? 'خطأ (قد يكون اسم جدول OTP مختلفاً): ' + error.message : 'تم تصفير حدّ الرمز للرقم ' + ph + ' ✓');
+  };
+  return (
+    <div className="card">
+      <div className="secttl">تفعيل رقم بائع</div>
+      <label className="fld"><span>رقم الهاتف</span>
+        <div style={{ display: 'flex', gap: 8 }}><span style={{ background: 'var(--sand)', borderRadius: 12, padding: '13px 12px', fontWeight: 800 }}>+967</span>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="7X XXX XXXX" inputMode="tel" /></div></label>
+      <div className="row2">
+        <button className="btn sm" onClick={activate}>تفعيل الرقم</button>
+        <button className="btn sm ghost" onClick={resetOtp}>تصفير حدّ الرمز</button>
+      </div>
+      {msg && <div className={msg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{msg}</div>}
+      <p className="muted" style={{ marginTop: 10 }}>التفعيل يسمح للرقم باستلام رمز التسجيل كبائع. التصفير يُستخدم عند ظهور «تم إرسال رمز خلال ٢٤ ساعة».</p>
+    </div>
+  );
+}
+
+// ---- Deletion requests ----
+function Deletions() {
+  const [rows, setRows] = useState(null);
+  const load = async () => { setRows(null); const { data, error } = await SB.from('deletion_requests').select('*').order('created_at', { ascending: false }); setRows(error ? [] : (data || [])); };
+  useEffect(() => { load(); }, []);
+  const mark = async (r) => { const { error } = await SB.from('deletion_requests').update({ handled: true, status: 'handled' }).eq('user_id', r.user_id); if (!error) load(); };
+  return (
+    <div>
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !rows.length ? <div className="empty">لا توجد طلبات حذف.</div>
+          : rows.map((r) => (
+            <div className="card" key={r.user_id}>
+              <div className="v-head"><strong>{r.name || 'مستخدم'}</strong><span className="tag">{r.role || ''}</span>{r.handled && <span className="tag approved">منجز</span>}</div>
+              <div className="kv"><b>الهاتف:</b> {r.phone || '—'} · <b>البريد:</b> {r.email || '—'}</div>
+              <div className="kv"><b>المعرّف:</b> <span style={{ fontSize: 11 }}>{r.user_id}</span></div>
+              <p className="muted" style={{ margin: '8px 0' }}>الحذف النهائي من Authentication → Users في Supabase. هنا تضع علامة «منجز» بعد الحذف.</p>
+              {!r.handled && <button className="btn sm ghost" onClick={() => mark(r)}>وضع علامة منجز</button>}
+            </div>
+          ))}
+    </div>
+  );
+}
+
+// ---- Settings & badges ----
+function SettingsTab() {
+  const [wa, setWa] = useState('');
+  const [waMsg, setWaMsg] = useState('');
+  const [stores, setStores] = useState(null);
+  useEffect(() => {
+    SB.from('settings').select('value').eq('key', 'support_wa').maybeSingle().then(({ data }) => { if (data) setWa(data.value || ''); });
+    SB.from('stores').select('vendor_id,name,shahti_free').then(({ data }) => setStores(data || []));
+  }, []);
+  const saveWa = async () => {
+    const { error } = await SB.from('settings').upsert({ key: 'support_wa', value: wa, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    setWaMsg(error ? 'خطأ: ' + error.message : 'تم الحفظ ✓'); setTimeout(() => setWaMsg(''), 1500);
+  };
+  const toggleShahti = async (s) => {
+    const next = !s.shahti_free;
+    setStores((ls) => ls.map((x) => x.vendor_id === s.vendor_id ? { ...x, shahti_free: next } : x));
+    const { error } = await SB.from('stores').update({ shahti_free: next }).eq('vendor_id', s.vendor_id);
+    if (error) { alert('خطأ: ' + error.message); }
+  };
+  return (
+    <div>
+      <div className="card">
+        <div className="secttl">رقم دعم واتساب</div>
+        <label className="fld"><span>الرقم (مع +967)</span>
+          <input value={wa} onChange={(e) => setWa(e.target.value)} placeholder="+9677XXXXXXXX" inputMode="tel" /></label>
+        <button className="btn sm" onClick={saveWa}>حفظ الرقم</button>
+        {waMsg && <div className={waMsg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{waMsg}</div>}
+      </div>
+      <div className="card">
+        <div className="secttl">منح شارة «خالٍ من المرارة»</div>
+        {stores === null ? <div className="muted">جارٍ التحميل…</div>
+          : !stores.length ? <div className="muted">لا توجد متاجر بعد.</div>
+            : stores.map((s) => (
+              <div className="store-row" key={s.vendor_id}>
+                <span className="sr-name">{s.name || 'متجر بلا اسم'}</span>
+                <span className={`switch ${s.shahti_free ? 'on' : ''}`} onClick={() => toggleShahti(s)}><i></i></span>
+              </div>
+            ))}
+      </div>
+    </div>
+  );
+}
+
+function Admin() {
+  const [user, setUser] = useState(undefined); // undefined=loading, null=logged out
+  const [tab, setTab] = useState('verif');
+  useEffect(() => {
+    SB.auth.getSession().then(async ({ data }) => {
+      const u = data && data.session && data.session.user;
+      if (!u) return setUser(null);
+      const { data: a } = await SB.from('admins').select('user_id').eq('user_id', u.id).maybeSingle();
+      setUser(a ? u : null);
+    });
+  }, []);
+  if (user === undefined) return <div className="empty">جارٍ التحميل…</div>;
+  if (!user) return <Login onIn={setUser} />;
+  const TABS = [['verif', 'التحقق من البائعين'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات والشارات']];
+  return (
+    <div>
+      <div className="topbar"><h1>لوزي · لوحة الإدارة</h1><button onClick={() => { SB.auth.signOut(); setUser(null); }}>خروج</button></div>
+      <div className="tabs">{TABS.map(([id, label]) => <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>)}</div>
+      <div className="wrap">
+        {tab === 'verif' && <Verifications />}
+        {tab === 'numbers' && <Numbers />}
+        {tab === 'del' && <Deletions />}
+        {tab === 'settings' && <SettingsTab />}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Admin />);
+</script>
+</body>
+</html>
