@@ -371,6 +371,310 @@ function ShahtiReqs() {
   );
 }
 
+// ---- User account management (تعليق / حظر / حذف) ----
+function Users() {
+  const [rows, setRows] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [q, setQ] = useState('');
+  const [msg, setMsg] = useState('');
+  const load = async () => {
+    setRows(null);
+    let query = SB.from('profiles').select('*').order('created_at', { ascending: false });
+    if (filter !== 'all') query = query.eq('status', filter);
+    const { data, error } = await query;
+    setRows(error ? [] : (data || []));
+  };
+  useEffect(() => { load(); }, [filter]);
+  const setStatus = async (r, status, label) => {
+    if (!confirm(label + ' الحساب «' + (r.name || r.phone || 'مستخدم') + '»؟')) return;
+    const { error } = await SB.from('profiles').update({ status: status }).eq('user_id', r.user_id);
+    if (error) return setMsg('خطأ: ' + error.message);
+    setMsg('تم ✓'); setTimeout(() => setMsg(''), 1500); load();
+  };
+  const del = async (r) => {
+    if (!confirm('⚠️ حذف الحساب «' + (r.name || r.phone || 'مستخدم') + '» وكل بياناته نهائياً؟ لا يمكن التراجع.')) return;
+    if (!confirm('تأكيد أخير: سيتم حذف منتجاته ومتجره. متابعة؟')) return;
+    // Best-effort cascade of the user's app data, then flag for final auth removal.
+    try { await SB.from('products').delete().eq('vendor_id', r.user_id); } catch (e) {}
+    try { await SB.from('stores').delete().eq('vendor_id', r.user_id); } catch (e) {}
+    try { await SB.from('deletion_requests').upsert({ user_id: r.user_id, name: r.name, phone: r.phone, role: r.role, status: 'pending', created_at: new Date().toISOString() }, { onConflict: 'user_id' }); } catch (e) {}
+    const { error } = await SB.from('profiles').update({ status: 'deleted' }).eq('user_id', r.user_id);
+    if (error) return setMsg('خطأ: ' + error.message);
+    setMsg('تم حذف بيانات الحساب. أزل الحساب نهائياً من تبويب «طلبات الحذف».'); setTimeout(() => setMsg(''), 3500); load();
+  };
+  const ROLE = { farmer_almond: 'مزارع لوز', farmer_raisin: 'مزارع زبيب', farmer: 'مزارع', retail: 'تاجر تجزئة', wholesale: 'تاجر جملة', customer: 'زبون' };
+  const ST = { active: ['مفعّل', 'approved'], suspended: ['معلّق', 'pending'], banned: ['محظور', 'rejected'], deleted: ['محذوف', 'rejected'] };
+  const visible = (rows || []).filter((r) => !q.trim() || (r.name || '').includes(q.trim()) || (r.phone || '').includes(q.trim()));
+  return (
+    <div>
+      <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
+        {['all', 'active', 'suspended', 'banned'].map((f) =>
+          <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{{ all: 'الكل', active: 'مفعّل', suspended: 'معلّق', banned: 'محظور' }[f]}</button>)}
+      </div>
+      <label className="fld"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث بالاسم أو الهاتف…" /></label>
+      {msg && <div className="ok" style={{ margin: '4px 0 10px' }}>{msg}</div>}
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !visible.length ? <div className="empty">لا يوجد مستخدمون. (تأكّد من إنشاء جدول profiles)</div>
+          : visible.map((r) => {
+            const st = ST[r.status] || ['—', 'pending'];
+            return (
+              <div className="card" key={r.user_id}>
+                <div className="v-head"><strong>{r.name || 'بدون اسم'}</strong><span className={`tag ${st[1]}`}>{st[0]}</span></div>
+                <div className="kv"><b>الهاتف:</b> {r.phone || '—'}</div>
+                <div className="kv"><b>الدور:</b> {ROLE[r.role] || r.role || '—'}</div>
+                <div className="kv"><b>المعرّف:</b> <span style={{ fontSize: 11 }}>{r.user_id}</span></div>
+                {r.status !== 'deleted' &&
+                  <div className="acts" style={{ flexWrap: 'wrap' }}>
+                    {r.status !== 'suspended' && <button className="btn sm ghost" onClick={() => setStatus(r, 'suspended', 'تعليق')}>تعليق</button>}
+                    {r.status === 'suspended' && <button className="btn sm" onClick={() => setStatus(r, 'active', 'إعادة تفعيل')}>إلغاء التعليق</button>}
+                    {r.status !== 'banned' && <button className="btn sm danger" onClick={() => setStatus(r, 'banned', 'حظر')}>حظر</button>}
+                    {r.status === 'banned' && <button className="btn sm" onClick={() => setStatus(r, 'active', 'رفع الحظر')}>رفع الحظر</button>}
+                    <button className="btn sm danger" onClick={() => del(r)}>حذف</button>
+                  </div>}
+              </div>
+            );
+          })}
+    </div>
+  );
+}
+
+// ---- LOZI savings products (خانة التوفير) ----
+function SavingsAdmin() {
+  const [rows, setRows] = useState(null);
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [weight, setWeight] = useState('');
+  const [price, setPrice] = useState('');
+  const [oldPrice, setOldPrice] = useState('');
+  const [pub, setPub] = useState(true);
+  const [imgUrl, setImgUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [msg, setMsg] = useState('');
+  const load = async () => {
+    setRows(null);
+    const { data, error } = await SB.from('products').select('*').eq('category', 'savings').order('created_at', { ascending: false });
+    setRows(error ? [] : (data || []));
+  };
+  useEffect(() => { load(); }, []);
+  const reset = () => { setName(''); setDesc(''); setWeight(''); setPrice(''); setOldPrice(''); setPub(true); setImgUrl(''); setEditId(null); };
+  const pickImg = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true); setMsg('جارٍ رفع الصورة…');
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const path = 'lozi-savings/' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '.' + ext;
+    const { error } = await SB.storage.from('product-images').upload(path, file, { upsert: true });
+    if (error) { setBusy(false); return setMsg('تعذّر رفع الصورة: ' + error.message); }
+    const { data } = SB.storage.from('product-images').getPublicUrl(path);
+    setImgUrl(data.publicUrl); setBusy(false); setMsg('تم رفع الصورة ✓'); setTimeout(() => setMsg(''), 1500);
+  };
+  const save = async () => {
+    if (!name.trim() || !price || Number(price) <= 0) return setMsg('أدخل الاسم والسعر.');
+    setBusy(true); setMsg('');
+    const { data: au } = await SB.auth.getUser();
+    const uid = au && au.user && au.user.id;
+    const data = {
+      name: { ar: name.trim(), en: name.trim() },
+      weight: { ar: weight.trim() || '—', en: weight.trim() || '—' },
+      desc: { ar: desc.trim(), en: desc.trim() },
+      img: imgUrl, images: imgUrl ? [imgUrl] : [],
+      price: Number(price), old: oldPrice ? Number(oldPrice) : null, cat: 'savings',
+    };
+    const row = {
+      vendor_id: uid, vendor_role: 'retail', category: 'savings',
+      name: name.trim(), description: desc.trim() || null,
+      price: Number(price), status: pub ? 'available' : 'hidden', data: data,
+    };
+    const res = editId ? await SB.from('products').update(row).eq('id', editId) : await SB.from('products').insert(row);
+    setBusy(false);
+    if (res.error) return setMsg('خطأ: ' + res.error.message);
+    setMsg(editId ? 'تم التعديل ✓' : 'تمت الإضافة ✓'); setTimeout(() => setMsg(''), 1800); reset(); load();
+  };
+  const edit = (r) => {
+    const d = r.data || {};
+    setEditId(r.id); setName((d.name && d.name.ar) || r.name || '');
+    setDesc((d.desc && d.desc.ar) || r.description || ''); setWeight((d.weight && d.weight.ar) || '');
+    setPrice(String(r.price || d.price || '')); setOldPrice(d.old ? String(d.old) : '');
+    setPub(r.status !== 'hidden'); setImgUrl(d.img || '');
+    window.scrollTo(0, 0);
+  };
+  const toggle = async (r) => { const { error } = await SB.from('products').update({ status: r.status === 'hidden' ? 'available' : 'hidden' }).eq('id', r.id); if (!error) load(); };
+  const del = async (r) => { if (!confirm('حذف هذا المنتج من خانة التوفير؟')) return; const { error } = await SB.from('products').delete().eq('id', r.id); if (!error) load(); };
+  return (
+    <div>
+      <div className="card">
+        <div className="secttl">{editId ? 'تعديل منتج توفير' : 'إضافة منتج إلى خانة التوفير'}</div>
+        <label className="fld"><span>اسم المنتج</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: لوز جبري مقشّر" /></label>
+        <label className="fld"><span>الوصف</span><textarea rows="2" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="وصف مختصر للمنتج" /></label>
+        <label className="fld"><span>الوزن / الكمية</span><input value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="مثال: ٥٠٠ جم" /></label>
+        <div className="row2">
+          <label className="fld" style={{ flex: 1 }}><span>سعر لوزي (ريال)</span><input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="السعر الفعلي" /></label>
+          <label className="fld" style={{ flex: 1 }}><span>السعر المشطوب (السوق)</span><input value={oldPrice} onChange={(e) => setOldPrice(e.target.value)} inputMode="numeric" placeholder="سعر السوق" /></label>
+        </div>
+        {(price || oldPrice) &&
+          <div className="kv" style={{ marginBottom: 10 }}><b>المعاينة:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 900, fontSize: 16 }}>{price || '—'} ريال</span>{oldPrice && <span style={{ textDecoration: 'line-through', color: 'var(--muted)', marginInlineStart: 8 }}>{oldPrice} ريال</span>}</div>}
+        <label className="fld"><span>صورة المنتج</span>
+          <input type="file" accept="image/*" onChange={pickImg} /></label>
+        {imgUrl && <img src={imgUrl} alt="" style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 12, marginBottom: 10 }} />}
+        <div className="store-row" style={{ borderTop: 'none', padding: '4px 0 12px' }}>
+          <span className="sr-name">نشر المنتج (ظاهر للعملاء)</span>
+          <div className={`switch ${pub ? 'on' : ''}`} onClick={() => setPub(!pub)}><i></i></div>
+        </div>
+        <div className="row2">
+          <button className="btn sm" disabled={busy} onClick={save}>{busy ? 'جارٍ…' : (editId ? 'حفظ التعديل' : 'إضافة المنتج')}</button>
+          {editId && <button className="btn sm ghost" onClick={reset}>إلغاء</button>}
+        </div>
+        {msg && <div className={msg.indexOf('خطأ') === 0 || msg.indexOf('تعذّر') === 0 ? 'err' : 'ok'} style={{ marginTop: 8 }}>{msg}</div>}
+      </div>
+      <div className="secttl">منتجات التوفير الحالية</div>
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !rows.length ? <div className="empty">لا توجد منتجات بعد.</div>
+          : rows.map((r) => {
+            const d = r.data || {};
+            return (
+              <div className="card" key={r.id}>
+                <div className="v-head" style={{ alignItems: 'center' }}>
+                  {d.img && <img src={d.img} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 10 }} />}
+                  <strong style={{ flex: 1 }}>{r.name}</strong>
+                  {r.status === 'hidden' && <span className="tag rejected">مخفي</span>}
+                </div>
+                <div className="kv"><b>السعر:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 800 }}>{r.price} ريال</span>{d.old && <span style={{ textDecoration: 'line-through', color: 'var(--muted)', marginInlineStart: 8 }}>{d.old} ريال</span>}</div>
+                <div className="acts">
+                  <button className="btn sm ghost" onClick={() => edit(r)}>تعديل</button>
+                  <button className="btn sm ghost" onClick={() => toggle(r)}>{r.status === 'hidden' ? 'إظهار' : 'إخفاء'}</button>
+                  <button className="btn sm danger" onClick={() => del(r)}>حذف</button>
+                </div>
+              </div>
+            );
+          })}
+    </div>
+  );
+}
+
+// ---- Orders management (الطلبات) ----
+function OrdersAdmin() {
+  const [orders, setOrders] = useState(null);
+  const [prof, setProf] = useState({});   // user_id -> {name, phone, role}
+  const [stores, setStores] = useState({}); // vendor_id -> store name
+  const [pcat, setPcat] = useState({});    // product id -> category
+  const [vcat, setVcat] = useState({});    // vendor_id -> category (fallback)
+  const [tab, setTab] = useState('savings');
+  const [sub, setSub] = useState('almond');
+  const [msg, setMsg] = useState('');
+  const load = async () => {
+    setOrders(null);
+    const [o, p, s, pr] = await Promise.all([
+      SB.from('orders').select('*').order('created_at', { ascending: false }),
+      SB.from('products').select('id,category,vendor_id'),
+      SB.from('stores').select('vendor_id,name'),
+      SB.from('profiles').select('user_id,name,phone,role'),
+    ]);
+    const pc = {}, vc = {};
+    (p.data || []).forEach((r) => { pc[r.id] = r.category; if (r.category) vc[r.vendor_id] = r.category; });
+    const sm = {}; (s.data || []).forEach((r) => { sm[r.vendor_id] = r.name; });
+    const pm = {}; (pr.data || []).forEach((r) => { pm[r.user_id] = r; });
+    setPcat(pc); setVcat(vc); setStores(sm); setProf(pm);
+    setOrders(o.error ? [] : (o.data || []));
+  };
+  useEffect(() => { load(); }, []);
+  // Each order's section is taken from its products' category (the accurate source),
+  // falling back to the seller's category / role if a product was deleted.
+  const catOf = (o) => {
+    const items = Array.isArray(o.items) ? o.items : [];
+    for (const it of items) { const c = pcat[it.p]; if (c) return c; }
+    if (vcat[o.seller_vendor_id]) return vcat[o.seller_vendor_id];
+    const role = (prof[o.seller_vendor_id] || {}).role || '';
+    if (role.indexOf('almond') >= 0) return 'almond';
+    if (role.indexOf('raisin') >= 0) return 'raisin';
+    if (role === 'retail' || role === 'wholesale') return role;
+    return 'other';
+  };
+  const bucketOf = (c) => (c === 'savings' ? 'savings' : (c === 'almond' || c === 'raisin') ? 'farmer' : (c === 'retail' || c === 'wholesale') ? c : 'other');
+  const ROLE = { farmer_almond: 'مزارع لوز', farmer_raisin: 'مزارع زبيب', farmer: 'مزارع', retail: 'تاجر تجزئة', wholesale: 'تاجر جملة', customer: 'زبون', admin: 'لوزي' };
+  const STAT = { new: ['جديد', 'pending'], received: ['جديد', 'pending'], payreview: ['بانتظار مراجعة الدفع', 'pending'], preparing: ['قيد التجهيز', 'pending'], delivering: ['قيد التسليم', 'pending'], delivered: ['مكتمل', 'approved'], rejected: ['مرفوض', 'rejected'], cancelled: ['ملغى', 'rejected'] };
+  const PAYST = { pending: ['بانتظار المراجعة', 'pending'], approved: ['مقبول', 'approved'], rejected: ['مرفوض', 'rejected'] };
+  const money = (n) => (Number(n) || 0).toLocaleString('en-US') + ' ريال';
+  const when = (s) => { try { return new Date(s).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return s || '—'; } };
+  const setStatus = async (o, status) => {
+    const { error } = await SB.from('orders').update({ status }).eq('order_no', o.order_no);
+    if (error) return setMsg('خطأ: ' + error.message);
+    setMsg('تم تحديث الحالة ✓'); setTimeout(() => setMsg(''), 1500); load();
+  };
+  const openReceipt = async (o) => {
+    let url = o.pay_receipt;
+    if (url && url.indexOf('http') !== 0) { const { data } = SB.storage.from('product-images').getPublicUrl(url); url = data.publicUrl; }
+    if (url) window.open(url, '_blank');
+  };
+  const setPay = async (o, pay_status) => {
+    const { error } = await SB.from('orders').update({ pay_status }).eq('order_no', o.order_no);
+    if (error) return setMsg('خطأ: ' + error.message);
+    setMsg(pay_status === 'approved' ? 'تم قبول الإيصال ✓' : 'تم رفض الإيصال'); setTimeout(() => setMsg(''), 1500); load();
+  };
+  const shown = (orders || []).filter((o) => { const b = bucketOf(catOf(o)); if (b !== tab) return false; if (tab === 'farmer') return catOf(o) === sub; return true; });
+  return (
+    <div>
+      <div className="tabs" style={{ position: 'static', padding: '0 0 10px' }}>
+        {[['savings', 'طلبات التوفير'], ['farmer', 'طلبات المزارعين'], ['retail', 'طلبات التجزئة'], ['wholesale', 'طلبات الجملة']].map(([id, label]) =>
+          <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>)}
+      </div>
+      {tab === 'farmer' &&
+        <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
+          {[['almond', 'لوز'], ['raisin', 'زبيب']].map(([id, label]) =>
+            <button key={id} className={sub === id ? 'on' : ''} onClick={() => setSub(id)}>{label}</button>)}
+        </div>}
+      {msg && <div className="ok" style={{ marginBottom: 10 }}>{msg}</div>}
+      {orders === null ? <div className="empty">جارٍ التحميل…</div>
+        : !shown.length ? <div className="empty">لا توجد طلبات في هذا القسم.</div>
+          : shown.map((o) => {
+            const seller = prof[o.seller_vendor_id] || {};
+            const c = o.customer || {};
+            const st = STAT[o.status] || [o.status, 'pending'];
+            const items = Array.isArray(o.items) ? o.items : [];
+            const isSavings = tab === 'savings';
+            return (
+              <div className="card" key={o.order_no}>
+                <div className="v-head"><strong>طلب #{o.order_no}</strong><span className={`tag ${st[1]}`}>{st[0]}</span></div>
+                <div className="kv" style={{ color: 'var(--muted)' }}>{when(o.created_at)}</div>
+
+                <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13.5 }}>🌿 البائع</div>
+                <div className="kv"><b>الاسم:</b> {seller.name || (isSavings ? 'لوزي · التوفير' : '—')}</div>
+                <div className="kv"><b>الهاتف:</b> {seller.phone || '—'}</div>
+                <div className="kv"><b>الدور:</b> {ROLE[seller.role] || (isSavings ? 'لوزي' : seller.role || '—')}</div>
+                {stores[o.seller_vendor_id] && <div className="kv"><b>المتجر:</b> {stores[o.seller_vendor_id]}</div>}
+
+                <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13.5 }}>🛒 المشتري</div>
+                <div className="kv"><b>الاسم:</b> {c.name || '—'}</div>
+                <div className="kv"><b>الهاتف:</b> {c.phone || '—'}</div>
+                <div className="kv"><b>العنوان:</b> {[c.city, c.address].filter(Boolean).join('، ') || '—'}</div>
+
+                <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13.5 }}>📦 تفاصيل الطلب</div>
+                {items.map((it, i) =>
+                  <div className="kv" key={i}>• {it.name || 'منتج'} — {it.q}{it.weight ? ' × ' + it.weight : ''} · {money(it.price)}</div>)}
+                <div className="kv"><b>الإجمالي:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 900 }}>{money(o.total)}</span></div>
+                <div className="kv"><b>الدفع:</b> {o.pay === 'prepaid' ? 'تحويل مسبق' : 'نقداً عند الاستلام'}
+                  {o.pay === 'prepaid' && <span className={`tag ${(PAYST[o.pay_status] || PAYST.pending)[1]}`} style={{ marginInlineStart: 6 }}>{(PAYST[o.pay_status] || PAYST.pending)[0]}</span>}</div>
+                {o.reject_reason && <div className="kv"><b>سبب الرفض:</b> {o.reject_reason}</div>}
+
+                {o.pay === 'prepaid' && o.pay_receipt &&
+                  <div className="acts" style={{ flexWrap: 'wrap' }}>
+                    <button className="btn sm ghost" onClick={() => openReceipt(o)}>عرض الإيصال</button>
+                    {o.pay_status !== 'approved' && <button className="btn sm" onClick={() => setPay(o, 'approved')}>قبول الدفع</button>}
+                    {o.pay_status !== 'rejected' && <button className="btn sm danger" onClick={() => setPay(o, 'rejected')}>رفض الدفع</button>}
+                  </div>}
+
+                <div className="acts" style={{ flexWrap: 'wrap', marginTop: 10 }}>
+                  {[['preparing', 'قيد التجهيز'], ['delivering', 'قيد التسليم'], ['delivered', 'مكتمل'], ['cancelled', 'إلغاء']].map(([s, label]) =>
+                    <button key={s} className={`btn sm ${o.status === s ? '' : (s === 'cancelled' ? 'danger' : 'ghost')}`} onClick={() => setStatus(o, s)}>{label}</button>)}
+                </div>
+              </div>
+            );
+          })}
+    </div>
+  );
+}
+
 function Admin() {
   const [user, setUser] = useState(undefined); // undefined=loading, null=logged out
   const [tab, setTab] = useState('verif');
@@ -384,13 +688,16 @@ function Admin() {
   }, []);
   if (user === undefined) return <div className="empty">جارٍ التحميل…</div>;
   if (!user) return <Login onIn={setUser} />;
-  const TABS = [['verif', 'التحقق من البائعين'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
+  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['lozisave', 'خانة التوفير'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
   return (
     <div>
       <div className="topbar"><h1>لوزي · لوحة الإدارة</h1><button onClick={() => { SB.auth.signOut(); setUser(null); }}>خروج</button></div>
       <div className="tabs">{TABS.map(([id, label]) => <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>)}</div>
       <div className="wrap">
         {tab === 'verif' && <Verifications />}
+        {tab === 'users' && <Users />}
+        {tab === 'orders' && <OrdersAdmin />}
+        {tab === 'lozisave' && <SavingsAdmin />}
         {tab === 'shahti' && <ShahtiReqs />}
         {tab === 'reports' && <Reports />}
         {tab === 'reviews' && <ReviewsMod />}
