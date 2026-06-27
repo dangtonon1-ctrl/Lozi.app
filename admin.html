@@ -49,6 +49,8 @@
   .tag.rejected{background:#FBE3E5;color:var(--danger);}
   .kv{font-size:13.5px;margin:3px 0;color:var(--ink);}
   .kv b{color:var(--muted);font-weight:700;}
+  .kv.ts{margin-top:6px;font-size:12.5px;color:var(--gold-deep);font-weight:700;}
+  .kv.ts b{color:var(--muted);}
   .docs{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;}
   .docs a{font-size:12.5px;font-weight:800;color:var(--green-deep);background:var(--green-soft);padding:8px 12px;border-radius:10px;text-decoration:none;}
   .acts{display:flex;gap:8px;margin-top:10px;}
@@ -75,6 +77,23 @@
 <script>var SB = window.supabase.createClient(window.LOZI_SUPABASE_URL, window.LOZI_SUPABASE_ANON);</script>
 <script type="text/babel" data-presets="react">
 const { useState, useEffect } = React;
+
+// ---- Precise date & time helpers (shown across the whole dashboard) ----
+const fmtDT = (s) => {
+  if (!s) return '—';
+  try {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString('ar-EG', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
+    });
+  } catch (e) { return '—'; }
+};
+const nowStamp = () => fmtDT(new Date().toISOString());
+function Stamp({ at, label }) {
+  return <div className="kv ts"><b>{label || 'التاريخ والوقت'}:</b> 🕒 {fmtDT(at)}</div>;
+}
 
 function Login({ onIn }) {
   const [email, setEmail] = useState('');
@@ -130,8 +149,8 @@ function Verifications() {
     if (status === 'rejected') { note = prompt('سبب الرفض (اختياري):') || null; }
     const { error } = await SB.from('vendor_verifications').update({ status, note, reviewed_at: new Date().toISOString() }).eq('user_id', r.user_id);
     if (error) return setMsg('خطأ: ' + error.message);
-    setMsg(status === 'approved' ? 'تم التفعيل ✓' : 'تم الرفض');
-    setTimeout(() => setMsg(''), 1500);
+    setMsg((status === 'approved' ? 'تم التفعيل ✓' : 'تم الرفض') + ' · 🕒 ' + nowStamp());
+    setTimeout(() => setMsg(''), 3000);
     load();
   };
   const ROLE = { farmer_almond: 'مزارع لوز', farmer_raisin: 'مزارع زبيب', retail: 'تاجر تجزئة', wholesale: 'تاجر جملة', farmer: 'مزارع' };
@@ -152,6 +171,8 @@ function Verifications() {
                 <div className="kv"><b>الهاتف:</b> {r.phone || '—'}</div>
                 <div className="kv"><b>العنوان:</b> {r.address || '—'}</div>
                 <div className="kv"><b>المعرّف:</b> <span style={{ fontSize: 11 }}>{r.user_id}</span></div>
+                <Stamp at={r.submitted_at} label="تاريخ التقديم" />
+                {r.reviewed_at && <Stamp at={r.reviewed_at} label="تاريخ المراجعة" />}
                 <div className="docs">
                   {d.id_front && <a onClick={() => openDoc(d.id_front)}>البطاقة (أمام)</a>}
                   {d.id_back && <a onClick={() => openDoc(d.id_back)}>البطاقة (خلف)</a>}
@@ -189,7 +210,7 @@ function Reports() {
     if (txt === null) return;
     const { error } = await SB.from('reports').update({ reply: txt, status: 'resolved' }).eq('id', r.id);
     if (error) return setMsg('خطأ: ' + error.message);
-    setMsg('تم الرد والإغلاق ✓'); setTimeout(() => setMsg(''), 1500); load();
+    setMsg('تم الرد والإغلاق ✓ · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 3000); load();
   };
   const TYPE = { farmer: 'مزارع', retail: 'تجزئة', wholesale: 'جملة', general: 'عام' };
   return (
@@ -206,6 +227,8 @@ function Reports() {
               <div className="v-head"><strong>{r.subject || 'بلاغ'}</strong><span className={`tag ${r.status === 'resolved' ? 'approved' : 'pending'}`}>{r.status === 'resolved' ? 'مغلقة' : 'مراجعة'}</span></div>
               <div className="kv"><b>النوع:</b> {TYPE[r.type_id] || r.type_id || '—'}{r.target ? ' · ' + r.target : ''}{r.order_id ? ' · طلب #' + r.order_id : ''}</div>
               <div className="kv"><b>من:</b> {r.reporter_name || '—'} · {r.reporter_phone || '—'}</div>
+              <Stamp at={r.created_at} label="تاريخ البلاغ" />
+              {r.status === 'resolved' && r.updated_at && <Stamp at={r.updated_at} label="تاريخ الإغلاق" />}
               <div className="kv" style={{ marginTop: 6 }}>{r.description}</div>
               {r.reply && <div className="kv" style={{ marginTop: 6, color: 'var(--green-deep)' }}><b>الرد:</b> {r.reply}</div>}
               <div className="acts"><button className="btn sm" onClick={() => reply(r)}>{r.status === 'resolved' ? 'تعديل الرد' : 'رد وإغلاق'}</button></div>
@@ -233,6 +256,7 @@ function ReviewsMod() {
               {r.comment && <div className="kv" style={{ marginTop: 4 }}>{r.comment}</div>}
               {r.reply && <div className="kv" style={{ color: 'var(--green-deep)' }}><b>ردّ المتجر:</b> {r.reply}</div>}
               <div className="kv"><b>متجر:</b> <span style={{ fontSize: 11 }}>{r.store_vendor_id}</span></div>
+              <Stamp at={r.created_at} label="تاريخ التقييم" />
               <div className="acts">
                 <button className="btn sm ghost" onClick={() => toggle(r)}>{r.hidden ? 'إظهار' : 'إخفاء'}</button>
                 <button className="btn sm danger" onClick={() => del(r)}>حذف</button>
@@ -254,13 +278,13 @@ function Numbers() {
     if (!phone.trim()) return;
     const ph = norm(phone);
     const { error } = await SB.from('vendor_authorizations').upsert({ phone: ph, role, status: 'active' }, { onConflict: 'phone' });
-    setMsg(error ? 'خطأ: ' + error.message : 'تم تفعيل الرقم ' + ph + ' كـ' + (ROLES.find((r) => r.v === role)?.l || role) + ' ✓');
+    setMsg(error ? 'خطأ: ' + error.message : 'تم تفعيل الرقم ' + ph + ' كـ' + (ROLES.find((r) => r.v === role)?.l || role) + ' ✓ · 🕒 ' + nowStamp());
   };
   const resetOtp = async () => {
     if (!phone.trim()) return;
     const ph = norm(phone);
     const { error } = await SB.from('otp_attempts').delete().eq('phone', ph);
-    setMsg(error ? 'خطأ (قد يكون اسم جدول OTP مختلفاً): ' + error.message : 'تم تصفير حدّ الرمز للرقم ' + ph + ' ✓');
+    setMsg(error ? 'خطأ (قد يكون اسم جدول OTP مختلفاً): ' + error.message : 'تم تصفير حدّ الرمز للرقم ' + ph + ' ✓ · 🕒 ' + nowStamp());
   };
   return (
     <div className="card">
@@ -297,6 +321,8 @@ function Deletions() {
               <div className="v-head"><strong>{r.name || 'مستخدم'}</strong><span className="tag">{r.role || ''}</span>{r.handled && <span className="tag approved">منجز</span>}</div>
               <div className="kv"><b>الهاتف:</b> {r.phone || '—'} · <b>البريد:</b> {r.email || '—'}</div>
               <div className="kv"><b>المعرّف:</b> <span style={{ fontSize: 11 }}>{r.user_id}</span></div>
+              <Stamp at={r.created_at} label="تاريخ الطلب" />
+              {r.handled && r.handled_at && <Stamp at={r.handled_at} label="تاريخ التنفيذ" />}
               <p className="muted" style={{ margin: '8px 0' }}>الحذف النهائي من Authentication → Users في Supabase. هنا تضع علامة «منجز» بعد الحذف.</p>
               {!r.handled && <button className="btn sm ghost" onClick={() => mark(r)}>وضع علامة منجز</button>}
             </div>
@@ -309,12 +335,15 @@ function Deletions() {
 function SettingsTab() {
   const [wa, setWa] = useState('');
   const [waMsg, setWaMsg] = useState('');
+  const [waUpdated, setWaUpdated] = useState(null);
   useEffect(() => {
-    SB.from('settings').select('value').eq('key', 'support_wa').maybeSingle().then(({ data }) => { if (data) setWa(data.value || ''); });
+    SB.from('settings').select('value,updated_at').eq('key', 'support_wa').maybeSingle().then(({ data }) => { if (data) { setWa(data.value || ''); setWaUpdated(data.updated_at || null); } });
   }, []);
   const saveWa = async () => {
-    const { error } = await SB.from('settings').upsert({ key: 'support_wa', value: wa, updated_at: new Date().toISOString() }, { onConflict: 'key' });
-    setWaMsg(error ? 'خطأ: ' + error.message : 'تم الحفظ ✓'); setTimeout(() => setWaMsg(''), 1500);
+    const now = new Date().toISOString();
+    const { error } = await SB.from('settings').upsert({ key: 'support_wa', value: wa, updated_at: now }, { onConflict: 'key' });
+    if (!error) setWaUpdated(now);
+    setWaMsg(error ? 'خطأ: ' + error.message : 'تم الحفظ ✓ · 🕒 ' + nowStamp()); setTimeout(() => setWaMsg(''), 3000);
   };
   return (
     <div>
@@ -323,6 +352,7 @@ function SettingsTab() {
         <label className="fld"><span>الرقم (مع +967)</span>
           <input value={wa} onChange={(e) => setWa(e.target.value)} placeholder="+9677XXXXXXXX" inputMode="tel" /></label>
         <button className="btn sm" onClick={saveWa}>حفظ الرقم</button>
+        {waUpdated && <Stamp at={waUpdated} label="آخر تحديث" />}
         {waMsg && <div className={waMsg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{waMsg}</div>}
       </div>
     </div>
@@ -336,7 +366,7 @@ function ShahtiReqs() {
   const [msg, setMsg] = useState('');
   const load = async () => {
     setRows(null);
-    let q = SB.from('products').select('id,name,data,status,shahti_status,vendor_id').order('created_at', { ascending: false });
+    let q = SB.from('products').select('id,name,data,status,shahti_status,vendor_id,created_at').order('created_at', { ascending: false });
     if (filter !== 'all') q = q.eq('shahti_status', filter); else q = q.not('shahti_status', 'is', null);
     const { data, error } = await q;
     setRows(error ? [] : (data || []));
@@ -346,7 +376,7 @@ function ShahtiReqs() {
     const data = Object.assign({}, r.data || {}); data.shahtiStatus = status;
     const { error } = await SB.from('products').update({ shahti_status: status, data: data }).eq('id', r.id);
     if (error) return setMsg('خطأ: ' + error.message);
-    setMsg(status === 'approved' ? 'تم القبول ✓' : 'تم الرفض'); setTimeout(() => setMsg(''), 1500); load();
+    setMsg((status === 'approved' ? 'تم القبول ✓' : 'تم الرفض') + ' · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 3000); load();
   };
   return (
     <div>
@@ -365,6 +395,7 @@ function ShahtiReqs() {
                 <div className="v-head"><strong>{nm}</strong><span className={`tag ${r.shahti_status === 'approved' ? 'approved' : r.shahti_status === 'rejected' ? 'rejected' : 'pending'}`}>{{ pending: 'منتظر', approved: 'مقبول', rejected: 'مرفوض' }[r.shahti_status] || r.shahti_status}</span>{r.status === 'hidden' && <span className="tag">مخفي/مُباع</span>}</div>
                 {insp && <div className="kv"><b>الفحص:</b> {insp}</div>}
                 <div className="kv"><b>المتجر:</b> <span style={{ fontSize: 11 }}>{r.vendor_id}</span></div>
+                <Stamp at={r.created_at} label="تاريخ إضافة المنتج" />
                 {r.shahti_status !== 'approved' &&
                   <div className="acts">
                     <button className="btn sm" onClick={() => decide(r, 'approved')}>✓ قبول</button>
@@ -395,7 +426,7 @@ function Users() {
     if (!confirm(label + ' الحساب «' + (r.name || r.phone || 'مستخدم') + '»؟')) return;
     const { error } = await SB.from('profiles').update({ status: status }).eq('user_id', r.user_id);
     if (error) return setMsg('خطأ: ' + error.message);
-    setMsg('تم ✓'); setTimeout(() => setMsg(''), 1500); load();
+    setMsg('تم ✓ · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 3000); load();
   };
   const del = async (r) => {
     if (!confirm('⚠️ حذف الحساب «' + (r.name || r.phone || 'مستخدم') + '» وكل بياناته نهائياً؟ لا يمكن التراجع.')) return;
@@ -429,6 +460,8 @@ function Users() {
                 <div className="kv"><b>الهاتف:</b> {r.phone || '—'}</div>
                 <div className="kv"><b>الدور:</b> {ROLE[r.role] || r.role || '—'}</div>
                 <div className="kv"><b>المعرّف:</b> <span style={{ fontSize: 11 }}>{r.user_id}</span></div>
+                <Stamp at={r.created_at} label="تاريخ التسجيل" />
+                {r.updated_at && <Stamp at={r.updated_at} label="آخر تحديث" />}
                 {r.status !== 'deleted' &&
                   <div className="acts" style={{ flexWrap: 'wrap' }}>
                     {r.status !== 'suspended' && <button className="btn sm ghost" onClick={() => setStatus(r, 'suspended', 'تعليق')}>تعليق</button>}
@@ -547,6 +580,8 @@ function SavingsAdmin() {
                   {r.status === 'hidden' && <span className="tag rejected">مخفي</span>}
                 </div>
                 <div className="kv"><b>السعر:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 800 }}>{r.price} ريال</span>{d.old && <span style={{ textDecoration: 'line-through', color: 'var(--muted)', marginInlineStart: 8 }}>{d.old} ريال</span>}</div>
+                <Stamp at={r.created_at} label="تاريخ الإضافة" />
+                {r.updated_at && <Stamp at={r.updated_at} label="آخر تعديل" />}
                 <div className="acts">
                   <button className="btn sm ghost" onClick={() => edit(r)}>تعديل</button>
                   <button className="btn sm ghost" onClick={() => toggle(r)}>{r.status === 'hidden' ? 'إظهار' : 'إخفاء'}</button>
@@ -603,11 +638,11 @@ function OrdersAdmin() {
   const STAT = { new: ['جديد', 'pending'], received: ['جديد', 'pending'], payreview: ['بانتظار مراجعة الدفع', 'pending'], preparing: ['قيد التجهيز', 'pending'], delivering: ['قيد التسليم', 'pending'], delivered: ['مكتمل', 'approved'], rejected: ['مرفوض', 'rejected'], cancelled: ['ملغى', 'rejected'] };
   const PAYST = { pending: ['بانتظار المراجعة', 'pending'], approved: ['مقبول', 'approved'], rejected: ['مرفوض', 'rejected'] };
   const money = (n) => (Number(n) || 0).toLocaleString('en-US') + ' ريال';
-  const when = (s) => { try { return new Date(s).toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return s || '—'; } };
+  const when = (s) => fmtDT(s);
   const setStatus = async (o, status) => {
     const { error } = await SB.from('orders').update({ status }).eq('order_no', o.order_no);
     if (error) return setMsg('خطأ: ' + error.message);
-    setMsg('تم تحديث الحالة ✓'); setTimeout(() => setMsg(''), 1500); load();
+    setMsg('تم تحديث الحالة ✓ · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 3000); load();
   };
   const openReceipt = async (o) => {
     let url = o.pay_receipt;
@@ -617,7 +652,7 @@ function OrdersAdmin() {
   const setPay = async (o, pay_status) => {
     const { error } = await SB.from('orders').update({ pay_status }).eq('order_no', o.order_no);
     if (error) return setMsg('خطأ: ' + error.message);
-    setMsg(pay_status === 'approved' ? 'تم قبول الإيصال ✓' : 'تم رفض الإيصال'); setTimeout(() => setMsg(''), 1500); load();
+    setMsg((pay_status === 'approved' ? 'تم قبول الإيصال ✓' : 'تم رفض الإيصال') + ' · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 3000); load();
   };
   // Wholesale only: admin enters the delivery cost; total = subtotal + fee.
   const setDelivery = async (o) => {
@@ -628,7 +663,7 @@ function OrdersAdmin() {
     const subtotal = items.reduce((a, it) => a + (Number(it.price) || 0) * (Number(it.q) || 0), 0);
     const { error } = await SB.from('orders').update({ delivery_fee: fee, total: subtotal + fee }).eq('order_no', o.order_no);
     if (error) return setMsg('خطأ: ' + error.message);
-    setMsg('تم تحديث رسوم التوصيل ✓'); setTimeout(() => setMsg(''), 1500); load();
+    setMsg('تم تحديث رسوم التوصيل ✓ · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 3000); load();
   };
   const shown = (orders || []).filter((o) => { const b = bucketOf(catOf(o)); if (b !== tab) return false; if (tab === 'farmer') return catOf(o) === sub; return true; });
   return (
@@ -654,7 +689,8 @@ function OrdersAdmin() {
             return (
               <div className="card" key={o.order_no}>
                 <div className="v-head"><strong>طلب #{o.order_no}</strong><span className={`tag ${st[1]}`}>{st[0]}</span></div>
-                <div className="kv" style={{ color: 'var(--muted)' }}>{when(o.created_at)}</div>
+                <Stamp at={o.created_at} label="تاريخ ووقت الطلب" />
+                {o.updated_at && <Stamp at={o.updated_at} label="آخر تحديث" />}
 
                 <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13.5 }}>🌿 البائع</div>
                 <div className="kv"><b>الاسم:</b> {seller.name || (isSavings ? 'لوزي · التوفير' : '—')}</div>
