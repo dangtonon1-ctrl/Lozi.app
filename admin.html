@@ -569,6 +569,7 @@ function OrdersAdmin() {
   const [tab, setTab] = useState('savings');
   const [sub, setSub] = useState('almond');
   const [msg, setMsg] = useState('');
+  const [feeInput, setFeeInput] = useState({}); // order_no -> wholesale delivery fee being edited
   const load = async () => {
     setOrders(null);
     const [o, p, s, pr] = await Promise.all([
@@ -618,6 +619,17 @@ function OrdersAdmin() {
     if (error) return setMsg('خطأ: ' + error.message);
     setMsg(pay_status === 'approved' ? 'تم قبول الإيصال ✓' : 'تم رفض الإيصال'); setTimeout(() => setMsg(''), 1500); load();
   };
+  // Wholesale only: admin enters the delivery cost; total = subtotal + fee.
+  const setDelivery = async (o) => {
+    const raw = feeInput[o.order_no];
+    if (raw === '' || raw == null) return setMsg('أدخل رسوم التوصيل أولاً');
+    const fee = Math.max(0, Math.round(Number(raw) || 0));
+    const items = Array.isArray(o.items) ? o.items : [];
+    const subtotal = items.reduce((a, it) => a + (Number(it.price) || 0) * (Number(it.q) || 0), 0);
+    const { error } = await SB.from('orders').update({ delivery_fee: fee, total: subtotal + fee }).eq('order_no', o.order_no);
+    if (error) return setMsg('خطأ: ' + error.message);
+    setMsg('تم تحديث رسوم التوصيل ✓'); setTimeout(() => setMsg(''), 1500); load();
+  };
   const shown = (orders || []).filter((o) => { const b = bucketOf(catOf(o)); if (b !== tab) return false; if (tab === 'farmer') return catOf(o) === sub; return true; });
   return (
     <div>
@@ -658,6 +670,16 @@ function OrdersAdmin() {
                 <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13.5 }}>📦 تفاصيل الطلب</div>
                 {items.map((it, i) =>
                   <div className="kv" key={i}>• {it.name || 'منتج'} — {it.q}{it.weight ? ' × ' + it.weight : ''} · {money(it.price)}</div>)}
+                {tab === 'wholesale' &&
+                  <div className="kv" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '4px 0' }}>
+                    <b>رسوم التوصيل:</b>
+                    <input type="number" min="0" inputMode="numeric" placeholder="أدخل التكلفة"
+                      value={feeInput[o.order_no] != null ? feeInput[o.order_no] : (o.delivery_fee != null ? o.delivery_fee : '')}
+                      onChange={(e) => setFeeInput((s) => ({ ...s, [o.order_no]: e.target.value }))}
+                      style={{ width: 120 }} />
+                    <button className="btn sm" onClick={() => setDelivery(o)}>حفظ</button>
+                    <span style={{ color: 'var(--muted)' }}>{o.delivery_fee != null ? 'الحالي: ' + money(o.delivery_fee) : 'لم تُحدَّد بعد'}</span>
+                  </div>}
                 <div className="kv"><b>الإجمالي:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 900 }}>{money(o.total)}</span></div>
                 <div className="kv"><b>الدفع:</b> {o.pay === 'prepaid' ? 'تحويل مسبق' : 'نقداً عند الاستلام'}
                   {o.pay === 'prepaid' && <span className={`tag ${(PAYST[o.pay_status] || PAYST.pending)[1]}`} style={{ marginInlineStart: 6 }}>{(PAYST[o.pay_status] || PAYST.pending)[0]}</span>}</div>
