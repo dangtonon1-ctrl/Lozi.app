@@ -246,13 +246,15 @@ function ReviewsMod() {
 // ---- Number activation ----
 function Numbers() {
   const [phone, setPhone] = useState('');
+  const [role, setRole] = useState('farmer');
   const [msg, setMsg] = useState('');
+  const ROLES = [{ v: 'farmer', l: 'مزارع' }, { v: 'retail', l: 'تاجر تجزئة' }, { v: 'wholesale', l: 'تاجر جملة' }];
   const norm = (p) => { let d = String(p).replace(/[^0-9]/g, ''); if (d.indexOf('967') !== 0) d = '967' + d.replace(/^0+/, ''); return '+' + d; };
   const activate = async () => {
     if (!phone.trim()) return;
     const ph = norm(phone);
-    const { error } = await SB.from('vendor_authorizations').upsert({ phone: ph, status: 'active' }, { onConflict: 'phone' });
-    setMsg(error ? 'خطأ: ' + error.message : 'تم تفعيل الرقم ' + ph + ' ✓');
+    const { error } = await SB.from('vendor_authorizations').upsert({ phone: ph, role, status: 'active' }, { onConflict: 'phone' });
+    setMsg(error ? 'خطأ: ' + error.message : 'تم تفعيل الرقم ' + ph + ' كـ' + (ROLES.find((r) => r.v === role)?.l || role) + ' ✓');
   };
   const resetOtp = async () => {
     if (!phone.trim()) return;
@@ -266,6 +268,10 @@ function Numbers() {
       <label className="fld"><span>رقم الهاتف</span>
         <div style={{ display: 'flex', gap: 8 }}><span style={{ background: 'var(--sand)', borderRadius: 12, padding: '13px 12px', fontWeight: 800 }}>+967</span>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="7X XXX XXXX" inputMode="tel" /></div></label>
+      <label className="fld"><span>نوع البائع</span>
+        <select value={role} onChange={(e) => setRole(e.target.value)}>
+          {ROLES.map((r) => <option key={r.v} value={r.v}>{r.l}</option>)}
+        </select></label>
       <div className="row2">
         <button className="btn sm" onClick={activate}>تفعيل الرقم</button>
         <button className="btn sm ghost" onClick={resetOtp}>تصفير حدّ الرمز</button>
