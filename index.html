@@ -369,8 +369,47 @@ const{useState:useS,useEffect:useE}=React,SECTION_ORDER=["almond","raisin","reta
     btn.innerHTML =
       '<span class="rg"><i>' + AR(tr.level) + "</i></span>" +
       '<span class="ct"><b>مستوى ' + AR(tr.level) + "</b><s>" + SEG_AR[seg] + " · " + pct(tr.rate, seg) + "</s></span>";
-    btn.addEventListener("click", openSheet);
     document.body.appendChild(btn);
+    try {
+      var saved = JSON.parse(localStorage.getItem("lzc_chip_pos") || "null");
+      if (saved && typeof saved.left === "number") applyPos(btn, saved.left, saved.top);
+    } catch (e) {}
+    makeDraggable(btn, openSheet);
+  }
+
+  // Drag the chip anywhere; a tap (no real movement) opens the sheet. Position persists.
+  function applyPos(el, left, top) {
+    var w = el.offsetWidth || 150, h = el.offsetHeight || 46;
+    left = Math.max(6, Math.min(window.innerWidth - w - 6, left));
+    top = Math.max(6, Math.min(window.innerHeight - h - 6, top));
+    el.style.left = left + "px"; el.style.top = top + "px";
+    el.style.right = "auto"; el.style.bottom = "auto"; el.style.insetInlineStart = "auto";
+  }
+  function makeDraggable(el, onTap) {
+    var sx = 0, sy = 0, ox = 0, oy = 0, moved = false, dragging = false, pid = null;
+    el.style.touchAction = "none";
+    el.addEventListener("pointerdown", function (e) {
+      dragging = true; moved = false; pid = e.pointerId;
+      var r = el.getBoundingClientRect();
+      sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+      try { el.setPointerCapture(pid); } catch (_) {}
+    });
+    el.addEventListener("pointermove", function (e) {
+      if (!dragging) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+      if (moved) applyPos(el, ox + dx, oy + dy);
+    });
+    function end() {
+      if (!dragging) return; dragging = false;
+      try { el.releasePointerCapture(pid); } catch (_) {}
+      if (moved) {
+        var r = el.getBoundingClientRect();
+        try { localStorage.setItem("lzc_chip_pos", JSON.stringify({ left: r.left, top: r.top })); } catch (_) {}
+      } else { onTap(); }
+    }
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", end);
   }
 
   // ---------- sheet ----------
