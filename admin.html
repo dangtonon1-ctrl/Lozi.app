@@ -361,14 +361,25 @@ function SettingsTab() {
   const [wa, setWa] = useState('');
   const [waMsg, setWaMsg] = useState('');
   const [waUpdated, setWaUpdated] = useState(null);
+  const [bundleLimit, setBundleLimit] = useState('1');
+  const [blMsg, setBlMsg] = useState('');
+  const [blUpdated, setBlUpdated] = useState(null);
   useEffect(() => {
     SB.from('settings').select('value,updated_at').eq('key', 'support_wa').maybeSingle().then(({ data }) => { if (data) { setWa(data.value || ''); setWaUpdated(data.updated_at || null); } });
+    SB.from('settings').select('value,updated_at').eq('key', 'retail_bundle_limit').maybeSingle().then(({ data }) => { if (data && data.value != null && data.value !== '') { setBundleLimit(String(data.value)); setBlUpdated(data.updated_at || null); } });
   }, []);
   const saveWa = async () => {
     const now = new Date().toISOString();
     const { error } = await SB.from('settings').upsert({ key: 'support_wa', value: wa, updated_at: now }, { onConflict: 'key' });
     if (!error) setWaUpdated(now);
     setWaMsg(error ? 'خطأ: ' + error.message : 'تم الحفظ ✓ · 🕒 ' + nowStamp()); setTimeout(() => setWaMsg(''), 3000);
+  };
+  const saveBundleLimit = async () => {
+    const n = Math.max(0, Math.floor(Number(bundleLimit) || 0));
+    const now = new Date().toISOString();
+    const { error } = await SB.from('settings').upsert({ key: 'retail_bundle_limit', value: String(n), updated_at: now }, { onConflict: 'key' });
+    if (!error) { setBundleLimit(String(n)); setBlUpdated(now); }
+    setBlMsg(error ? 'خطأ: ' + error.message : 'تم الحفظ ✓ · 🕒 ' + nowStamp()); setTimeout(() => setBlMsg(''), 3000);
   };
   return (
     <div>
@@ -379,6 +390,15 @@ function SettingsTab() {
         <button className="btn sm" onClick={saveWa}>حفظ الرقم</button>
         {waUpdated && <Stamp at={waUpdated} label="آخر تحديث" />}
         {waMsg && <div className={waMsg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{waMsg}</div>}
+      </div>
+      <div className="card">
+        <div className="secttl">حد العروض المشكّلة للتجزئة</div>
+        <div className="kv" style={{ marginBottom: 8, color: 'var(--muted)' }}>أقصى عدد من «العروض المشكّلة» يسمح به لكل تاجر تجزئة. الافتراضي ١.</div>
+        <label className="fld"><span>الحد الأقصى لكل متجر</span>
+          <input value={bundleLimit} onChange={(e) => setBundleLimit(e.target.value.replace(/[^0-9]/g, ''))} placeholder="1" inputMode="numeric" /></label>
+        <button className="btn sm" onClick={saveBundleLimit}>حفظ الحد</button>
+        {blUpdated && <Stamp at={blUpdated} label="آخر تحديث" />}
+        {blMsg && <div className={blMsg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{blMsg}</div>}
       </div>
     </div>
   );
