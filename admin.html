@@ -515,6 +515,7 @@ function SavingsAdmin() {
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState(null);
   const [msg, setMsg] = useState('');
+  const [view, setView] = useState('products');
   const load = async () => {
     setRows(null);
     const { data, error } = await SB.from('products').select('*').eq('category', 'savings').order('pinned', { ascending: false }).order('created_at', { ascending: false });
@@ -575,8 +576,14 @@ function SavingsAdmin() {
     if (error) return setMsg('خطأ: ' + error.message);
     setMsg((val ? 'تم التثبيت 📌' : 'تم إلغاء التثبيت') + ' · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 2500); load();
   };
+  const regular = (rows || []).filter((r) => !(r.data && r.data.bundle));
   return (
     <div>
+      <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
+        <button className={view === 'products' ? 'on' : ''} onClick={() => setView('products')}>منتجات التوفير</button>
+        <button className={view === 'bundles' ? 'on' : ''} onClick={() => setView('bundles')}>عرض مشكّل</button>
+      </div>
+      {view === 'bundles' ? <BundleAdmin /> : <div>
       <div className="card">
         <div className="secttl">{editId ? 'تعديل منتج توفير' : 'إضافة منتج إلى خانة التوفير'}</div>
         <label className="fld"><span>اسم المنتج</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: لوز جبري مقشّر" /></label>
@@ -603,8 +610,8 @@ function SavingsAdmin() {
       </div>
       <div className="secttl">منتجات التوفير الحالية</div>
       {rows === null ? <div className="empty">جارٍ التحميل…</div>
-        : !rows.length ? <div className="empty">لا توجد منتجات بعد.</div>
-          : rows.map((r) => {
+        : !regular.length ? <div className="empty">لا توجد منتجات بعد.</div>
+          : regular.map((r) => {
             const d = r.data || {};
             return (
               <div className="card" key={r.id}>
@@ -620,6 +627,142 @@ function SavingsAdmin() {
                 <div className="acts">
                   <button className="btn sm ghost" onClick={() => edit(r)}>تعديل</button>
                   <button className={`btn sm ${r.pinned ? 'gold' : 'ghost'}`} onClick={() => pin(r)}>{r.pinned ? '📌 إلغاء التثبيت' : '📌 تثبيت'}</button>
+                  <button className="btn sm ghost" onClick={() => toggle(r)}>{r.status === 'hidden' ? 'إظهار' : 'إخفاء'}</button>
+                  <button className="btn sm danger" onClick={() => del(r)}>حذف</button>
+                </div>
+              </div>
+            );
+          })}
+      </div>}
+    </div>
+  );
+}
+
+// ---- LOZI mixed bundle offers (عرض مشكّل) ----
+function BundleAdmin() {
+  const [rows, setRows] = useState(null);
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState('');
+  const [stock, setStock] = useState('');
+  const [pub, setPub] = useState(true);
+  const [imgUrl, setImgUrl] = useState('');
+  const [items, setItems] = useState([{ name: '', weight: '' }, { name: '', weight: '' }]);
+  const [busy, setBusy] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [msg, setMsg] = useState('');
+  const load = async () => {
+    setRows(null);
+    const { data, error } = await SB.from('products').select('*').eq('category', 'savings').order('created_at', { ascending: false });
+    setRows(error ? [] : (data || []).filter((r) => r.data && r.data.bundle));
+  };
+  useEffect(() => { load(); }, []);
+  const reset = () => { setName(''); setPrice(''); setStock(''); setPub(true); setImgUrl(''); setItems([{ name: '', weight: '' }, { name: '', weight: '' }]); setEditId(null); };
+  const pickImg = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true); setMsg('جارٍ رفع الصورة…');
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const path = 'lozi-savings/bundle-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '.' + ext;
+    const { error } = await SB.storage.from('product-images').upload(path, file, { upsert: true });
+    if (error) { setBusy(false); return setMsg('تعذّر رفع الصورة: ' + error.message); }
+    const { data } = SB.storage.from('product-images').getPublicUrl(path);
+    setImgUrl(data.publicUrl); setBusy(false); setMsg('تم رفع الصورة ✓'); setTimeout(() => setMsg(''), 1500);
+  };
+  const setItem = (i, k, v) => setItems((arr) => arr.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
+  const addItem = () => setItems((arr) => [...arr, { name: '', weight: '' }]);
+  const removeItem = (i) => setItems((arr) => (arr.length > 1 ? arr.filter((_, j) => j !== i) : arr));
+  const save = async () => {
+    const cleanItems = items.map((it) => ({ name: it.name.trim(), weight: it.weight.trim() })).filter((it) => it.name);
+    if (!name.trim() || !price || Number(price) <= 0) return setMsg('أدخل اسم العرض والسعر الإجمالي.');
+    if (cleanItems.length < 2) return setMsg('أضف عنصرين على الأقل إلى العرض المشكّل.');
+    setBusy(true); setMsg('');
+    const { data: au } = await SB.auth.getUser();
+    const uid = au && au.user && au.user.id;
+    const summary = cleanItems.map((it) => it.name + (it.weight ? ' ' + it.weight : '')).join(' + ');
+    const stockVal = stock !== '' ? Math.max(0, Math.floor(Number(stock) || 0)) : null;
+    const data = {
+      name: { ar: name.trim(), en: name.trim() },
+      weight: { ar: 'عرض مشكّل', en: 'Mixed bundle' },
+      desc: { ar: 'عرض مشكّل — محتويات وأوزان ثابتة بسعر واحد.', en: 'Mixed bundle — fixed contents and weights, one price.' },
+      img: imgUrl, images: imgUrl ? [imgUrl] : [],
+      price: Number(price), cat: 'savings',
+      bundle: true, items: cleanItems, stock: stockVal,
+    };
+    const row = {
+      vendor_id: uid, vendor_role: 'retail', category: 'savings',
+      name: name.trim(), description: summary,
+      price: Number(price), status: pub ? 'available' : 'hidden',
+      stock: stockVal, data: data,
+    };
+    const res = editId ? await SB.from('products').update(row).eq('id', editId) : await SB.from('products').insert(row);
+    setBusy(false);
+    if (res.error) return setMsg('خطأ: ' + res.error.message);
+    setMsg(editId ? 'تم التعديل ✓' : 'تمت الإضافة ✓'); setTimeout(() => setMsg(''), 1800); reset(); load();
+  };
+  const edit = (r) => {
+    const d = r.data || {};
+    setEditId(r.id);
+    setName((d.name && d.name.ar) || r.name || '');
+    setPrice(String(r.price || d.price || ''));
+    setStock(r.stock != null ? String(r.stock) : (d.stock != null ? String(d.stock) : ''));
+    setPub(r.status !== 'hidden');
+    setImgUrl(d.img || '');
+    setItems(d.items && d.items.length ? d.items.map((it) => ({ name: it.name || '', weight: it.weight || '' })) : [{ name: '', weight: '' }, { name: '', weight: '' }]);
+    window.scrollTo(0, 0);
+  };
+  const toggle = async (r) => { const { error } = await SB.from('products').update({ status: r.status === 'hidden' ? 'available' : 'hidden' }).eq('id', r.id); if (!error) load(); };
+  const del = async (r) => { if (!confirm('حذف هذا العرض المشكّل؟')) return; const { error } = await SB.from('products').delete().eq('id', r.id); if (!error) load(); };
+  return (
+    <div>
+      <div className="card">
+        <div className="secttl">{editId ? 'تعديل عرض مشكّل' : 'إنشاء عرض مشكّل'}</div>
+        <label className="fld"><span>اسم العرض (يمكن تغييره لاحقاً)</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: عرض المكسّرات المشكّل" /></label>
+        <label className="fld"><span>السعر الإجمالي للعرض (ريال)</span><input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="سعر العرض كاملاً" /></label>
+        <label className="fld"><span>الكمية المتوفّرة (مخزون العرض)</span><input value={stock} onChange={(e) => setStock(e.target.value)} inputMode="numeric" placeholder="اتركه فارغاً لغير محدود" /></label>
+        <div className="secttl" style={{ marginTop: 6 }}>مكوّنات العرض</div>
+        {items.map((it, i) => (
+          <div className="row2" key={i} style={{ alignItems: 'flex-end' }}>
+            <label className="fld" style={{ flex: 2 }}><span>الصنف {i + 1}</span><input value={it.name} onChange={(e) => setItem(i, 'name', e.target.value)} placeholder="مثال: لوز" /></label>
+            <label className="fld" style={{ flex: 1 }}><span>الوزن</span><input value={it.weight} onChange={(e) => setItem(i, 'weight', e.target.value)} placeholder="مثال: ٢٥٠ جم" /></label>
+            <button className="btn sm danger" style={{ marginBottom: 10 }} disabled={items.length <= 1} onClick={() => removeItem(i)}>حذف</button>
+          </div>
+        ))}
+        <button className="btn sm ghost" onClick={addItem} style={{ marginBottom: 10 }}>+ إضافة صنف</button>
+        <label className="fld"><span>صورة العرض</span>
+          <input type="file" accept="image/*" onChange={pickImg} /></label>
+        {imgUrl && <img src={imgUrl} alt="" style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 12, marginBottom: 10 }} />}
+        <div className="store-row" style={{ borderTop: 'none', padding: '4px 0 12px' }}>
+          <span className="sr-name">نشر العرض (ظاهر للعملاء)</span>
+          <div className={`switch ${pub ? 'on' : ''}`} onClick={() => setPub(!pub)}><i></i></div>
+        </div>
+        <div className="row2">
+          <button className="btn sm" disabled={busy} onClick={save}>{busy ? 'جارٍ…' : (editId ? 'حفظ التعديل' : 'إنشاء العرض')}</button>
+          {editId && <button className="btn sm ghost" onClick={reset}>إلغاء</button>}
+        </div>
+        {msg && <div className={msg.indexOf('خطأ') === 0 || msg.indexOf('تعذّر') === 0 ? 'err' : 'ok'} style={{ marginTop: 8 }}>{msg}</div>}
+      </div>
+      <div className="secttl">العروض المشكّلة الحالية</div>
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !rows.length ? <div className="empty">لا توجد عروض مشكّلة بعد.</div>
+          : rows.map((r) => {
+            const d = r.data || {};
+            const its = Array.isArray(d.items) ? d.items : [];
+            return (
+              <div className="card" key={r.id}>
+                <div className="v-head" style={{ alignItems: 'center' }}>
+                  {d.img && <img src={d.img} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 10 }} />}
+                  <strong style={{ flex: 1 }}>{r.name}</strong>
+                  <span className="tag approved">عرض مشكّل</span>
+                  {r.status === 'hidden' && <span className="tag rejected">مخفي</span>}
+                </div>
+                <div className="kv"><b>السعر:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 800 }}>{r.price} ريال</span></div>
+                <div className="kv"><b>المخزون:</b> {r.stock != null ? r.stock : 'غير محدود'}</div>
+                <div className="kv"><b>المكوّنات:</b> {its.map((it, i) => (it.name + (it.weight ? ' ' + it.weight : ''))).join(' + ') || '—'}</div>
+                <Stamp at={r.created_at} label="تاريخ الإنشاء" />
+                {r.updated_at && <Stamp at={r.updated_at} label="آخر تعديل" />}
+                <div className="acts">
+                  <button className="btn sm ghost" onClick={() => edit(r)}>تعديل</button>
                   <button className="btn sm ghost" onClick={() => toggle(r)}>{r.status === 'hidden' ? 'إظهار' : 'إخفاء'}</button>
                   <button className="btn sm danger" onClick={() => del(r)}>حذف</button>
                 </div>
