@@ -492,7 +492,7 @@ function SavingsAdmin() {
   const [msg, setMsg] = useState('');
   const load = async () => {
     setRows(null);
-    const { data, error } = await SB.from('products').select('*').eq('category', 'savings').order('created_at', { ascending: false });
+    const { data, error } = await SB.from('products').select('*').eq('category', 'savings').order('pinned', { ascending: false }).order('created_at', { ascending: false });
     setRows(error ? [] : (data || []));
   };
   useEffect(() => { load(); }, []);
@@ -541,6 +541,15 @@ function SavingsAdmin() {
   };
   const toggle = async (r) => { const { error } = await SB.from('products').update({ status: r.status === 'hidden' ? 'available' : 'hidden' }).eq('id', r.id); if (!error) load(); };
   const del = async (r) => { if (!confirm('حذف هذا المنتج من خانة التوفير؟')) return; const { error } = await SB.from('products').delete().eq('id', r.id); if (!error) load(); };
+  const pin = async (r) => {
+    const val = !r.pinned;
+    if (val && (rows || []).filter((x) => x.pinned && x.id !== r.id).length >= 3) {
+      setMsg('الحد الأقصى 3 منتجات مثبّتة'); setTimeout(() => setMsg(''), 3000); return;
+    }
+    const { error } = await SB.from('products').update({ pinned: val, pinned_at: val ? new Date().toISOString() : null }).eq('id', r.id);
+    if (error) return setMsg('خطأ: ' + error.message);
+    setMsg((val ? 'تم التثبيت 📌' : 'تم إلغاء التثبيت') + ' · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 2500); load();
+  };
   return (
     <div>
       <div className="card">
@@ -576,7 +585,8 @@ function SavingsAdmin() {
               <div className="card" key={r.id}>
                 <div className="v-head" style={{ alignItems: 'center' }}>
                   {d.img && <img src={d.img} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 10 }} />}
-                  <strong style={{ flex: 1 }}>{r.name}</strong>
+                  <strong style={{ flex: 1 }}>{r.pinned && <span title="مثبّت">📌 </span>}{r.name}</strong>
+                  {r.pinned && <span className="tag approved">مثبّت</span>}
                   {r.status === 'hidden' && <span className="tag rejected">مخفي</span>}
                 </div>
                 <div className="kv"><b>السعر:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 800 }}>{r.price} ريال</span>{d.old && <span style={{ textDecoration: 'line-through', color: 'var(--muted)', marginInlineStart: 8 }}>{d.old} ريال</span>}</div>
@@ -584,6 +594,7 @@ function SavingsAdmin() {
                 {r.updated_at && <Stamp at={r.updated_at} label="آخر تعديل" />}
                 <div className="acts">
                   <button className="btn sm ghost" onClick={() => edit(r)}>تعديل</button>
+                  <button className={`btn sm ${r.pinned ? 'gold' : 'ghost'}`} onClick={() => pin(r)}>{r.pinned ? '📌 إلغاء التثبيت' : '📌 تثبيت'}</button>
                   <button className="btn sm ghost" onClick={() => toggle(r)}>{r.status === 'hidden' ? 'إظهار' : 'إخفاء'}</button>
                   <button className="btn sm danger" onClick={() => del(r)}>حذف</button>
                 </div>
