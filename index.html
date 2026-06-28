@@ -226,5 +226,305 @@ const{useState:useStateS}=React,SELLER_STEPS=["new","preparing","delivering","de
 const{useState:useS,useEffect:useE}=React,SECTION_ORDER=["almond","raisin","retail","wholesale"];function sectionsForRole(role){const canWholesale=role==="retail"||role==="wholesale";return SECTION_ORDER.filter(s=>s!=="wholesale"||canWholesale)}function addMonths(date,m){const d=new Date(date);return d.setMonth(d.getMonth()+m),d}function fmtDate(d,lang){return d?new Date(d).toLocaleDateString(lang==="ar"?"ar-EG":"en-GB",{day:"2-digit",month:"long",year:"numeric"}):"—"}function sbDate(iso){try{const d=new Date(iso);return{ar:d.toLocaleDateString("ar-EG"),en:d.toLocaleDateString("en-GB")}}catch(e){return{ar:"محفوظ",en:"Saved"}}}function App(){const[lang,setLang]=useS("ar"),[currency,setCurrencyState]=useS("YER"),[stage,setStage]=useS(()=>sessionStorage.getItem("lozi_active")?localStorage.getItem("lozi_stage")||"register":"splash"),[screen,setScreen]=useS("home"),[params,setParams]=useS({}),[tab,setTab]=useS("home"),[hist,setHist]=useS([]),[cart,setCart]=useS([]),[favs,setFavs]=useS(["p2","p5"]),[orders,setOrders]=useS(LOZI_ORDERS_SEED),[reports,setReports]=useS([]),[notifs,setNotifs]=useS(LOZI_NOTIFS_SEED),[subscribed,setSubscribed]=useS(!1),[subPending,setSubPending]=useS(!1),[subOpen,setSubOpen]=useS(!1),[termsOpen,setTermsOpen]=useS(!1),[supportOpen,setSupportOpen]=useS(!1),[support,setSupport]=useS(()=>{try{return JSON.parse(localStorage.getItem("lozi_support"))||LOZI_SUPPORT_SEED}catch(e){return LOZI_SUPPORT_SEED}}),[supportWa,setSupportWa]=useS("777184208"),[verif,setVerif]=useS(null),[verifOpen,setVerifOpen]=useS(!1),[store,setStore]=useS(null),[uploadProg,setUploadProg]=useS(null),[addCropOpen,setAddCropOpen]=useS(!1),[dbProducts,setDbProducts]=useS([]),[userId,setUserId]=useS(null),rowToProduct=r=>({...r.data||{},id:r.id,cat:r.category||r.data&&r.data.cat,price:r.price!=null?r.price:r.data&&r.data.price,active:r.status!=="hidden",_vendor:r.vendor_id,shahtiStatus:r.shahti_status||r.data&&r.data.shahtiStatus||null,stock:r.stock!=null?r.stock:r.data&&r.data.stock!=null?r.data.stock:null,pinned:r.pinned===!0,pinnedAt:r.pinned_at||null}),isBlockedAccount=async uid=>{if(!window.LOZI_SB||!uid)return!1;try{const{data,error}=await window.LOZI_SB.from("profiles").select("status").eq("user_id",uid).maybeSingle();if(error||!data)return!1;if(data.status==="suspended"||data.status==="banned")return await window.LOZI_SB.auth.signOut(),setStage("login"),showToast(data.status==="banned"?"تم حظر هذا الحساب. للاستفسار تواصل مع الدعم.":"تم تعليق هذا الحساب مؤقتاً. تواصل مع الدعم."),!0}catch(e){}return!1},loadProducts=()=>{window.LOZI_SB&&window.LOZI_SB.from("products").select("*").then(({data,error})=>{if(error){console.warn("load products:",error.message);return}setDbProducts((data||[]).map(rowToProduct))})},[editingProduct,setEditingProduct]=useS(null),[sellerOrders,setSellerOrders]=useS(typeof LOZI_SELLER_ORDERS_SEED!="undefined"?LOZI_SELLER_ORDERS_SEED:[]),[walletPayOpen,setWalletPayOpen]=useS(!1),[lastPay,setLastPay]=useS({amount:9800,date:{ar:"٣١ مايو",en:"May 31"},status:"approved"}),[seenNewOrders,setSeenNewOrders]=useS([]),[sub,setSub]=useS({start:null,expiry:null}),[userRole,setUserRole]=useS(()=>localStorage.getItem("lozi_role")||"customer"),[themeMode,setThemeMode]=useS(()=>localStorage.getItem("lozi_theme")||"light"),[person,setPerson]=useS(()=>{try{return JSON.parse(localStorage.getItem("lozi_person"))||{name:"",phone:"",city:"",address:""}}catch(e){return{name:"",phone:"",city:"",address:""}}}),[toast,setToast]=useS(""),t=LOZI_T[lang];setCurrency(currency),useE(()=>{document.documentElement.lang=lang,document.documentElement.dir=t.dir},[lang]),useE(()=>{stage!=="splash"&&(localStorage.setItem("lozi_stage",stage),sessionStorage.setItem("lozi_active","1"))},[stage]),useE(()=>{localStorage.setItem("lozi_role",userRole)},[userRole]),useE(()=>{localStorage.setItem("lozi_person",JSON.stringify(person))},[person]);const resolveTheme=mode=>{if(mode==="dark")return"dark";if(mode==="light")return"light";const h=new Date().getHours();return h>=18||h<6?"dark":"light"};useE(()=>{localStorage.setItem("lozi_theme",themeMode);const apply=()=>{const root=document.querySelector(".app-root");root&&root.setAttribute("data-theme",resolveTheme(themeMode))};if(apply(),themeMode==="auto"){const iv=setInterval(apply,6e4);return()=>clearInterval(iv)}},[themeMode]),useE(()=>{localStorage.setItem("lozi_support",JSON.stringify(support))},[support]),useE(()=>{if(!window.LOZI_SB)return;if(window.LOZI_RECOVERY){setStage("reset");return}const sub2=window.LOZI_SB.auth.onAuthStateChange(event=>{event==="PASSWORD_RECOVERY"&&setStage("reset")});return window.LOZI_SB.auth.getSession().then(async({data})=>{if(window.LOZI_RECOVERY){setStage("reset");return}const u=data&&data.session&&data.session.user;if(!u||await isBlockedAccount(u.id))return;setUserId(u.id);const md=u.user_metadata||{};md.role&&setUserRole(md.role==="farmer"?"farmer_almond":md.role),setPerson(p=>({...p,name:md.name||md.full_name||p.name,phone:md.phone||(u.phone?"+"+u.phone:p.phone)})),setStage("app")}),()=>{try{sub2.data.subscription.unsubscribe()}catch(e){}}},[]),useE(()=>{window.LOZI_SB&&loadCustomerOrders()},[]);const rowToCustomerOrder=r=>({id:r.order_no||String(r.id).slice(0,6),status:r.status==="new"?"received":r.status||"received",total:r.total||0,delivery_fee:r.delivery_fee!=null?r.delivery_fee:null,wholesale:(Array.isArray(r.items)?r.items:[]).some(it=>{const pr=dbProducts.find(p=>p.id===it.p);return pr&&pr.cat==="wholesale"}),pay:r.pay||"cod",date:sbDate(r.created_at),items:Array.isArray(r.items)?r.items:[],seller:r.seller_vendor_id||null}),loadCustomerOrders=()=>{!window.LOZI_SB||!userId||window.LOZI_SB.from("orders").select("*").eq("customer_id",userId).order("created_at",{ascending:!1}).then(({data,error})=>{error||setOrders((data||[]).map(rowToCustomerOrder))})};useE(()=>{loadCustomerOrders()},[userId]);const rowToSellerOrder=r=>({id:r.order_no||String(r.id).slice(0,6),status:r.status==="received"||r.status==="payreview"?"new":r.status||"new",total:r.total||0,pay:r.pay||"cod",items:Array.isArray(r.items)?r.items:[],customer:r.customer||{name:""},rejectReason:r.reject_reason||null,date:sbDate(r.created_at),placed:sbDate(r.created_at)}),loadSellerOrders=()=>{const seller=userRole!=="customer";!window.LOZI_SB||!userId||!seller||window.LOZI_SB.from("orders").select("*").eq("seller_vendor_id",userId).order("created_at",{ascending:!1}).then(({data,error})=>{error||setSellerOrders((data||[]).map(rowToSellerOrder))})};useE(()=>{loadSellerOrders()},[userRole,userId]),useE(()=>{screen==="orders"&&loadCustomerOrders(),screen==="dashboard"&&loadSellerOrders()},[screen]),useE(()=>{loadProducts()},[stage,userId]),useE(()=>{window.LOZI_SB&&window.LOZI_SB.from("settings").select("key,value").then(({data,error})=>{if(error||!data)return;const row=data.find(r=>r.key==="support_wa");if(row&&row.value){const local=String(row.value).replace(/[^0-9]/g,"").replace(/^967/,"");setSupportWa(local),setSupport(list=>list.map(n=>n.primary?{...n,phone:local}:n))}})},[]);const loadVerif=()=>{!(userRole==="farmer_almond"||userRole==="farmer_raisin"||userRole==="retail"||userRole==="wholesale")||!userId||!window.LOZI_SB||window.LOZI_SB.from("vendor_verifications").select("status,doc_path,note").eq("user_id",userId).maybeSingle().then(({data,error})=>{error||setVerif(data||{status:"none"})})};useE(()=>{loadVerif()},[userRole,userId]);const loadStore=()=>{!(userRole==="farmer_almond"||userRole==="farmer_raisin"||userRole==="retail"||userRole==="wholesale")||!userId||!window.LOZI_SB||window.LOZI_SB.from("stores").select("name,description,hours,enabled,shahti_free,image_path,offers").eq("vendor_id",userId).maybeSingle().then(({data,error})=>{error||setStore(data?{name:data.name,description:data.description,hours:data.hours,enabled:data.enabled,shahti_free:data.shahti_free,image:data.image_path,offers:data.offers||null}:{name:""})})};useE(()=>{loadStore()},[userRole,userId]);const[myRating,setMyRating]=useS({avg:0,count:0}),loadMyRating=()=>{!(userRole==="farmer_almond"||userRole==="farmer_raisin"||userRole==="retail"||userRole==="wholesale")||!userId||!window.LOZI_SB||window.LOZI_SB.from("reviews").select("rating").eq("store_vendor_id",userId).then(({data,error})=>{error||!data||setMyRating({count:data.length,avg:data.length?data.reduce((a,r)=>a+r.rating,0)/data.length:0})})};useE(()=>{loadMyRating()},[userRole,userId]);const[storeOffers,setStoreOffers]=useS({}),[storesMap,setStoresMap]=useS({}),loadStoreOffers=()=>{window.LOZI_SB&&window.LOZI_SB.from("stores").select("vendor_id,name,image_path,offers").then(({data,error})=>{if(error||!data)return;const m={},names={};data.forEach(r=>{r.offers&&(m[r.vendor_id]=r.offers),names[r.vendor_id]={name:r.name,image:r.image_path}}),setStoreOffers(m),setStoresMap(names)})};useE(()=>{loadStoreOffers()},[stage,userId]);const withDiscount=p=>{const off=storeOffers[p._vendor],d=off&&off.discount;return!d||!d.percent||!p.price||!(d.scope==="all"||d.scope==="product"&&d.productId===p.id)?p:{...p,price:Math.round(p.price*(1-d.percent/100)),old:p.price}},submitVerif=async({address,idFront,idBack,commercialFile,shopFile})=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{data:au}=await window.LOZI_SB.auth.getUser(),uid=au&&au.user&&au.user.id;if(!uid)return{ok:!1,error:"سجّل الدخول أولاً"};const mk=(file,tag)=>{const ext=(String(file.name).split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";return{file,bucket:"vendor-docs",path:uid+"/"+tag+"-"+Date.now()+"."+ext,key:tag}},jobs=[mk(idFront,"id_front"),mk(idBack,"id_back")];commercialFile&&jobs.push(mk(commercialFile,"commercial")),shopFile&&jobs.push(mk(shopFile,"shop"));const res=await uploadFiles(jobs.map(j=>({file:j.file,bucket:j.bucket,path:j.path}))),docs={};for(let i=0;i<jobs.length;i++){if(!res[i]||!res[i].ok)return{ok:!1,error:res[i]&&res[i].error||"تعذّر رفع الملف"};docs[jobs[i].key]=jobs[i].path}const{error}=await window.LOZI_SB.from("vendor_verifications").upsert({user_id:uid,status:"pending",doc_path:docs.id_front,docs,address,name:person&&person.name||null,phone:person&&person.phone||(au.user.phone?"+"+au.user.phone:null),note:null,submitted_at:new Date().toISOString()},{onConflict:"user_id"});return error?{ok:!1,error:error.message}:(setVerif({status:"pending",doc_path:docs.id_front}),{ok:!0})},showToast=m=>{setToast(m),setTimeout(()=>setToast(""),1500)},toggleLang=()=>setLang(l=>l==="ar"?"en":"ar"),TAB_SCREENS=["home","sections","savings","cart","profile","dashboard","wallet"],go=(s,p={})=>{setHist(h=>TAB_SCREENS.includes(s)?[]:[...h,{screen,params}]),setScreen(s),setParams(p),TAB_SCREENS.includes(s)?setTab(s):s==="store"||s==="product"||s==="vstore"?setTab("sections"):s==="myproducts"||s==="mystore"||s==="myoffers"||s==="myreviews"?setTab("dashboard"):["orders","favorites","reports","settings","personal","subscription"].includes(s)&&setTab("profile");const main=document.querySelector(".app-main");main&&(main.scrollTop=0)},goBack=()=>{setHist(h=>{if(!h.length)return setScreen("home"),setTab("home"),[];const prev=h[h.length-1];return setScreen(prev.screen),setParams(prev.params),setTab(TAB_SCREENS.includes(prev.screen)?prev.screen:prev.screen==="store"?"sections":tab),h.slice(0,-1)});const main=document.querySelector(".app-main");main&&(main.scrollTop=0)},addToCart=(p,q=1,meta)=>{setCart(c=>{const ex=c.find(it=>it.p.id===p.id);if(meta&&meta.byAmount){const item={p,q,byAmount:!0,grams:meta.grams,amount:meta.amount};return ex?c.map(it=>it.p.id===p.id?item:it):[...c,item]}return ex?c.map(it=>it.p.id===p.id?{...it,q:it.q+q,byAmount:!1}:it):[...c,{p,q}]}),showToast(t.added)},setQty=(id,q)=>setCart(c=>c.map(it=>it.p.id===id?{...it,q}:it)),removeItem=id=>setCart(c=>c.filter(it=>it.p.id!==id)),toggleFav=id=>setFavs(f=>f.includes(id)?f.filter(x=>x!==id):[...f,id]),confirmOrder=async(vendorId,pay="cod",receiptFile)=>{const grp=cart.filter(it=>it.p._vendor===vendorId);if(!grp.length)return;const subtotal=grp.reduce((a,it)=>a+it.p.price*it.q,0),deliveryFee=typeof feeFor=="function"?feeFor(grp,storeOffers):1e3,total=subtotal+(deliveryFee||0),id=String(Date.now()).slice(-6),items=grp.map(it=>it.byAmount?({p:it.p.id,q:1,name:it.p.name&&(it.p.name.ar||it.p.name)||"",weight:"≈ "+it.grams+" جم",price:Math.round(it.amount)}):({p:it.p.id,q:it.q,name:it.p.name&&(it.p.name.ar||it.p.name)||"",weight:it.p.weight&&(it.p.weight.ar||it.p.weight)||"",price:it.p.price}));setOrders(o=>[{id,status:"received",date:{ar:"الآن",en:"Just now"},total,pay,items,seller:vendorId},...o]),setCart(c=>c.filter(it=>it.p._vendor!==vendorId)),pay==="prepaid"&&showToast(t.prepaid_sent_toast),go("success",{review:pay==="prepaid"});let payReceipt=null;if(receiptFile&&window.LOZI_SB&&userId){let blob=receiptFile,ext="webp";try{blob=await compressImage(receiptFile)}catch(e){ext=(String(receiptFile.name).split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg"}const path="receipts/"+userId+"/"+id+"-"+Math.random().toString(36).slice(2,8)+"."+ext;try{const res=await uploadFiles([{file:blob,bucket:"product-images",path}]);res[0]&&res[0].ok&&(payReceipt=lozPublicUrl("product-images",path))}catch(e){}}window.LOZI_SB&&userId&&window.LOZI_SB.from("orders").insert({order_no:id,seller_vendor_id:vendorId,customer_id:userId,vendor:vendorId,status:"new",pay,total,delivery_fee:deliveryFee,items,customer:person||null,pay_receipt:payReceipt,pay_status:pay==="prepaid"?"pending":null}).then(({error})=>{error?console.warn("save order:",error.message):(loadCustomerOrders(),setTimeout(loadProducts,600))})},reorder=o=>{go("cart"),showToast(t.added)},cancelOrder=id=>{setOrders(os=>os.filter(o=>o.id!==id)),window.LOZI_SB&&userId&&window.LOZI_SB.from("orders").delete().eq("order_no",id).eq("customer_id",userId).then(()=>{})},unreadNotifs=notifs.filter(n=>!n.read).length,sellerNotifs=sellerOrders.filter(o=>o.status==="new").map(o=>({id:"so-"+o.id,type:"order",read:seenNewOrders.includes(o.id),link:"dashboard",title:{ar:"طلب جديد وصلك 🛎️",en:"New order received 🛎️"},body:{ar:`طلب #${o.id} من ${o.customer.name} · ${moneyStr(o.total)}`,en:`Order #${o.id} from ${o.customer.name} · ${moneyStr(o.total)}`},time:o.placed})),unreadSellerNotifs=sellerOrders.filter(o=>o.status==="new"&&!seenNewOrders.includes(o.id)).length,openNotifs=()=>{go("notifications"),isSeller?setSeenNewOrders(sellerOrders.filter(o=>o.status==="new").map(o=>o.id)):setNotifs(ns=>ns.map(n=>({...n,read:!0})))},rowToReport=r=>({id:r.id,typeId:r.type_id,orderId:r.order_id,target:r.target,subject:r.subject,desc:r.description,status:r.status,reply:r.reply||null,date:{ar:new Date(r.created_at).toLocaleDateString("ar-EG"),en:new Date(r.created_at).toLocaleDateString("en-GB")}}),loadReports=()=>{!window.LOZI_SB||!userId||window.LOZI_SB.from("reports").select("*").eq("user_id",userId).order("created_at",{ascending:!1}).then(({data,error})=>{error||setReports((data||[]).map(rowToReport))})};useE(()=>{loadReports()},[userId]);const submitReport=async r=>{const id=String(Date.now()).slice(-5);if(setReports(rs=>[{id,status:"review",date:{ar:"الآن",en:"Just now"},reply:null,...r},...rs]),showToast(t.rep_sent),window.LOZI_SB&&userId){const{error}=await window.LOZI_SB.from("reports").insert({user_id:userId,type_id:r.typeId,target:r.target,subject:r.subject,description:r.desc,order_id:r.orderId,reporter_name:person&&person.name||null,reporter_phone:person&&person.phone||null,status:"review"});error||loadReports()}},reportOrder=o=>{const first=findP(o.items[0].p),vk=vendorKey(first),info=vendorInfo(vk,lang),typeId=vk==="farmers"?"farmer":vk==="lozi"?"general":"retail";go("reports",{prefill:{typeId,target:typeId==="general"?"":info.name,orderId:o.id}})},reviewStore=o=>{const first=o.items&&o.items[0]&&findP(o.items[0].p),vid=first&&first._vendor;if(!vid){showToast("تعذّر تحديد المتجر");return}go("vstore",{vendorId:vid})},compressImage=file=>new Promise((resolve,reject)=>{const img=new Image,url=URL.createObjectURL(file);img.onload=()=>{URL.revokeObjectURL(url);let w=img.width,h=img.height;if(w>1600||h>1600){const r=Math.min(1600/w,1600/h);w=Math.round(w*r),h=Math.round(h*r)}const c=document.createElement("canvas");c.width=w,c.height=h,c.getContext("2d").drawImage(img,0,0,w,h),c.toBlob(b=>b?resolve(b):reject(new Error("encode")),"image/webp",.82)},img.onerror=()=>{URL.revokeObjectURL(url),reject(new Error("load"))},img.src=url}),uploadFiles=async jobs=>{const total=jobs.length;if(!total)return[];const started=Date.now();setUploadProg({pct:0});const{data:sess}=await window.LOZI_SB.auth.getSession(),token=sess&&sess.session&&sess.session.access_token,results=[];for(let i=0;i<total;i++){const j=jobs[i];let res=await lozUploadXHR(j.bucket,j.path,j.file,token,p=>setUploadProg({pct:(i+p)/total}));if(!res||!res.ok){const up=await window.LOZI_SB.storage.from(j.bucket).upload(j.path,j.file,{upsert:!0,contentType:j.file.type||void 0});res=up.error?{ok:!1,error:up.error.message}:{ok:!0}}setUploadProg({pct:(i+1)/total}),results.push(res)}const elapsed=Date.now()-started;return elapsed<700&&await new Promise(r=>setTimeout(r,700-elapsed)),setUploadProg(null),results},addCrop=async(crop,isEdit)=>{if(setAddCropOpen(!1),setEditingProduct(null),userRole!=="customer"&&!(verif&&verif.status==="approved")){showToast("فعّل حسابك أولاً للنشر"),setVerifOpen(!0);return}if(!window.LOZI_SB){showToast(isEdit?t.product_updated:t.crop_published);return}const{data:au}=await window.LOZI_SB.auth.getUser(),uid=au&&au.user&&au.user.id;if(!uid){showToast("سجّل الدخول أولاً");return}const items=crop.photoItems||[],images=new Array(items.length).fill(null),jobs=[];items.some(it=>it.file)&&setUploadProg({pct:0});for(let i=0;i<items.length;i++){if(items[i].url){images[i]=items[i].url;continue}let blob=items[i].file,ext="webp";try{blob=await compressImage(items[i].file)}catch(e){ext=(String(items[i].file.name).split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg"}const path=uid+"/"+Date.now()+"-"+Math.random().toString(36).slice(2,8)+"."+ext;jobs.push({file:blob,bucket:"product-images",path,idx:i})}try{if(jobs.length){const res2=await uploadFiles(jobs.map(j=>({file:j.file,bucket:j.bucket,path:j.path})));let failErr="";jobs.forEach((j,k)=>{res2[k]&&res2[k].ok?images[j.idx]=lozPublicUrl("product-images",j.path):failErr=res2[k]&&res2[k].error||"فشل الرفع"}),failErr&&showToast("تعذّر رفع الصورة: "+failErr)}}finally{setUploadProg(null)}const data=Object.assign({},crop);delete data.photoItems,data.images=images.filter(Boolean),data.img=data.images[0]||data.img;const role3=userRole.indexOf("farmer")===0?"farmer":userRole,seg=crop.cat==="wholesale"?"wholesale":crop.cat==="retail"?"retail":null,row={vendor_id:uid,vendor_role:role3,market_segment:seg,category:crop.cat,name:crop.name&&crop.name.ar||"",description:crop.desc&&crop.desc.ar||null,price:crop.price!=null?Number(crop.price):null,status:"available",data,shahti_status:data.shahtiStatus||null,stock:data.stock!=null?data.stock:null},res=isEdit&&crop.id?await window.LOZI_SB.from("products").update(row).eq("id",crop.id):await window.LOZI_SB.from("products").insert(row);if(res.error){showToast("خطأ: "+res.error.message);return}showToast(isEdit?t.product_updated:t.crop_published),loadProducts()},saveStore=async({name,description,hours,enabled,imageFile})=>{if(!window.LOZI_SB)return showToast("الخدمة غير متاحة"),{ok:!1};const{data:au}=await window.LOZI_SB.auth.getUser(),uid=au&&au.user&&au.user.id;if(!uid)return showToast("سجّل الدخول أولاً"),{ok:!1};let image_path=store&&store.image||null;if(imageFile){let blob=imageFile,ext="webp";try{blob=await compressImage(imageFile)}catch(e){ext=(String(imageFile.name).split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg"}const path=uid+"/store-"+Date.now()+"."+ext,res=await uploadFiles([{file:blob,bucket:"product-images",path}]);res[0]&&res[0].ok&&(image_path=lozPublicUrl("product-images",path))}const{error}=await window.LOZI_SB.from("stores").upsert({vendor_id:uid,name,description,hours,enabled,image_path,updated_at:new Date().toISOString()},{onConflict:"vendor_id"});return error?(showToast("خطأ: "+error.message),{ok:!1,error:error.message}):(setStore(st=>({...st||{},name,description,hours,enabled,image:image_path})),showToast("تم حفظ الملف التجاري"),go("dashboard"),{ok:!0})},saveOffers=async offers=>{if(!window.LOZI_SB)return showToast("الخدمة غير متاحة"),{ok:!1};const{data:au}=await window.LOZI_SB.auth.getUser(),uid=au&&au.user&&au.user.id;if(!uid)return showToast("سجّل الدخول أولاً"),{ok:!1};const{error}=await window.LOZI_SB.from("stores").upsert({vendor_id:uid,offers,updated_at:new Date().toISOString()},{onConflict:"vendor_id"});return error?(showToast("خطأ: "+error.message),{ok:!1,error:error.message}):(setStore(st=>({...st||{},offers})),setStoreOffers(m=>Object.assign({},m,{[uid]:offers})),showToast("تم حفظ العروض"),go("dashboard"),{ok:!0})},myProducts=dbProducts.filter(p=>p._vendor&&p._vendor===userId).map(withDiscount),pinProduct=async(id,pin)=>{if(!window.LOZI_SB)return;if(pin){const cnt=myProducts.filter(x=>x.pinned&&x.id!==id).length;if(cnt>=3){showToast("الحد الأقصى 3 منتجات مثبّتة");return;}}setDbProducts(ps=>ps.map(x=>x.id===id?{...x,pinned:pin}:x));const r=await window.LOZI_SB.from("products").update({pinned:pin,pinned_at:pin?new Date().toISOString():null}).eq("id",id);r.error?(showToast("خطأ: "+r.error.message),loadProducts()):showToast(pin?"تم التثبيت 📌":"تم إلغاء التثبيت");},toggleProduct=async id=>{if(!window.LOZI_SB)return;const p=myProducts.find(x=>x.id===id),next=p&&p.active===!1?"active":"hidden";setDbProducts(ps=>ps.map(x=>x.id===id?{...x,active:next!=="hidden"}:x));const{error}=await window.LOZI_SB.from("products").update({status:next}).eq("id",id);error&&(showToast("خطأ: "+error.message),loadProducts())},removeProduct=async id=>{if(!window.LOZI_SB)return;setDbProducts(ps=>ps.filter(x=>x.id!==id));const{error}=await window.LOZI_SB.from("products").delete().eq("id",id);if(error){showToast("خطأ: "+error.message),loadProducts();return}showToast(t.myp_removed)},startEditProduct=id=>{const p=myProducts.find(x=>x.id===id);p&&(setEditingProduct(p),setAddCropOpen(!0))},SELLER_FLOW={new:"preparing",preparing:"delivering",delivering:"delivered"},updateOrderStatus=(id,status,extra)=>{!window.LOZI_SB||!userId||window.LOZI_SB.from("orders").update(Object.assign({status},extra||{})).eq("order_no",id).eq("seller_vendor_id",userId).then(({error})=>{error&&showToast("خطأ: "+error.message)})},advanceSellerOrder=id=>setSellerOrders(os=>os.map(o=>{if(o.id===id&&SELLER_FLOW[o.status]){const next=SELLER_FLOW[o.status];return updateOrderStatus(id,next),{...o,status:next}}return o})),assignSellerCourier=(id,who)=>setSellerOrders(os=>os.map(o=>o.id===id?{...o,courier:who}:o)),rejectSellerOrder=(id,reason)=>{setSellerOrders(os=>os.map(o=>o.id===id?{...o,status:"rejected",rejectReason:reason}:o)),updateOrderStatus(id,"rejected",{reject_reason:reason}),showToast(t.rej_done)},submitWalletPay=()=>{setWalletPayOpen(!1),setLastPay({amount:LOZI_WALLET_DUE,date:{ar:"الآن",en:"Just now"},status:"review"}),showToast(t.wal_pay_submitted)},openSub=()=>setSubOpen(!0),submitSub=()=>{setSubOpen(!1),setSubPending(!0),showToast(t.sub_pending),setTimeout(()=>{const start=new Date;setSub({start,expiry:addMonths(start,LOZI_SUB.months)}),setSubPending(!1),setSubscribed(!0)},3200)},onRegistered=({role,person:pers})=>{setUserRole(role),pers&&setPerson(pers),setStage("app"),go("home")},e164=p=>String(p).charAt(0)==="+"?String(p):"+967"+String(p).replace(/[^0-9]/g,"").replace(/^0+/,""),appRole=r=>r==="farmer"?"farmer_almond":r,openSupportWa=()=>{try{window.open("https://wa.me/967"+String(supportWa).replace(/[^0-9]/g,"").replace(/^967/,""),"_blank")}catch(e){}},invokeFn=async(fn,body2)=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{data,error}=await window.LOZI_SB.functions.invoke(fn,{body:body2});if(!error)return data||{ok:!1};try{const b=await error.context.json();if(b&&(b.reason==="not_authorized"||b.reason==="rate_limited"))return b;if(b)return{ok:!1,error:b.detail||b.reason||error.message}}catch(e){}return{ok:!1,error:error.message}},onVendorSendOtp=({phone:ph,purpose="register"})=>invokeFn("request-otp",{phone:e164(ph),purpose}),onVendorVerify=({phone:ph,code,purpose="register"})=>invokeFn("verify-otp",{phone:e164(ph),code,purpose}),onVendorSetPassword=({phone:ph,setup_token,password})=>invokeFn("vendor-forgot-password",{phone:e164(ph),setup_token,password}),onVendorSignIn=async({phone:ph,password,role,name})=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{data,error}=await window.LOZI_SB.auth.signInWithPassword({phone:e164(ph),password});if(error)return{ok:!1,error:error.message};if(data.user&&await isBlockedAccount(data.user.id))return{ok:!1,error:"هذا الحساب معلّق أو محظور. تواصل مع الدعم."};data.user&&setUserId(data.user.id);const md=data.user&&data.user.user_metadata||{};if(name&&name!==md.name)try{await window.LOZI_SB.auth.updateUser({data:{name}})}catch(e){}return onRegistered({role:appRole(role||md.role)||"customer",person:{name:name||md.name||"",phone:e164(ph)}}),{ok:!0}},onDevSkip=async role=>{if(!window.LOZI_SB){showToast("الخدمة غير متاحة");return}if(!window.LOZI_SB.auth.signInAnonymously){showToast("حدّث الصفحة — الإصدار قديم");return}const{data,error}=await window.LOZI_SB.auth.signInAnonymously();if(error){showToast("فعّل «Anonymous» في Supabase أولاً");return}const uid=data.user&&data.user.id;uid&&setUserId(uid);const r=appRole(role)||"retail";try{await window.LOZI_SB.auth.updateUser({data:{role:r,name:"تاجر تجريبي"}})}catch(e){}try{await window.LOZI_SB.from("vendor_verifications").upsert({user_id:uid,status:"approved"},{onConflict:"user_id"})}catch(e){}setVerif({status:"approved"}),onRegistered({role:r,person:{name:"تاجر تجريبي",phone:""}})},onCustomerSignIn=async({email,password})=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{data,error}=await window.LOZI_SB.auth.signInWithPassword({email,password});if(error)return{ok:!1,error:error.message};if(data.user&&await isBlockedAccount(data.user.id))return{ok:!1,error:"هذا الحساب معلّق أو محظور. تواصل مع الدعم."};data.user&&setUserId(data.user.id);const md=data.user&&data.user.user_metadata||{};return onRegistered({role:appRole(md.role)||"customer",person:{name:md.name||"",phone:md.phone||""}}),{ok:!0}},onCustomerSignUp=async({name,email,password,phone:ph})=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const appUrl=window.location.origin+window.location.pathname,{data,error}=await window.LOZI_SB.auth.signUp({email,password,options:{emailRedirectTo:appUrl,data:{role:"customer",name,phone:e164(ph)}}});if(error)return{ok:!1,error:error.message};if(data.session){data.user&&setUserId(data.user.id);try{await window.LOZI_SB.from("customers").insert({user_id:data.user.id,full_name:name,phone:e164(ph),email})}catch(e){}return onRegistered({role:"customer",person:{name,phone:e164(ph)}}),{ok:!0}}return{ok:!0,needsConfirm:!0}},onCustomerForgot=async({email})=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{error}=await window.LOZI_SB.auth.resetPasswordForEmail(email,{redirectTo:window.location.href.split("#")[0].split("?")[0]});return error?{ok:!1,error:(error.message||"تعذّر الإرسال")+(error.status?" ("+error.status+")":"")}:{ok:!0}},onSetNewPassword=async({password})=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{data,error}=await window.LOZI_SB.auth.updateUser({password});if(error)return{ok:!1,error:error.message};data.user&&setUserId(data.user.id);try{window.LOZI_RECOVERY=!1}catch(e){}const md=data.user&&data.user.user_metadata||{};return onRegistered({role:appRole(md.role)||"customer",person:{name:md.name||"",phone:md.phone||(data.user.phone?"+"+data.user.phone:"")}}),{ok:!0}},onLogout=()=>{if(window.LOZI_SB)try{window.LOZI_SB.auth.signOut()}catch(e){}localStorage.removeItem("lozi_stage"),localStorage.removeItem("lozi_role"),localStorage.removeItem("lozi_person"),setUserRole("customer"),setPerson({name:"",phone:"",city:"",address:""}),setStage("login")},requestDeleteAccount=async()=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{data:au}=await window.LOZI_SB.auth.getUser(),u=au&&au.user;if(!u)return{ok:!1,error:"سجّل الدخول أولاً"};const{error}=await window.LOZI_SB.from("deletion_requests").upsert({user_id:u.id,role:userRole,name:person&&person.name||u.user_metadata&&u.user_metadata.name||null,phone:person&&person.phone||(u.phone?"+"+u.phone:null),email:u.email||null,status:"pending",created_at:new Date().toISOString()},{onConflict:"user_id"});return error?{ok:!1,error:error.message}:{ok:!0}},cartCount=cart.reduce((a,it)=>a+it.q,0),showNav=stage==="app"&&TAB_SCREENS.includes(screen),isFarmCat=p=>p.cat==="almond"||p.cat==="raisin",catalog=dbProducts.filter(p=>p.active!==!1&&p.cat!=="savings"&&!(isFarmCat(p)&&p.stock!=null&&p.stock<=0)).map(withDiscount),savingsProducts=dbProducts.filter(p=>p.cat==="savings"&&p.active!==!1).map(withDiscount).sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)),allProducts=[...catalog,...savingsProducts,...LOZI_SAVINGS],findP=p=>typeof p=="string"?allProducts.find(x=>x.id===p):p,avail=sectionsForRole(userRole),sellSection={farmer_almond:"almond",farmer_raisin:"raisin",retail:"retail",wholesale:"wholesale"}[userRole]||null,isSeller=!!sellSection,sellerApproved=verif&&verif.status==="approved",openAddProduct=()=>{if(isSeller&&!sellerApproved){setVerifOpen(!0);return}setEditingProduct(null),setAddCropOpen(!0)};let body=null;if(stage==="splash")body=React.createElement(Splash,{onDone:()=>setStage(localStorage.getItem("lozi_stage")||"register")});else if(stage==="register")body=React.createElement(Register,{t,lang,onDone:onRegistered,onVendorSendOtp,onVendorVerify,onVendorSetPassword,onVendorSignIn,onCustomerSignUp,onSupport:openSupportWa,onGoLogin:()=>setStage("login"),openTerms:()=>setTermsOpen(!0),onDevSkip});else if(stage==="login")body=React.createElement(Login,{t,lang,onCustomerSignIn,onCustomerForgot,onVendorSignIn,onVendorSendOtp,onVendorVerify,onVendorSetPassword,onSupport:openSupportWa,goRegister:()=>setStage("register")});else if(stage==="reset")body=React.createElement(ResetPassword,{onSetNewPassword});else switch(screen){case"home":body=React.createElement(Home,{t,lang,go,role:userRole,avail,catalog,storesMap,isSeller,sellSection,notifCount:isSeller?unreadSellerNotifs:unreadNotifs,onBell:openNotifs,onAddCrop:openAddProduct,openStore:s=>go("store",{store:s}),openProduct:p=>go("product",{p}),addToCart,favs,toggleFav});break;case"sections":body=React.createElement(SectionBrowse,{t,lang,go,avail,catalog,storesMap,init:params.section,initType:params.type,openStore:s=>go("store",{store:s}),openProduct:p=>go("product",{p}),addToCart,favs,toggleFav});break;case"store":body=React.createElement(StoreProfile,{s:params.store,t,lang,onBack:goBack,openProduct:p=>go("product",{p}),addToCart,favs,toggleFav});break;case"vstore":body=React.createElement(VendorStore,{t,lang,vendorId:params.vendorId,me:{id:userId,name:person&&person.name},products:catalog.filter(p=>p._vendor===params.vendorId).sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)),onBack:goBack,openProduct:p=>go("product",{p}),addToCart,favs,toggleFav,showToast});break;case"product":body=React.createElement(Product,{p:findP(params.p),t,lang,onBack:goBack,addToCart,fav:favs.includes(findP(params.p).id),onFav:toggleFav,go});break;case"cart":body=React.createElement(Cart,{t,lang,items:cart,setQty,removeItem,go,offers:storeOffers,storesMap});break;case"checkout":body=React.createElement(Checkout,{t,lang,items:cart.filter(it=>it.p._vendor===params.vendor),vendor:params.vendor,person,onSaveAddress:a=>setPerson(p=>({...p,...a})),onBack:()=>go("cart"),onConfirm:(pay,receipt)=>confirmOrder(params.vendor,pay,receipt),offers:storeOffers,storesMap});break;case"success":body=React.createElement(OrderSuccess,{t,go,review:params.review});break;case"orders":body=React.createElement(Orders,{t,lang,orders,onBack:()=>go("profile"),reorder,cancel:cancelOrder,reportOrder,go,isSeller,role:userRole,onReview:reviewStore});break;case"savings":body=React.createElement(Savings,{t,lang,products:savingsProducts,subscribed,subPending,onSubscribe:openSub,openProduct:p=>go("product",{p}),addToCart,favs,toggleFav,canSubscribe:userRole!=="retail"&&userRole!=="wholesale"});break;case"dashboard":body=React.createElement(SellerDashboard,{t,lang,role:userRole,person,storeName:store&&store.name,orders:sellerOrders,onAdvance:advanceSellerOrder,onAssign:assignSellerCourier,onReject:rejectSellerOrder,productCount:myProducts.length,go,onAddProduct:openAddProduct,onMyProducts:()=>go("myproducts"),onStore:()=>go("mystore"),onOffers:()=>go("myoffers"),onReviews:()=>go("myreviews"),rating:myRating,verifStatus:verif?verif.status:"none",onVerify:()=>setVerifOpen(!0)});break;case"mystore":body=React.createElement(SellerStore,{t,lang,store,verifStatus:verif?verif.status:"none",onBack:()=>go("dashboard"),onSave:saveStore,onVerify:()=>setVerifOpen(!0)});break;case"myoffers":body=React.createElement(SellerOffers,{t,lang,store,products:myProducts,onBack:()=>go("dashboard"),onSave:saveOffers});break;case"myreviews":body=React.createElement(SellerReviews,{t,lang,vendorId:userId,onBack:()=>go("dashboard")});break;case"myproducts":body=React.createElement(MyProducts,{t,lang,role:userRole,products:myProducts,onBack:()=>go("dashboard"),onAdd:openAddProduct,onToggle:toggleProduct,onDelete:removeProduct,onEdit:startEditProduct,onPin:pinProduct});break;case"wallet":body=isSeller?React.createElement(SellerWallet,{t,lang,person,due:LOZI_WALLET_DUE,deadline:t.wal_deadline_val,lastPay,orders:LOZI_COMMISSION_ORDERS,onPay:()=>setWalletPayOpen(!0)}):React.createElement(Home,{t,lang,go,role:userRole,avail,catalog,storesMap,isSeller,sellSection,notifCount:unreadNotifs,onBell:openNotifs,onAddCrop:openAddProduct,openStore:s=>go("store",{store:s}),openProduct:p=>go("product",{p}),addToCart,favs,toggleFav});break;case"profile":body=React.createElement(Profile,{t,lang,go,favCount:favs.length,subscribed,subPending,role:userRole,person,isSeller,dashCount:sellerOrders.filter(o=>o.status==="new").length});break;case"personal":body=React.createElement(PersonalInfo,{t,lang,onBack:goBack,person,onSave:p=>{setPerson(p),showToast(t.saved)}});break;case"subscription":body=React.createElement(SubscriptionDetails,{t,lang,onBack:goBack,subscribed,subPending,sub,onSubscribe:openSub,fmtDate});break;case"favorites":body=React.createElement(Favorites,{t,lang,favs,onBack:goBack,openProduct:p=>go("product",{p}),addToCart,toggleFav,go});break;case"reports":body=React.createElement(Reports,{t,lang,onBack:goBack,reports,onSubmit:submitReport,prefill:params.prefill,showToast});break;case"notifications":body=React.createElement(Notifications,{t,lang,notifs:isSeller?sellerNotifs:notifs,onBack:goBack,go});break;case"settings":body=React.createElement(Settings,{t,lang,onBack:()=>go("profile"),toggleLang,currency,setCurrencyState,themeMode,setThemeMode,openTerms:()=>setTermsOpen(!0),go,person,onLogout,openSupport:()=>setSupportOpen(!0),onRequestDelete:requestDeleteAccount});break;default:body=null}const chrome=stage==="app";return React.createElement("div",{className:"app-root",dir:t.dir},React.createElement("div",{className:`app-main ${showNav?"with-nav":""} ${chrome?"":"full"}`},body),showNav&&React.createElement(BottomNav,{active:tab,go,cartCount,t,isSeller}),subOpen&&React.createElement(SubModal,{t,lang,onClose:()=>setSubOpen(!1),onSubmitted:submitSub}),termsOpen&&React.createElement(TermsSheet,{t,lang,onClose:()=>setTermsOpen(!1)}),supportOpen&&React.createElement(SupportSheet,{t,lang,numbers:support,onClose:()=>setSupportOpen(!1)}),addCropOpen&&React.createElement(AddProductSheet,{t,lang,section:editingProduct&&editingProduct.cat||sellSection,role:userRole,initial:editingProduct,onClose:()=>{setAddCropOpen(!1),setEditingProduct(null)},onPublish:addCrop}),verifOpen&&React.createElement(VerifySheet,{t,role:userRole,status:verif?verif.status:"none",note:verif?verif.note:null,onClose:()=>setVerifOpen(!1),onSubmit:submitVerif}),walletPayOpen&&React.createElement(CommissionPaySheet,{t,lang,amount:LOZI_WALLET_DUE,onClose:()=>setWalletPayOpen(!1),onSubmitted:submitWalletPay}),uploadProg&&React.createElement(UploadRing,{pct:uploadProg.pct}),React.createElement(Toast,{msg:toast}))}ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App,null));
 
 </script>
+<!-- ===== Lozi Commission Center (cumulative-commission seller UI) ===== -->
+<script>
+(function () {
+  "use strict";
+  var SELLER_ROLES = ["farmer", "retail", "wholesale"];
+  var SEG_AR = { retail: "تجزئة", wholesale: "جملة" };
+  var AR = function (s) { return String(s).replace(/[0-9]/g, function (d) { return "٠١٢٣٤٥٦٧٨٩"[d]; }); };
+  var pct = function (rate, seg) { return (Number(rate) * 100).toFixed(seg === "wholesale" ? 1 : 2) + "%"; };
+  var grp = function (n) { return (Number(n) || 0).toLocaleString("en-US"); };
+  var money2 = function (n) { return (Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: (Number(n) % 1 !== 0 ? 2 : 0), maximumFractionDigits: 2 }); };
+  var tierOf = function (tiers, seg, cum) {
+    var rows = (tiers || []).filter(function (t) { return t.segment === seg; }).sort(function (a, b) { return a.level - b.level; });
+    var c = Number(cum) || 0;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (c >= Number(r.min_sales) && (r.max_sales == null || c <= Number(r.max_sales))) return r;
+    }
+    return rows[rows.length - 1] || null;
+  };
+  var nextTier = function (tiers, seg, level) {
+    return (tiers || []).filter(function (t) { return t.segment === seg; }).find(function (t) { return t.level === level + 1; }) || null;
+  };
+
+  var SB = null, STATE = { uid: null, profile: null, tiers: [], orders: null, calcSeg: "retail", calcAmt: 4500, tab: "level" };
+
+  // ---------- styling ----------
+  function injectCss() {
+    if (document.getElementById("lzc-css")) return;
+    if (!document.querySelector('link[href*="Tajawal"]')) {
+      var l = document.createElement("link"); l.rel = "stylesheet";
+      l.href = "https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap";
+      document.head.appendChild(l);
+    }
+    var css = document.createElement("style"); css.id = "lzc-css";
+    css.textContent = [
+      ".lzc{--g:#2F5E3E;--gd:#234a30;--gs:#eef5f0;--gl:#cfe2d6;--go:#C08A43;--gos:#fbf3e4;--gol:#ecd9b8;--ink:#23302a;--mut:#6c7d73;--red:#b4452f;font-family:'Tajawal',sans-serif;}",
+      ".lzc-chip{position:fixed;bottom:84px;inset-inline-start:14px;z-index:99990;display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#2F5E3E,#234a30);color:#fff;border:none;border-radius:30px;padding:8px 14px 8px 12px;box-shadow:0 8px 22px rgba(35,74,48,.34);cursor:pointer;font-family:'Tajawal',sans-serif;}",
+      ".lzc-chip .rg{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:900;color:#fff;background:conic-gradient(#C08A43 var(--p,30%),rgba(255,255,255,.28) 0);}",
+      ".lzc-chip .rg i{width:16px;height:16px;border-radius:50%;background:#234a30;display:grid;place-items:center;font-style:normal;}",
+      ".lzc-chip .ct{display:flex;flex-direction:column;line-height:1.15;text-align:start;}",
+      ".lzc-chip .ct b{font-size:12.5px;font-weight:800;}",
+      ".lzc-chip .ct s{font-size:10px;text-decoration:none;color:#d6e7db;font-weight:600;}",
+      ".lzc-ov{position:fixed;inset:0;z-index:99991;background:rgba(20,30,24,.5);display:flex;align-items:flex-end;justify-content:center;}",
+      ".lzc-sheet{background:#fff;width:100%;max-width:460px;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.25);}",
+      "@media(min-width:520px){.lzc-ov{align-items:center;}.lzc-sheet{border-radius:22px;}}",
+      ".lzc-hd{background:linear-gradient(135deg,#2F5E3E,#234a30);color:#fff;padding:16px 18px;position:relative;display:flex;justify-content:space-between;align-items:center;}",
+      ".lzc-hd::after{content:'';position:absolute;inset-inline:0;bottom:0;height:4px;background:linear-gradient(90deg,#C08A43,#e0b574,#C08A43);}",
+      ".lzc-hd h3{font-size:18px;font-weight:900;margin:0;}",
+      ".lzc-x{background:rgba(255,255,255,.16);border:none;color:#fff;width:32px;height:32px;border-radius:10px;font-size:18px;cursor:pointer;}",
+      ".lzc-tabs{display:flex;gap:6px;padding:12px 14px 0;flex-wrap:wrap;}",
+      ".lzc-tabs button{flex:1;min-width:74px;border:1px solid #e3e9e3;background:#f7f9f7;color:#4a5a50;font-family:inherit;font-size:12.5px;font-weight:800;padding:9px 6px;border-radius:10px;cursor:pointer;}",
+      ".lzc-tabs button.on{background:#2F5E3E;color:#fff;border-color:#2F5E3E;}",
+      ".lzc-bd{padding:14px 16px 22px;}",
+      ".lzc-track{border:1px solid #eef1ee;border-radius:16px;padding:15px 16px;margin-bottom:12px;}",
+      ".lzc-th{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}",
+      ".lzc-th .nm{font-weight:900;font-size:15px;display:flex;align-items:center;gap:8px;}",
+      ".lzc-dot{width:11px;height:11px;border-radius:50%;}",
+      ".lzc-r .lzc-dot{background:#2F5E3E;}.lzc-w .lzc-dot{background:#C08A43;}",
+      ".lzc-bdg{font-size:12.5px;font-weight:900;padding:5px 11px;border-radius:20px;}",
+      ".lzc-r .lzc-bdg{background:#eef5f0;color:#234a30;}.lzc-w .lzc-bdg{background:#fbf3e4;color:#9a6a25;}",
+      ".lzc-rate{display:flex;align-items:baseline;gap:7px;margin-bottom:11px;}",
+      ".lzc-rate b{font-size:25px;font-weight:900;}.lzc-rate span{font-size:12px;color:var(--mut);font-weight:700;}",
+      ".lzc-bar{height:11px;border-radius:30px;background:#edf1ed;overflow:hidden;}",
+      ".lzc-bar i{display:block;height:100%;border-radius:30px;}",
+      ".lzc-r .lzc-bar i{background:linear-gradient(90deg,#3f7a52,#2F5E3E);}.lzc-w .lzc-bar i{background:linear-gradient(90deg,#d6a866,#C08A43);}",
+      ".lzc-meta{display:flex;justify-content:space-between;margin-top:9px;font-size:12.5px;font-weight:800;}",
+      ".lzc-r .lzc-meta .nx{color:#234a30;}.lzc-w .lzc-meta .nx{color:#9a6a25;}",
+      ".lzc-meta .tt{color:var(--mut);direction:ltr;}",
+      ".lzc-max{display:flex;align-items:center;gap:9px;background:#fbf3e4;border:1px solid #ecd9b8;border-radius:11px;padding:11px 13px;font-size:13px;font-weight:900;color:#9a6a25;}",
+      ".lzc-foot{background:#eef5f0;border:1px solid #cfe2d6;border-radius:12px;padding:11px;text-align:center;font-size:12.5px;font-weight:700;color:#234a30;}",
+      ".lzc-seg{display:flex;background:#f0f3f0;border-radius:12px;padding:5px;gap:5px;margin-bottom:16px;}",
+      ".lzc-seg button{flex:1;border:none;background:transparent;font-family:inherit;font-size:14px;font-weight:800;color:var(--mut);padding:9px;border-radius:9px;cursor:pointer;}",
+      ".lzc-seg button.on{background:#fff;color:#234a30;box-shadow:0 2px 6px rgba(35,74,48,.1);}",
+      ".lzc-fld{display:block;font-size:13px;font-weight:800;color:var(--mut);margin-bottom:7px;}",
+      ".lzc-inp{position:relative;margin-bottom:14px;}",
+      ".lzc-inp input{width:100%;font-family:inherit;font-size:23px;font-weight:900;color:var(--ink);padding:14px 16px 14px 52px;border:2px solid #e3e9e3;border-radius:13px;outline:none;direction:ltr;text-align:left;}",
+      ".lzc-inp .cur{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:14px;font-weight:800;color:var(--mut);}",
+      ".lzc-tag{display:flex;align-items:center;justify-content:space-between;background:#eef5f0;border:1px solid #cfe2d6;border-radius:12px;padding:12px 15px;margin-bottom:13px;font-weight:900;color:#234a30;}",
+      ".lzc-tag.w{background:#fbf3e4;border-color:#ecd9b8;color:#9a6a25;}",
+      ".lzc-res{border:1px solid #eef1ee;border-radius:14px;overflow:hidden;}",
+      ".lzc-row{display:flex;justify-content:space-between;align-items:center;padding:13px 15px;font-size:14.5px;}",
+      ".lzc-row .k{color:var(--mut);font-weight:700;}.lzc-row .v{font-weight:900;direction:ltr;}",
+      ".lzc-row.c{background:#fbf3e4;border-block:1px solid #ecd9b8;}.lzc-row.c .v{color:var(--red);}",
+      ".lzc-row.n{background:#2F5E3E;color:#fff;}.lzc-row.n .k{color:#fff;font-weight:900;}.lzc-row.n .v{font-size:19px;}",
+      ".lzc-save{margin-top:13px;background:linear-gradient(135deg,#fbf3e4,#fff);border:1px dashed #C08A43;border-radius:13px;padding:13px 15px;font-size:13px;font-weight:700;color:#7a5a22;line-height:1.6;}",
+      ".lzc-save b{color:#9a6a25;font-weight:900;}",
+      ".lzc-tbl{width:100%;border-collapse:collapse;font-size:13.5px;margin-bottom:16px;border:1px solid #cfe2d6;border-radius:12px;overflow:hidden;}",
+      ".lzc-tbl th{background:#2F5E3E;color:#fff;font-weight:800;padding:10px 6px;}",
+      ".lzc-tbl td{padding:10px 6px;text-align:center;border-top:1px solid #e9efe9;font-weight:700;}",
+      ".lzc-tbl tr:nth-child(even){background:#eef5f0;}",
+      ".lzc-tbl .rng{direction:ltr;color:#2a4cc0;font-weight:800;}",
+      ".lzc-secttl{font-size:14px;font-weight:900;color:#234a30;margin:4px 0 8px;}",
+      ".lzc-ord{border:1px solid #eef1ee;border-radius:13px;padding:12px 14px;margin-bottom:10px;}",
+      ".lzc-ord .top{display:flex;justify-content:space-between;align-items:center;font-weight:900;}",
+      ".lzc-ord .amt{color:var(--red);direction:ltr;}",
+      ".lzc-ord .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}",
+      ".lzc-ord .chips span{font-size:11px;font-weight:800;background:#fbf3e4;border:1px solid #ecd9b8;color:#9a6a25;padding:3px 9px;border-radius:20px;}",
+      ".lzc-ord .rev{margin-top:7px;font-size:12px;font-weight:800;color:var(--red);}",
+      ".lzc-empty{text-align:center;color:var(--mut);font-weight:700;padding:26px 10px;}"
+    ].join("\n");
+    document.head.appendChild(css);
+  }
+
+  // ---------- data ----------
+  function loadTiers() {
+    if (STATE.tiers.length) return Promise.resolve(STATE.tiers);
+    return SB.from("commission_tiers").select("*").then(function (r) { STATE.tiers = r.data || []; return STATE.tiers; });
+  }
+  function loadProfile() {
+    return SB.auth.getUser().then(function (r) {
+      var u = r && r.data && r.data.user;
+      if (!u) { STATE.uid = null; STATE.profile = null; return null; }
+      STATE.uid = u.id;
+      return SB.from("profiles").select("name,role,retail_cumulative_sales,wholesale_cumulative_sales").eq("user_id", u.id).maybeSingle()
+        .then(function (p) { STATE.profile = p.data || null; return STATE.profile; });
+    });
+  }
+  function isSeller(p) {
+    if (!p || !p.role) return false;
+    var role = p.role;
+    return SELLER_ROLES.some(function (x) { return role === x || role.indexOf(x) === 0; });
+  }
+  function primarySeg(p) {
+    if (!p) return "retail";
+    return Number(p.wholesale_cumulative_sales) > Number(p.retail_cumulative_sales) ? "wholesale" : "retail";
+  }
+
+  // ---------- chip ----------
+  function renderChip() {
+    var old = document.querySelector(".lzc-chip"); if (old) old.remove();
+    if (!STATE.profile || !isSeller(STATE.profile)) return;
+    var seg = primarySeg(STATE.profile);
+    var cum = Number(STATE.profile[seg + "_cumulative_sales"]) || 0;
+    var tr = tierOf(STATE.tiers, seg, cum);
+    if (!tr) return;
+    var nx = nextTier(STATE.tiers, seg, tr.level);
+    var prog = nx ? Math.max(0, Math.min(100, ((cum - tr.min_sales) / (nx.min_sales - tr.min_sales)) * 100)) : 100;
+    var btn = document.createElement("button");
+    btn.className = "lzc-chip lzc";
+    btn.style.setProperty("--p", prog.toFixed(0) + "%");
+    btn.innerHTML =
+      '<span class="rg"><i>' + AR(tr.level) + "</i></span>" +
+      '<span class="ct"><b>مستوى ' + AR(tr.level) + "</b><s>" + SEG_AR[seg] + " · " + pct(tr.rate, seg) + "</s></span>";
+    btn.addEventListener("click", openSheet);
+    document.body.appendChild(btn);
+  }
+
+  // ---------- sheet ----------
+  function openSheet() {
+    Promise.all([loadProfile(), loadTiers()]).then(function () {
+      STATE.calcSeg = primarySeg(STATE.profile);
+      var ov = document.createElement("div");
+      ov.className = "lzc-ov lzc";
+      ov.addEventListener("click", function (e) { if (e.target === ov) ov.remove(); });
+      ov.innerHTML = '<div class="lzc-sheet"><div class="lzc-hd"><h3>مركز العمولة</h3><button class="lzc-x">×</button></div>' +
+        '<div class="lzc-tabs"></div><div class="lzc-bd"></div></div>';
+      ov.querySelector(".lzc-x").addEventListener("click", function () { ov.remove(); });
+      document.body.appendChild(ov);
+      buildTabs(ov); renderTab(ov);
+    });
+  }
+  function buildTabs(ov) {
+    var tabs = [["level", "مستواي"], ["calc", "احسب"], ["system", "النظام"], ["mine", "عمولاتي"]];
+    var box = ov.querySelector(".lzc-tabs"); box.innerHTML = "";
+    tabs.forEach(function (t) {
+      var b = document.createElement("button");
+      b.textContent = t[1]; if (STATE.tab === t[0]) b.className = "on";
+      b.addEventListener("click", function () { STATE.tab = t[0]; buildTabs(ov); renderTab(ov); });
+      box.appendChild(b);
+    });
+  }
+  function renderTab(ov) {
+    var bd = ov.querySelector(".lzc-bd");
+    if (STATE.tab === "level") bd.innerHTML = viewLevel();
+    else if (STATE.tab === "calc") { bd.innerHTML = viewCalc(); wireCalc(ov); }
+    else if (STATE.tab === "system") bd.innerHTML = viewSystem();
+    else { bd.innerHTML = '<div class="lzc-empty">جارٍ التحميل…</div>'; loadMine(ov); }
+  }
+
+  function trackHtml(seg, cum) {
+    var cls = seg === "wholesale" ? "lzc-w" : "lzc-r";
+    var tr = tierOf(STATE.tiers, seg, cum);
+    if (!tr) return "";
+    var nx = nextTier(STATE.tiers, seg, tr.level);
+    var head = '<div class="lzc-track ' + cls + '"><div class="lzc-th"><div class="nm"><span class="lzc-dot"></span>' + SEG_AR[seg] +
+      '</div><span class="lzc-bdg">مستوى ' + AR(tr.level) + " من ٧</span></div>" +
+      '<div class="lzc-rate"><b>' + pct(tr.rate, seg) + "</b><span>عمولتك الحالية</span></div>";
+    if (nx) {
+      var prog = Math.max(0, Math.min(100, ((cum - tr.min_sales) / (nx.min_sales - tr.min_sales)) * 100));
+      var remaining = Math.max(0, nx.min_sales - cum);
+      head += '<div class="lzc-bar"><i style="width:' + prog.toFixed(0) + '%"></i></div>' +
+        '<div class="lzc-meta"><span class="nx">متبقٍ ' + grp(remaining) + " ر للمستوى " + AR(nx.level) + " · عمولة " + pct(nx.rate, seg) + "</span>" +
+        '<span class="tt">' + grp(cum) + " / " + grp(nx.min_sales) + "</span></div>";
+    } else {
+      head += '<div class="lzc-max">🏆 وصلت لأعلى مستوى — تتمتع بأقل عمولة في المنصة</div>';
+    }
+    return head + "</div>";
+  }
+  function viewLevel() {
+    var p = STATE.profile || {};
+    return trackHtml("retail", Number(p.retail_cumulative_sales) || 0) +
+      trackHtml("wholesale", Number(p.wholesale_cumulative_sales) || 0) +
+      '<div class="lzc-foot">كل ما بعت أكثر، قلّت عمولتك — والمسارَان مستقلان تماماً</div>';
+  }
+
+  function viewCalc() {
+    var seg = STATE.calcSeg;
+    var p = STATE.profile || {};
+    var cum = Number(p[seg + "_cumulative_sales"]) || 0;
+    var tr = tierOf(STATE.tiers, seg, cum);
+    var amt = Number(STATE.calcAmt) || 0;
+    var rate = tr ? Number(tr.rate) : 0;
+    var comm = Math.round(amt * rate * 100) / 100;
+    var net = Math.round((amt - comm) * 100) / 100;
+    var nx = tr ? nextTier(STATE.tiers, seg, tr.level) : null;
+    var save = nx ?
+      '<div class="lzc-save">في المستوى التالي (عمولة ' + pct(nx.rate, seg) + ") ستدفع على نفس المبلغ عمولة أقل بـ <b>" +
+      money2(Math.round(amt * (rate - nx.rate) * 100) / 100) + " ر</b>.</div>"
+      : '<div class="lzc-save"><b>أنت في أعلى مستوى</b> — تتمتع بأقل عمولة ممكنة.</div>';
+    return '<div class="lzc-seg"><button data-seg="retail" class="' + (seg === "retail" ? "on" : "") + '">تجزئة</button>' +
+      '<button data-seg="wholesale" class="' + (seg === "wholesale" ? "on" : "") + '">جملة</button></div>' +
+      '<label class="lzc-fld">قيمة البضاعة (بدون رسوم التوصيل)</label>' +
+      '<div class="lzc-inp"><span class="cur">ريال</span><input id="lzc-amt" inputmode="numeric" value="' + grp(amt) + '"></div>' +
+      '<div class="lzc-tag ' + (seg === "wholesale" ? "w" : "") + '"><span>مستواك الحالي: ' + (tr ? "مستوى " + AR(tr.level) + " من ٧" : "—") +
+      "</span><span>" + (tr ? pct(tr.rate, seg) : "—") + "</span></div>" +
+      '<div class="lzc-res"><div class="lzc-row"><span class="k">قيمة البضاعة</span><span class="v">' + money2(amt) + ' ر</span></div>' +
+      '<div class="lzc-row c"><span class="k">عمولة لوزي</span><span class="v">− ' + money2(comm) + ' ر</span></div>' +
+      '<div class="lzc-row n"><span class="k">صافي لك</span><span class="v">' + money2(net) + " ر</span></div></div>" + save +
+      '<div class="lzc-save" style="border-style:solid;border-color:#ecd9b8;background:#f7f9f7;color:#6c7d73;margin-top:10px;">المستوى يُحدَّد من مبيعاتك التراكمية لا من مبلغ الطلب — المبلغ هنا فقط لحساب العمولة بنسبتك الحالية.</div>';
+  }
+  function wireCalc(ov) {
+    var inp = ov.querySelector("#lzc-amt");
+    if (inp) inp.addEventListener("input", function () {
+      var raw = inp.value.replace(/[^0-9]/g, "");
+      STATE.calcAmt = raw === "" ? 0 : Number(raw);
+      var bd = ov.querySelector(".lzc-bd"); bd.innerHTML = viewCalc(); wireCalc(ov);
+      var ni = ov.querySelector("#lzc-amt"); if (ni) { ni.focus(); ni.setSelectionRange(ni.value.length, ni.value.length); }
+    });
+    ov.querySelectorAll(".lzc-seg button").forEach(function (b) {
+      b.addEventListener("click", function () { STATE.calcSeg = b.getAttribute("data-seg"); var bd = ov.querySelector(".lzc-bd"); bd.innerHTML = viewCalc(); wireCalc(ov); });
+    });
+  }
+
+  function segTable(seg) {
+    var rows = (STATE.tiers || []).filter(function (t) { return t.segment === seg; }).sort(function (a, b) { return a.level - b.level; });
+    var body = rows.map(function (r) {
+      var rng = r.max_sales == null ? grp(r.min_sales) + " فأكثر" : grp(r.min_sales) + " - " + grp(r.max_sales);
+      return "<tr><td>مستوى " + AR(r.level) + "</td><td>" + pct(r.rate, seg) + '</td><td class="rng">' + rng + "</td></tr>";
+    }).join("");
+    return '<div class="lzc-secttl">' + (seg === "retail" ? "مستويات التجزئة" : "مستويات الجملة") + "</div>" +
+      '<table class="lzc-tbl"><thead><tr><th>المستوى</th><th>العمولة</th><th>نطاق المبيعات (ر)</th></tr></thead><tbody>' + body + "</tbody></table>";
+  }
+  function viewSystem() {
+    return '<div class="lzc-save" style="border-style:solid;border-color:#cfe2d6;background:#eef5f0;color:#234a30;margin-bottom:14px;">' +
+      "كل ما زادت مبيعاتك التراكمية انخفضت عمولتك. لكل بائع عدّادان مستقلان تماماً: تجزئة وجملة. النسبة تُحسب من العدّاد قبل إضافة العملية، ولا يُحتسب إلا الطلبات المكتملة.</div>" +
+      segTable("retail") + segTable("wholesale");
+  }
+
+  function loadMine(ov) {
+    if (!STATE.uid) { ov.querySelector(".lzc-bd").innerHTML = '<div class="lzc-empty">سجّل الدخول لعرض عمولاتك.</div>'; return; }
+    SB.from("orders").select("order_no,segment,commission_rate_applied,commission_amount,commission_state,goods_subtotal,reversed_amount,created_at")
+      .eq("seller_vendor_id", STATE.uid).not("commission_amount", "is", null)
+      .order("created_at", { ascending: false }).then(function (r) {
+        if (STATE.tab !== "mine") return;
+        var bd = ov.querySelector(".lzc-bd");
+        var rows = r.data || [];
+        if (!rows.length) { bd.innerHTML = '<div class="lzc-empty">لا توجد عمولات محتسبة بعد.</div>'; return; }
+        bd.innerHTML = rows.map(function (o) {
+          var rev = o.commission_state === "reversed" || o.commission_state === "partially_reversed";
+          return '<div class="lzc-ord"><div class="top"><span>طلب #' + o.order_no + '</span><span class="amt">− ' + money2(o.commission_amount) + ' ر</span></div>' +
+            '<div class="chips"><span>' + (SEG_AR[o.segment] || o.segment || "—") + "</span><span>النسبة " + pct(o.commission_rate_applied, o.segment) +
+            "</span><span>الأساس " + money2(o.goods_subtotal) + " ر</span></div>" +
+            (rev ? '<div class="rev">' + (o.commission_state === "reversed" ? "أُعيدت كاملة" : "أُعيد جزء") + " (" + money2(o.reversed_amount) + " ر)</div>" : "") +
+            "</div>";
+        }).join("");
+      });
+  }
+
+  // ---------- boot ----------
+  function boot() {
+    SB = window.LOZI_SB;
+    if (!SB) return;
+    injectCss();
+    Promise.all([loadProfile(), loadTiers()]).then(renderChip);
+    if (SB.auth && SB.auth.onAuthStateChange) {
+      SB.auth.onAuthStateChange(function () {
+        Promise.all([loadProfile(), loadTiers()]).then(renderChip);
+      });
+    }
+  }
+  function waitSB(n) {
+    if (window.LOZI_SB) { boot(); return; }
+    if (n > 100) return;
+    setTimeout(function () { waitSB(n + 1); }, 100);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { waitSB(0); });
+  else waitSB(0);
+})();
+
+</script>
 </body>
 </html>
