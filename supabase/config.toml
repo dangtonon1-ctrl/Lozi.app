@@ -1,0 +1,8 @@
+project_id = "niloddwnllhsvrmuxfxw"
+
+# The Auth "Send Email" hook is called by Supabase with a Standard Webhooks
+# signature, not a user JWT — so JWT verification must be disabled for it.
+# (request-otp / verify-otp keep the default verify_jwt = true; they are invoked
+# from the client with the anon key.)
+[functions.send-email]
+verify_jwt = false
