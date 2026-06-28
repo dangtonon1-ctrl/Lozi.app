@@ -34,6 +34,9 @@
   .btn.ghost{background:var(--sand);color:var(--ink);}
   .btn.sm{height:42px;font-size:13.5px;border-radius:11px;}
   .row2{display:flex;gap:10px;}
+.bundle-item{border:1.5px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;background:var(--surface);}
+.bundle-item-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.bundle-item-title{font-size:13px;font-weight:800;color:var(--green);}
   .tabs{display:flex;gap:8px;overflow-x:auto;padding:0 18px 4px;background:var(--bg);position:sticky;top:56px;z-index:9;}
   .tabs button{flex-shrink:0;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:9px 15px;font-size:13.5px;font-weight:800;color:var(--muted);cursor:pointer;}
   .tabs button.on{background:var(--green-deep);color:#fff;border-color:var(--green-deep);}
@@ -119,6 +122,14 @@ const AR = (s) => String(s).replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d]);
 const pct = (rate, seg) => (Number(rate) * 100).toFixed(seg === 'wholesale' ? 1 : 2) + '%';
 const money2 = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: (Number(n) % 1 !== 0 ? 2 : 0), maximumFractionDigits: 2 });
 const SEG_AR = { retail: 'تجزئة', wholesale: 'جملة' };
+// Mixed-bundle component weight units
+const UNIT_AR = { gram: 'جرام', kilo: 'كيلو' };
+const fmtItemWeight = (it) => {
+  const w = (it && it.weight != null ? String(it.weight) : '').trim();
+  if (!w) return '';
+  const u = it && it.unit ? (UNIT_AR[it.unit] || '') : '';
+  return u ? w + ' ' + u : w;
+};
 
 function Login({ onIn }) {
   const [email, setEmail] = useState('');
@@ -666,7 +677,7 @@ function BundleAdmin() {
   const [stock, setStock] = useState('');
   const [pub, setPub] = useState(true);
   const [imgUrl, setImgUrl] = useState('');
-  const [items, setItems] = useState([{ name: '', weight: '' }, { name: '', weight: '' }]);
+  const [items, setItems] = useState([{ name: '', weight: '', unit: 'gram' }, { name: '', weight: '', unit: 'gram' }]);
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState(null);
   const [msg, setMsg] = useState('');
@@ -690,16 +701,16 @@ function BundleAdmin() {
     setImgUrl(data.publicUrl); setBusy(false); setMsg('تم رفع الصورة ✓'); setTimeout(() => setMsg(''), 1500);
   };
   const setItem = (i, k, v) => setItems((arr) => arr.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
-  const addItem = () => setItems((arr) => [...arr, { name: '', weight: '' }]);
+  const addItem = () => setItems((arr) => [...arr, { name: '', weight: '', unit: 'gram' }]);
   const removeItem = (i) => setItems((arr) => (arr.length > 1 ? arr.filter((_, j) => j !== i) : arr));
   const save = async () => {
-    const cleanItems = items.map((it) => ({ name: it.name.trim(), weight: it.weight.trim() })).filter((it) => it.name);
+    const cleanItems = items.map((it) => ({ name: it.name.trim(), weight: String(it.weight || '').trim(), unit: it.unit === 'kilo' ? 'kilo' : 'gram' })).filter((it) => it.name);
     if (!name.trim() || !price || Number(price) <= 0) return setMsg('أدخل اسم العرض والسعر الإجمالي.');
     if (cleanItems.length < 2) return setMsg('أضف عنصرين على الأقل إلى العرض المشكّل.');
     setBusy(true); setMsg('');
     const { data: au } = await SB.auth.getUser();
     const uid = au && au.user && au.user.id;
-    const summary = cleanItems.map((it) => it.name + (it.weight ? ' ' + it.weight : '')).join(' + ');
+    const summary = cleanItems.map((it) => { const w = fmtItemWeight(it); return it.name + (w ? ' ' + w : ''); }).join(' + ');
     const stockVal = stock !== '' ? Math.max(0, Math.floor(Number(stock) || 0)) : null;
     const data = {
       name: { ar: name.trim(), en: name.trim() },
@@ -728,7 +739,7 @@ function BundleAdmin() {
     setStock(r.stock != null ? String(r.stock) : (d.stock != null ? String(d.stock) : ''));
     setPub(r.status !== 'hidden');
     setImgUrl(d.img || '');
-    setItems(d.items && d.items.length ? d.items.map((it) => ({ name: it.name || '', weight: it.weight || '' })) : [{ name: '', weight: '' }, { name: '', weight: '' }]);
+    setItems(d.items && d.items.length ? d.items.map((it) => ({ name: it.name || '', weight: it.weight != null ? String(it.weight) : '', unit: it.unit === 'kilo' ? 'kilo' : 'gram' })) : [{ name: '', weight: '', unit: 'gram' }, { name: '', weight: '', unit: 'gram' }]);
     window.scrollTo(0, 0);
   };
   const toggle = async (r) => { const { error } = await SB.from('products').update({ status: r.status === 'hidden' ? 'available' : 'hidden' }).eq('id', r.id); if (!error) load(); };
@@ -742,10 +753,21 @@ function BundleAdmin() {
         <label className="fld"><span>الكمية المتوفّرة (مخزون العرض)</span><input value={stock} onChange={(e) => setStock(e.target.value)} inputMode="numeric" placeholder="اتركه فارغاً لغير محدود" /></label>
         <div className="secttl" style={{ marginTop: 6 }}>مكوّنات العرض</div>
         {items.map((it, i) => (
-          <div className="row2" key={i} style={{ alignItems: 'flex-end' }}>
-            <label className="fld" style={{ flex: 2 }}><span>الصنف {i + 1}</span><input value={it.name} onChange={(e) => setItem(i, 'name', e.target.value)} placeholder="مثال: لوز" /></label>
-            <label className="fld" style={{ flex: 1 }}><span>الوزن</span><input value={it.weight} onChange={(e) => setItem(i, 'weight', e.target.value)} placeholder="مثال: ٢٥٠ جم" /></label>
-            <button className="btn sm danger" style={{ marginBottom: 10 }} disabled={items.length <= 1} onClick={() => removeItem(i)}>حذف</button>
+          <div className="bundle-item" key={i}>
+            <div className="bundle-item-head">
+              <span className="bundle-item-title">الصنف {i + 1}</span>
+              <button className="btn sm danger" disabled={items.length <= 1} onClick={() => removeItem(i)}>حذف</button>
+            </div>
+            <label className="fld"><span>الصنف</span><input value={it.name} onChange={(e) => setItem(i, 'name', e.target.value)} placeholder="مثال: لوز" /></label>
+            <div className="row2">
+              <label className="fld" style={{ flex: 2 }}><span>الوزن</span><input value={it.weight} onChange={(e) => setItem(i, 'weight', e.target.value)} inputMode="decimal" placeholder="مثال: ٢٥٠" /></label>
+              <label className="fld" style={{ flex: 1, minWidth: 110 }}><span>الوحدة</span>
+                <select value={it.unit || 'gram'} onChange={(e) => setItem(i, 'unit', e.target.value)}>
+                  <option value="gram">جرام</option>
+                  <option value="kilo">كيلو</option>
+                </select>
+              </label>
+            </div>
           </div>
         ))}
         <button className="btn sm ghost" onClick={addItem} style={{ marginBottom: 10 }}>+ إضافة صنف</button>
@@ -778,7 +800,7 @@ function BundleAdmin() {
                 </div>
                 <div className="kv"><b>السعر:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 800 }}>{r.price} ريال</span></div>
                 <div className="kv"><b>المخزون:</b> {r.stock != null ? r.stock : 'غير محدود'}</div>
-                <div className="kv"><b>المكوّنات:</b> {its.map((it, i) => (it.name + (it.weight ? ' ' + it.weight : ''))).join(' + ') || '—'}</div>
+                <div className="kv"><b>المكوّنات:</b> {its.map((it) => { const w = fmtItemWeight(it); return it.name + (w ? ' ' + w : ''); }).join(' + ') || '—'}</div>
                 <Stamp at={r.created_at} label="تاريخ الإنشاء" />
                 {r.updated_at && <Stamp at={r.updated_at} label="آخر تعديل" />}
                 <div className="acts">
