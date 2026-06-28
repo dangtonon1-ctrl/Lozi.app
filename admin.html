@@ -95,6 +95,31 @@ function Stamp({ at, label }) {
   return <div className="kv ts"><b>{label || 'التاريخ والوقت'}:</b> 🕒 {fmtDT(at)}</div>;
 }
 
+// ---- Commission helpers (cumulative-sales tier system) ----
+const TIERS_CACHE = { data: null, p: null };
+async function getTiers() {
+  if (TIERS_CACHE.data) return TIERS_CACHE.data;
+  if (!TIERS_CACHE.p) {
+    TIERS_CACHE.p = SB.from('commission_tiers').select('*').then(({ data }) => {
+      TIERS_CACHE.data = data || []; return TIERS_CACHE.data;
+    });
+  }
+  return TIERS_CACHE.p;
+}
+// Level/rate row matching a cumulative value within a segment (single source of truth).
+const tierOf = (tiers, segment, cum) => {
+  const rows = (tiers || []).filter((t) => t.segment === segment).sort((a, b) => a.level - b.level);
+  const c = Number(cum) || 0;
+  for (const r of rows) {
+    if (c >= Number(r.min_sales) && (r.max_sales == null || c <= Number(r.max_sales))) return r;
+  }
+  return rows[rows.length - 1] || null;
+};
+const AR = (s) => String(s).replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d]);
+const pct = (rate, seg) => (Number(rate) * 100).toFixed(seg === 'wholesale' ? 1 : 2) + '%';
+const money2 = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: (Number(n) % 1 !== 0 ? 2 : 0), maximumFractionDigits: 2 });
+const SEG_AR = { retail: 'تجزئة', wholesale: 'جملة' };
+
 function Login({ onIn }) {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -616,14 +641,17 @@ function OrdersAdmin() {
   const [sub, setSub] = useState('almond');
   const [msg, setMsg] = useState('');
   const [feeInput, setFeeInput] = useState({}); // order_no -> wholesale delivery fee being edited
+  const [tiers, setTiers] = useState([]);
   const load = async () => {
     setOrders(null);
-    const [o, p, s, pr] = await Promise.all([
+    const [o, p, s, pr, t] = await Promise.all([
       SB.from('orders').select('*').order('created_at', { ascending: false }),
       SB.from('products').select('id,category,vendor_id'),
       SB.from('stores').select('vendor_id,name'),
       SB.from('profiles').select('user_id,name,phone,role'),
+      getTiers(),
     ]);
+    setTiers(t || []);
     const pc = {}, vc = {};
     (p.data || []).forEach((r) => { pc[r.id] = r.category; if (r.category) vc[r.vendor_id] = r.category; });
     const sm = {}; (s.data || []).forEach((r) => { sm[r.vendor_id] = r.name; });
@@ -728,6 +756,29 @@ function OrdersAdmin() {
                     <span style={{ color: 'var(--muted)' }}>{o.delivery_fee != null ? 'الحالي: ' + money(o.delivery_fee) : 'لم تُحدَّد بعد'}</span>
                   </div>}
                 <div className="kv"><b>الإجمالي:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 900 }}>{money(o.total)}</span></div>
+
+                {o.commission_amount != null && (() => {
+                  const tr = tierOf(tiers, o.segment, o.cumulative_before);
+                  const reversed = o.commission_state === 'reversed' || o.commission_state === 'partially_reversed';
+                  return (
+                    <div style={{ margin: '10px 0', background: 'var(--sand)', border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontWeight: 900, color: 'var(--gold-deep)' }}>٪ عمولة لوزي</div>
+                        <div style={{ fontWeight: 900, color: 'var(--danger)', direction: 'ltr' }}>− {money2(o.commission_amount)} ر</div>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 9 }}>
+                        <span className="tag">{SEG_AR[o.segment] || o.segment}</span>
+                        {tr && <span className="tag">مستوى {AR(tr.level)}</span>}
+                        <span className="tag">النسبة {pct(o.commission_rate_applied, o.segment)}</span>
+                        <span className="tag">الأساس: البضاعة {money2(o.goods_subtotal)} ر</span>
+                      </div>
+                      {reversed && <div className="kv" style={{ marginTop: 8, color: 'var(--danger)', fontWeight: 800 }}>
+                        {o.commission_state === 'reversed' ? 'أُعيدت العمولة كاملة' : 'أُعيد جزء من العمولة'} ({money2(o.reversed_amount)} ر)
+                      </div>}
+                    </div>
+                  );
+                })()}
+
                 <div className="kv"><b>الدفع:</b> {o.pay === 'prepaid' ? 'تحويل مسبق' : 'نقداً عند الاستلام'}
                   {o.pay === 'prepaid' && <span className={`tag ${(PAYST[o.pay_status] || PAYST.pending)[1]}`} style={{ marginInlineStart: 6 }}>{(PAYST[o.pay_status] || PAYST.pending)[0]}</span>}</div>
                 {o.reject_reason && <div className="kv"><b>سبب الرفض:</b> {o.reject_reason}</div>}
@@ -750,6 +801,77 @@ function OrdersAdmin() {
   );
 }
 
+// ---- Seller commission levels ----
+function SellerLevels() {
+  const [rows, setRows] = useState(null);
+  const [tiers, setTiers] = useState([]);
+  const [filter, setFilter] = useState('all'); // all | retail | wholesale | top
+  const load = async () => {
+    setRows(null);
+    const [t, p] = await Promise.all([
+      getTiers(),
+      SB.from('profiles').select('user_id,name,role,retail_cumulative_sales,wholesale_cumulative_sales'),
+    ]);
+    setTiers(t || []);
+    const sellers = (p.data || []).filter((r) => {
+      const role = r.role || '';
+      const isSeller = role === 'farmer' || role.indexOf('farmer') === 0 || role === 'retail' || role === 'wholesale';
+      const hasSales = Number(r.retail_cumulative_sales) > 0 || Number(r.wholesale_cumulative_sales) > 0;
+      return isSeller || hasSales;
+    });
+    setRows(sellers);
+  };
+  useEffect(() => { load(); }, []);
+  const Badge = ({ seg, cum }) => {
+    const has = Number(cum) > 0;
+    const tr = has ? tierOf(tiers, seg, cum) : null;
+    const isW = seg === 'wholesale';
+    const bg = !has ? '#F1F2F1' : isW ? 'var(--sand)' : 'var(--green-soft)';
+    const col = !has ? '#9AA49D' : isW ? 'var(--gold-deep)' : 'var(--green-deep)';
+    return (
+      <span className="tag" style={{ background: bg, color: col, fontSize: 11.5, padding: '5px 10px' }}>
+        {SEG_AR[seg]} {has && tr ? <b style={{ fontWeight: 900 }}>{'م' + AR(tr.level)} · {pct(tr.rate, seg)}</b> : '—'}
+      </span>
+    );
+  };
+  let shown = (rows || []);
+  if (filter === 'retail') shown = shown.filter((r) => Number(r.retail_cumulative_sales) > 0);
+  else if (filter === 'wholesale') shown = shown.filter((r) => Number(r.wholesale_cumulative_sales) > 0);
+  else if (filter === 'top') shown = [...shown].sort((a, b) =>
+    (Number(b.retail_cumulative_sales) + Number(b.wholesale_cumulative_sales)) -
+    (Number(a.retail_cumulative_sales) + Number(a.wholesale_cumulative_sales)));
+  const money = (n) => (Number(n) || 0).toLocaleString('en-US') + ' ر';
+  return (
+    <div>
+      <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
+        {[['all', 'الكل'], ['retail', 'تجزئة'], ['wholesale', 'جملة'], ['top', 'الأعلى مبيعاً']].map(([f, l]) =>
+          <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{l}</button>)}
+      </div>
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !shown.length ? <div className="empty">لا يوجد بائعون.</div>
+          : shown.map((r) => (
+            <div className="card" key={r.user_id} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div style={{ flex: '0 0 auto', width: 44, height: 44, borderRadius: 13, background: 'var(--green-soft)', color: 'var(--green-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 17, border: '1px solid var(--line)' }}>{(r.name || '؟').trim().charAt(0)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 900, fontSize: 15 }}>{r.name || 'بدون اسم'}</div>
+                <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                  تراكمي: تجزئة <b style={{ color: 'var(--green-deep)' }}>{money(r.retail_cumulative_sales)}</b>
+                  {Number(r.wholesale_cumulative_sales) > 0 && <> · جملة <b style={{ color: 'var(--gold-deep)' }}>{money(r.wholesale_cumulative_sales)}</b></>}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start', flex: '0 0 auto' }}>
+                <Badge seg="retail" cum={r.retail_cumulative_sales} />
+                <Badge seg="wholesale" cum={r.wholesale_cumulative_sales} />
+              </div>
+            </div>
+          ))}
+      <div className="muted" style={{ textAlign: 'center', padding: '6px 0' }}>
+        {rows ? AR(shown.length) + ' بائع' : ''}
+      </div>
+    </div>
+  );
+}
+
 function Admin() {
   const [user, setUser] = useState(undefined); // undefined=loading, null=logged out
   const [tab, setTab] = useState('verif');
@@ -763,7 +885,7 @@ function Admin() {
   }, []);
   if (user === undefined) return <div className="empty">جارٍ التحميل…</div>;
   if (!user) return <Login onIn={setUser} />;
-  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['lozisave', 'خانة التوفير'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
+  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['levels', 'مستويات البائعين'], ['lozisave', 'خانة التوفير'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
   return (
     <div>
       <div className="topbar"><h1>لوزي · لوحة الإدارة</h1><button onClick={() => { SB.auth.signOut(); setUser(null); }}>خروج</button></div>
@@ -772,6 +894,7 @@ function Admin() {
         {tab === 'verif' && <Verifications />}
         {tab === 'users' && <Users />}
         {tab === 'orders' && <OrdersAdmin />}
+        {tab === 'levels' && <SellerLevels />}
         {tab === 'lozisave' && <SavingsAdmin />}
         {tab === 'shahti' && <ShahtiReqs />}
         {tab === 'reports' && <Reports />}
