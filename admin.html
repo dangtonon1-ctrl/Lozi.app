@@ -503,6 +503,13 @@ function Users() {
     if (error) return setMsg('خطأ: ' + error.message);
     setMsg('تم ✓ · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 3000); load();
   };
+  // Re-activate clears the number-sharing strike state (warning_count -> 0).
+  const reactivate = async (r) => {
+    if (!confirm('إعادة تفعيل الحساب «' + (r.name || r.phone || 'مستخدم') + '» وتصفير المخالفات؟')) return;
+    const { error } = await SB.rpc('admin_reactivate_account', { p_user: r.user_id });
+    if (error) return setMsg('خطأ: ' + error.message);
+    setMsg('تمت إعادة التفعيل وتصفير المخالفات ✓ · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 3000); load();
+  };
   const del = async (r) => {
     if (!confirm('⚠️ حذف الحساب «' + (r.name || r.phone || 'مستخدم') + '» وكل بياناته نهائياً؟ لا يمكن التراجع.')) return;
     if (!confirm('تأكيد أخير: سيتم حذف منتجاته ومتجره. متابعة؟')) return;
@@ -534,15 +541,17 @@ function Users() {
                 <div className="v-head"><strong>{r.name || 'بدون اسم'}</strong><span className={`tag ${st[1]}`}>{st[0]}</span></div>
                 <div className="kv"><b>الهاتف:</b> {r.phone || '—'}</div>
                 <div className="kv"><b>الدور:</b> {ROLE[r.role] || r.role || '—'}</div>
+                {(r.warning_count > 0 || r.suspended_reason) &&
+                  <div className="kv"><b>مخالفات مشاركة الأرقام:</b> <span style={{ color: r.warning_count >= 3 ? 'var(--danger)' : 'var(--gold-deep)', fontWeight: 800 }}>{r.warning_count || 0} / 3</span>{r.suspended_reason === 'three_strikes_number_sharing' ? ' · موقوف تلقائياً' : ''}</div>}
                 <div className="kv"><b>المعرّف:</b> <span style={{ fontSize: 11 }}>{r.user_id}</span></div>
                 <Stamp at={r.created_at} label="تاريخ التسجيل" />
                 {r.updated_at && <Stamp at={r.updated_at} label="آخر تحديث" />}
                 {r.status !== 'deleted' &&
                   <div className="acts" style={{ flexWrap: 'wrap' }}>
                     {r.status !== 'suspended' && <button className="btn sm ghost" onClick={() => setStatus(r, 'suspended', 'تعليق')}>تعليق</button>}
-                    {r.status === 'suspended' && <button className="btn sm" onClick={() => setStatus(r, 'active', 'إعادة تفعيل')}>إلغاء التعليق</button>}
+                    {r.status === 'suspended' && <button className="btn sm" onClick={() => reactivate(r)}>إلغاء التعليق</button>}
                     {r.status !== 'banned' && <button className="btn sm danger" onClick={() => setStatus(r, 'banned', 'حظر')}>حظر</button>}
-                    {r.status === 'banned' && <button className="btn sm" onClick={() => setStatus(r, 'active', 'رفع الحظر')}>رفع الحظر</button>}
+                    {r.status === 'banned' && <button className="btn sm" onClick={() => reactivate(r)}>رفع الحظر</button>}
                     <button className="btn sm danger" onClick={() => del(r)}>حذف</button>
                   </div>}
               </div>
