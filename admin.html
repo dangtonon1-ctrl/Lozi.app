@@ -65,6 +65,25 @@
   .switch.on{background:var(--green);}
   .switch i{position:absolute;top:3px;inset-inline-start:3px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.2s;}
   .switch.on i{inset-inline-start:22px;}
+  /* ---- Chats oversight (الدردشات) ---- */
+  .conv-row{display:flex;align-items:center;gap:10px;width:100%;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;cursor:pointer;}
+  .conv-row.flag{border-color:#F3C9CE;background:#FFF7F8;}
+  .conv-row .ci{flex:1;min-width:0;}
+  .conv-parties{font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .conv-prev{font-size:12.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .conv-meta{font-size:11.5px;color:var(--gold-deep);font-weight:700;margin-top:4px;}
+  .flag-chip{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:7px;background:#FBE3E5;color:var(--danger);}
+  .role-chip{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:7px;background:var(--sand);color:var(--brown);}
+  .chat-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .chat-head .bk{background:var(--sand);border:none;border-radius:10px;padding:8px 12px;font-weight:800;font-size:13px;cursor:pointer;}
+  .chat-scroll{max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:6px 2px;}
+  .bub{max-width:78%;padding:9px 12px;border-radius:14px;font-size:14px;line-height:1.6;word-break:break-word;}
+  .bub.a{align-self:flex-start;background:var(--green-soft);border-bottom-inline-start-radius:4px;}
+  .bub.b{align-self:flex-end;background:var(--sand);border-bottom-inline-end-radius:4px;}
+  .bub.flag{outline:2px solid var(--danger);background:#FFF1F2;}
+  .bub .who{font-size:11px;font-weight:800;color:var(--green-deep);margin-bottom:3px;}
+  .bub .tm{font-size:10.5px;color:var(--muted);margin-top:4px;}
+  .bub .reasons{margin-top:5px;display:flex;gap:5px;flex-wrap:wrap;}
 </style>
 </head>
 <body>
@@ -1122,6 +1141,148 @@ function TrustBadges() {
   );
 }
 
+// ---- Chats oversight (الدردشات) — FULL monitoring of every conversation ----
+// Admin can read ALL conversations (not only flagged ones). The automatic
+// number/link/email flagging is an extra ALERT layer: flagged chats are
+// highlighted and sortable to the top. Penalty is MANUAL per case — the admin
+// decides warn/suspend/ban from the «المستخدمون» tab.
+const CHAT_ROLE = { customer: 'عميل', farmer: 'مزارع', farmer_almond: 'مزارع لوز', farmer_raisin: 'مزارع زبيب', retail: 'تاجر تجزئة', wholesale: 'تاجر جملة', admin: 'إدارة' };
+const roleLabel = (r) => CHAT_ROLE[r] || r || '—';
+const FLAG_AR = { number: 'رقم هاتف', whatsapp: 'واتساب', telegram: 'تلغرام', email: 'بريد' };
+
+function ChatThread({ conv, onBack }) {
+  const [msgs, setMsgs] = useState(null);
+  const scroller = React.useRef(null);
+  const nameOf = (sid) => sid === conv.participant_a ? (conv.participant_a_name || 'طرف أول')
+    : sid === conv.participant_b ? (conv.participant_b_name || 'طرف ثاني') : 'مستخدم';
+  const sideOf = (sid) => sid === conv.participant_a ? 'a' : 'b';
+  useEffect(() => {
+    let live = true;
+    const load = async () => {
+      const { data } = await SB.from('messages').select('*').eq('conversation_id', conv.id).order('created_at', { ascending: true });
+      if (live) setMsgs(data || []);
+    };
+    load();
+    // Mark this conversation's flag alerts as seen (admin opened it).
+    SB.from('chat_flag_alerts').update({ seen: true }).eq('conversation_id', conv.id).eq('seen', false).then(() => {});
+    // Realtime: new/updated messages appear instantly while the admin watches.
+    const ch = SB.channel('admin-thread-' + conv.id)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: 'conversation_id=eq.' + conv.id }, (payload) => {
+        setMsgs((prev) => {
+          const list = prev ? prev.slice() : [];
+          if (payload.eventType === 'INSERT') {
+            if (list.some((m) => m.id === payload.new.id)) return list;
+            return list.concat(payload.new);
+          }
+          if (payload.eventType === 'UPDATE') return list.map((m) => m.id === payload.new.id ? payload.new : m);
+          if (payload.eventType === 'DELETE') return list.filter((m) => m.id !== payload.old.id);
+          return list;
+        });
+      }).subscribe();
+    return () => { live = false; SB.removeChannel(ch); };
+  }, [conv.id]);
+  useEffect(() => { if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight; }, [msgs]);
+  return (
+    <div className="card">
+      <div className="chat-head">
+        <button className="bk" onClick={onBack}>‹ رجوع</button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="conv-parties">
+            {conv.participant_a_name || 'طرف أول'} <span className="role-chip">{roleLabel(conv.participant_a_role)}</span>
+            <span style={{ color: 'var(--muted)' }}>↔</span>
+            {conv.participant_b_name || 'طرف ثاني'} <span className="role-chip">{roleLabel(conv.participant_b_role)}</span>
+          </div>
+          <div className="conv-meta">
+            {conv.order_no ? 'مرتبطة بالطلب #' + conv.order_no + ' · ' : ''}آخر نشاط: {fmtDT(conv.last_message_at)}
+          </div>
+        </div>
+      </div>
+      <div className="muted" style={{ fontSize: 11.5, marginBottom: 8 }}>
+        العقوبة يدوية: لتحذير/إيقاف/حظر أحد الطرفين استخدم تبويب «المستخدمون».
+      </div>
+      <div className="chat-scroll" ref={scroller}>
+        {msgs === null ? <div className="empty">جارٍ التحميل…</div>
+          : !msgs.length ? <div className="empty">لا توجد رسائل بعد.</div>
+            : msgs.map((m) => (
+              <div key={m.id} className={`bub ${sideOf(m.sender_id)}${m.flagged ? ' flag' : ''}`}>
+                <div className="who">{nameOf(m.sender_id)}</div>
+                <div>{m.body || (Array.isArray(m.attachments) && m.attachments.length ? '📎 مرفق' : '—')}</div>
+                {m.flagged && (m.flag_reasons || []).length > 0 &&
+                  <div className="reasons">{(m.flag_reasons || []).map((r) => <span key={r} className="flag-chip">⚠ {FLAG_AR[r] || r}</span>)}</div>}
+                <div className="tm">🕒 {fmtDT(m.created_at)}</div>
+              </div>
+            ))}
+      </div>
+    </div>
+  );
+}
+
+function ChatsAdmin() {
+  const [rows, setRows] = useState(null);
+  const [filter, setFilter] = useState('all'); // all | flagged
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(null);
+  const [alerts, setAlerts] = useState(0);
+  const load = async () => {
+    // Flagged-first, then most recent activity — high-risk chats surface to top.
+    const { data, error } = await SB.from('admin_conversations').select('*')
+      .order('flagged', { ascending: false }).order('last_message_at', { ascending: false }).limit(500);
+    setRows(error ? [] : (data || []));
+    const { count } = await SB.from('chat_flag_alerts').select('id', { count: 'exact', head: true }).eq('resolved', false);
+    setAlerts(count || 0);
+  };
+  useEffect(() => {
+    load();
+    // Realtime: list reorders/refreshes as conversations get new activity or flags.
+    const ch = SB.channel('admin-convs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_flag_alerts' }, () => load())
+      .subscribe();
+    return () => { SB.removeChannel(ch); };
+  }, []);
+  if (open) return <ChatThread conv={open} onBack={() => { setOpen(null); load(); }} />;
+  let shown = rows || [];
+  if (filter === 'flagged') shown = shown.filter((r) => r.flagged);
+  const query = q.trim().toLowerCase();
+  if (query) shown = shown.filter((r) =>
+    [(r.participant_a_name || ''), (r.participant_b_name || ''), (r.order_no || '')].join(' ').toLowerCase().includes(query));
+  return (
+    <div>
+      <div className="muted" style={{ fontSize: 12.5, marginBottom: 10, lineHeight: 1.7 }}>
+        مراقبة كاملة لكل المحادثات داخل التطبيق. النظام يميّز تلقائياً الرسائل المشبوهة (أرقام هواتف، روابط واتساب/تلغرام، بريد) كطبقة تنبيه إضافية.
+        {alerts > 0 && <span style={{ color: 'var(--danger)', fontWeight: 800 }}>{' '}· تنبيهات غير معالجة: {alerts}</span>}
+      </div>
+      <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
+        {[['all', 'كل المحادثات'], ['flagged', 'المُعلَّمة فقط']].map(([f, l]) =>
+          <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{l}</button>)}
+      </div>
+      <label className="fld" style={{ marginBottom: 12 }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث باسم أحد الطرفين أو رقم الطلب…" />
+      </label>
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !shown.length ? <div className="empty">لا توجد محادثات مطابقة.</div>
+          : shown.map((r) => (
+            <button className={`conv-row${r.flagged ? ' flag' : ''}`} key={r.id} onClick={() => setOpen(r)}>
+              <div className="ci">
+                <div className="conv-parties">
+                  {(r.participant_a_name || 'طرف أول')} <span className="role-chip">{roleLabel(r.participant_a_role)}</span>
+                  <span style={{ color: 'var(--muted)' }}>↔</span>
+                  {(r.participant_b_name || 'طرف ثاني')} <span className="role-chip">{roleLabel(r.participant_b_role)}</span>
+                  {r.flagged && <span className="flag-chip">⚠ مُعلَّمة{r.flagged_count ? ' (' + r.flagged_count + ')' : ''}</span>}
+                </div>
+                {r.last_message_preview && <div className="conv-prev">{r.last_message_preview}</div>}
+                <div className="conv-meta">
+                  {r.order_no ? 'طلب #' + r.order_no + ' · ' : ''}🕒 {fmtDT(r.last_message_at)}
+                </div>
+              </div>
+              <span style={{ color: 'var(--muted)', fontSize: 20 }}>‹</span>
+            </button>
+          ))}
+      <div className="muted" style={{ textAlign: 'center', padding: '6px 0' }}>{rows ? shown.length + ' محادثة' : ''}</div>
+    </div>
+  );
+}
+
 function Admin() {
   const [user, setUser] = useState(undefined); // undefined=loading, null=logged out
   const [tab, setTab] = useState('verif');
@@ -1135,7 +1296,7 @@ function Admin() {
   }, []);
   if (user === undefined) return <div className="empty">جارٍ التحميل…</div>;
   if (!user) return <Login onIn={setUser} />;
-  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['levels', 'مستويات البائعين'], ['trust', 'شارات الثقة'], ['lozisave', 'خانة التوفير'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
+  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['chats', 'الدردشات'], ['levels', 'مستويات البائعين'], ['trust', 'شارات الثقة'], ['lozisave', 'خانة التوفير'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
   return (
     <div>
       <div className="topbar"><h1>لوزي · لوحة الإدارة</h1><button onClick={() => { SB.auth.signOut(); setUser(null); }}>خروج</button></div>
@@ -1144,6 +1305,7 @@ function Admin() {
         {tab === 'verif' && <Verifications />}
         {tab === 'users' && <Users />}
         {tab === 'orders' && <OrdersAdmin />}
+        {tab === 'chats' && <ChatsAdmin />}
         {tab === 'levels' && <SellerLevels />}
         {tab === 'trust' && <TrustBadges />}
         {tab === 'lozisave' && <SavingsAdmin />}
