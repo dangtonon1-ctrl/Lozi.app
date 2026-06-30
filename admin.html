@@ -697,6 +697,138 @@ function SavingsAdmin() {
   );
 }
 
+// ---- LOZI VIP market (سوق VIP) — admin-created premium products ----
+// Cloned from SavingsAdmin: same product-adding mechanism, same weight/unit
+// handling, same price input, same form layout. The only difference is the
+// data goes to the VIP collection (category 'vip'); the customer-facing VIP
+// page renders it in the gold/dark theme.
+function VipAdmin() {
+  const [rows, setRows] = useState(null);
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [weight, setWeight] = useState('');
+  const [price, setPrice] = useState('');
+  const [oldPrice, setOldPrice] = useState('');
+  const [pub, setPub] = useState(true);
+  const [imgUrl, setImgUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [msg, setMsg] = useState('');
+  const load = async () => {
+    setRows(null);
+    const { data, error } = await SB.from('products').select('*').eq('category', 'vip').order('pinned', { ascending: false }).order('created_at', { ascending: false });
+    setRows(error ? [] : (data || []));
+  };
+  useEffect(() => { load(); }, []);
+  const reset = () => { setName(''); setDesc(''); setWeight(''); setPrice(''); setOldPrice(''); setPub(true); setImgUrl(''); setEditId(null); };
+  const pickImg = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true); setMsg('جارٍ رفع الصورة…');
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const path = 'lozi-vip/' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '.' + ext;
+    const { error } = await SB.storage.from('product-images').upload(path, file, { upsert: true });
+    if (error) { setBusy(false); return setMsg('تعذّر رفع الصورة: ' + error.message); }
+    const { data } = SB.storage.from('product-images').getPublicUrl(path);
+    setImgUrl(data.publicUrl); setBusy(false); setMsg('تم رفع الصورة ✓'); setTimeout(() => setMsg(''), 1500);
+  };
+  const save = async () => {
+    if (!name.trim() || !price || Number(price) <= 0) return setMsg('أدخل الاسم والسعر.');
+    setBusy(true); setMsg('');
+    const { data: au } = await SB.auth.getUser();
+    const uid = au && au.user && au.user.id;
+    const data = {
+      name: { ar: name.trim(), en: name.trim() },
+      weight: { ar: weight.trim() || '—', en: weight.trim() || '—' },
+      desc: { ar: desc.trim(), en: desc.trim() },
+      img: imgUrl, images: imgUrl ? [imgUrl] : [],
+      price: Number(price), old: oldPrice ? Number(oldPrice) : null, cat: 'vip',
+    };
+    const row = {
+      vendor_id: uid, vendor_role: 'retail', category: 'vip',
+      name: name.trim(), description: desc.trim() || null,
+      price: Number(price), status: pub ? 'available' : 'hidden', data: data,
+    };
+    const res = editId ? await SB.from('products').update(row).eq('id', editId) : await SB.from('products').insert(row);
+    setBusy(false);
+    if (res.error) return setMsg('خطأ: ' + res.error.message);
+    setMsg(editId ? 'تم التعديل ✓' : 'تمت الإضافة ✓'); setTimeout(() => setMsg(''), 1800); reset(); load();
+  };
+  const edit = (r) => {
+    const d = r.data || {};
+    setEditId(r.id); setName((d.name && d.name.ar) || r.name || '');
+    setDesc((d.desc && d.desc.ar) || r.description || ''); setWeight((d.weight && d.weight.ar) || '');
+    setPrice(String(r.price || d.price || '')); setOldPrice(d.old ? String(d.old) : '');
+    setPub(r.status !== 'hidden'); setImgUrl(d.img || '');
+    window.scrollTo(0, 0);
+  };
+  const toggle = async (r) => { const { error } = await SB.from('products').update({ status: r.status === 'hidden' ? 'available' : 'hidden' }).eq('id', r.id); if (!error) load(); };
+  const del = async (r) => { if (!confirm('حذف هذا المنتج من سوق VIP؟')) return; const { error } = await SB.from('products').delete().eq('id', r.id); if (!error) load(); };
+  const pin = async (r) => {
+    const val = !r.pinned;
+    if (val && (rows || []).filter((x) => x.pinned && x.id !== r.id).length >= 3) {
+      setMsg('الحد الأقصى 3 منتجات مثبّتة'); setTimeout(() => setMsg(''), 3000); return;
+    }
+    const { error } = await SB.from('products').update({ pinned: val, pinned_at: val ? new Date().toISOString() : null }).eq('id', r.id);
+    if (error) return setMsg('خطأ: ' + error.message);
+    setMsg((val ? 'تم التثبيت 📌' : 'تم إلغاء التثبيت') + ' · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 2500); load();
+  };
+  return (
+    <div>
+      <div className="card">
+        <div className="secttl">{editId ? 'تعديل منتج VIP' : 'إضافة منتج إلى سوق VIP'}</div>
+        <label className="fld"><span>اسم المنتج</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: لوز جبري فاخر منتقى" /></label>
+        <label className="fld"><span>الوصف</span><textarea rows="2" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="وصف مختصر للمنتج" /></label>
+        <label className="fld"><span>الوزن / الكمية</span><input value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="مثال: ٥٠٠ جم" /></label>
+        <div className="row2">
+          <label className="fld" style={{ flex: 1 }}><span>سعر لوزي (ريال)</span><input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="السعر الفعلي" /></label>
+          <label className="fld" style={{ flex: 1 }}><span>السعر المشطوب (السوق)</span><input value={oldPrice} onChange={(e) => setOldPrice(e.target.value)} inputMode="numeric" placeholder="سعر السوق" /></label>
+        </div>
+        {(price || oldPrice) &&
+          <div className="kv" style={{ marginBottom: 10 }}><b>المعاينة:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 900, fontSize: 16 }}>{price || '—'} ريال</span>{oldPrice && <span style={{ textDecoration: 'line-through', color: 'var(--muted)', marginInlineStart: 8 }}>{oldPrice} ريال</span>}</div>}
+        <label className="fld"><span>صورة المنتج</span>
+          <input type="file" accept="image/*" onChange={pickImg} /></label>
+        {imgUrl && <img src={imgUrl} alt="" style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 12, marginBottom: 10 }} />}
+        <div className="store-row" style={{ borderTop: 'none', padding: '4px 0 12px' }}>
+          <span className="sr-name">نشر المنتج (ظاهر للعملاء)</span>
+          <div className={`switch ${pub ? 'on' : ''}`} onClick={() => setPub(!pub)}><i></i></div>
+        </div>
+        <div className="row2">
+          <button className="btn sm" disabled={busy} onClick={save}>{busy ? 'جارٍ…' : (editId ? 'حفظ التعديل' : 'إضافة المنتج')}</button>
+          {editId && <button className="btn sm ghost" onClick={reset}>إلغاء</button>}
+        </div>
+        {msg && <div className={msg.indexOf('خطأ') === 0 || msg.indexOf('تعذّر') === 0 ? 'err' : 'ok'} style={{ marginTop: 8 }}>{msg}</div>}
+      </div>
+      <div className="secttl">منتجات VIP الحالية</div>
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !rows.length ? <div className="empty">لا توجد منتجات بعد.</div>
+          : rows.map((r) => {
+            const d = r.data || {};
+            return (
+              <div className="card" key={r.id}>
+                <div className="v-head" style={{ alignItems: 'center' }}>
+                  {d.img && <img src={d.img} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 10 }} />}
+                  <strong style={{ flex: 1 }}>{r.pinned && <span title="مثبّت">📌 </span>}{r.name}</strong>
+                  {r.pinned && <span className="tag approved">مثبّت</span>}
+                  {r.status === 'hidden' && <span className="tag rejected">مخفي</span>}
+                </div>
+                <div className="kv"><b>السعر:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 800 }}>{r.price} ريال</span>{d.old && <span style={{ textDecoration: 'line-through', color: 'var(--muted)', marginInlineStart: 8 }}>{d.old} ريال</span>}</div>
+                <Stamp at={r.created_at} label="تاريخ الإضافة" />
+                {r.updated_at && <Stamp at={r.updated_at} label="آخر تعديل" />}
+                <div className="acts">
+                  <button className="btn sm ghost" onClick={() => edit(r)}>تعديل</button>
+                  <button className={`btn sm ${r.pinned ? 'gold' : 'ghost'}`} onClick={() => pin(r)}>{r.pinned ? '📌 إلغاء التثبيت' : '📌 تثبيت'}</button>
+                  <button className="btn sm ghost" onClick={() => toggle(r)}>{r.status === 'hidden' ? 'إظهار' : 'إخفاء'}</button>
+                  <button className="btn sm danger" onClick={() => del(r)}>حذف</button>
+                </div>
+              </div>
+            );
+          })}
+    </div>
+  );
+}
+
 // ---- LOZI mixed bundle offers (عرض مشكّل) ----
 function BundleAdmin() {
   const [rows, setRows] = useState(null);
@@ -885,7 +1017,7 @@ function OrdersAdmin() {
     if (role === 'retail' || role === 'wholesale') return role;
     return 'other';
   };
-  const bucketOf = (c) => (c === 'savings' ? 'savings' : (c === 'almond' || c === 'raisin') ? 'farmer' : (c === 'retail' || c === 'wholesale') ? c : 'other');
+  const bucketOf = (c) => (c === 'savings' ? 'savings' : c === 'vip' ? 'vip' : (c === 'almond' || c === 'raisin') ? 'farmer' : (c === 'retail' || c === 'wholesale') ? c : 'other');
   const ROLE = { farmer_almond: 'مزارع لوز', farmer_raisin: 'مزارع زبيب', farmer: 'مزارع', retail: 'تاجر تجزئة', wholesale: 'تاجر جملة', customer: 'زبون', admin: 'لوزي' };
   const STAT = { new: ['جديد', 'pending'], received: ['جديد', 'pending'], payreview: ['بانتظار مراجعة الدفع', 'pending'], preparing: ['قيد التجهيز', 'pending'], delivering: ['قيد التسليم', 'pending'], delivered: ['مكتمل', 'approved'], rejected: ['مرفوض', 'rejected'], cancelled: ['ملغى', 'rejected'] };
   const PAYST = { pending: ['بانتظار المراجعة', 'pending'], approved: ['مقبول', 'approved'], rejected: ['مرفوض', 'rejected'] };
@@ -921,7 +1053,7 @@ function OrdersAdmin() {
   return (
     <div>
       <div className="tabs" style={{ position: 'static', padding: '0 0 10px' }}>
-        {[['savings', 'طلبات التوفير'], ['farmer', 'طلبات المزارعين'], ['retail', 'طلبات التجزئة'], ['wholesale', 'طلبات الجملة']].map(([id, label]) =>
+        {[['savings', 'طلبات التوفير'], ['vip', 'طلبات VIP'], ['farmer', 'طلبات المزارعين'], ['retail', 'طلبات التجزئة'], ['wholesale', 'طلبات الجملة']].map(([id, label]) =>
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>)}
       </div>
       {tab === 'farmer' &&
@@ -937,7 +1069,7 @@ function OrdersAdmin() {
             const c = o.customer || {};
             const st = STAT[o.status] || [o.status, 'pending'];
             const items = Array.isArray(o.items) ? o.items : [];
-            const isSavings = tab === 'savings';
+            const isPlatform = tab === 'savings' || tab === 'vip';
             return (
               <div className="card" key={o.order_no}>
                 <div className="v-head"><strong>طلب #{o.order_no}</strong><span className={`tag ${st[1]}`}>{st[0]}</span></div>
@@ -945,9 +1077,9 @@ function OrdersAdmin() {
                 {o.updated_at && <Stamp at={o.updated_at} label="آخر تحديث" />}
 
                 <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13.5 }}>🌿 البائع</div>
-                <div className="kv"><b>الاسم:</b> {seller.name || (isSavings ? 'لوزي · التوفير' : '—')}</div>
+                <div className="kv"><b>الاسم:</b> {seller.name || (isPlatform ? (tab === 'vip' ? 'لوزي · VIP' : 'لوزي · التوفير') : '—')}</div>
                 <div className="kv"><b>الهاتف:</b> {seller.phone || '—'}</div>
-                <div className="kv"><b>الدور:</b> {ROLE[seller.role] || (isSavings ? 'لوزي' : seller.role || '—')}</div>
+                <div className="kv"><b>الدور:</b> {ROLE[seller.role] || (isPlatform ? 'لوزي' : seller.role || '—')}</div>
                 {stores[o.seller_vendor_id] && <div className="kv"><b>المتجر:</b> {stores[o.seller_vendor_id]}</div>}
 
                 <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13.5 }}>🛒 المشتري</div>
@@ -1305,7 +1437,7 @@ function Admin() {
   }, []);
   if (user === undefined) return <div className="empty">جارٍ التحميل…</div>;
   if (!user) return <Login onIn={setUser} />;
-  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['chats', 'الدردشات'], ['levels', 'مستويات البائعين'], ['trust', 'شارات الثقة'], ['lozisave', 'خانة التوفير'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
+  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['chats', 'الدردشات'], ['levels', 'مستويات البائعين'], ['trust', 'شارات الثقة'], ['lozisave', 'خانة التوفير'], ['vip', 'سوق VIP'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
   return (
     <div>
       <div className="topbar"><h1>لوزي · لوحة الإدارة</h1><button onClick={() => { SB.auth.signOut(); setUser(null); }}>خروج</button></div>
@@ -1318,6 +1450,7 @@ function Admin() {
         {tab === 'levels' && <SellerLevels />}
         {tab === 'trust' && <TrustBadges />}
         {tab === 'lozisave' && <SavingsAdmin />}
+        {tab === 'vip' && <VipAdmin />}
         {tab === 'shahti' && <ShahtiReqs />}
         {tab === 'reports' && <Reports />}
         {tab === 'reviews' && <ReviewsMod />}
