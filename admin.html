@@ -1057,6 +1057,71 @@ function SellerLevels() {
   );
 }
 
+function TrustBadges() {
+  const [rows, setRows] = useState(null);
+  const [view, setView] = useState('all'); // all | candidates | badged
+  const [busy, setBusy] = useState('');
+  const load = async () => {
+    setRows(null);
+    const { data } = await SB.from('stores')
+      .select('vendor_id,name,trusted_badge,badge_source,badge_granted_at,badge_blocked,ratings_count,average_rating')
+      .order('trusted_badge', { ascending: false })
+      .order('average_rating', { ascending: false, nullsFirst: false });
+    setRows(data || []);
+  };
+  useEffect(() => { load(); }, []);
+  const act = async (fn, vendor) => {
+    if (fn === 'admin_revoke_trusted_badge' && !window.confirm('سحب شارة «موثوق» من هذا المتجر؟ لن تُمنح تلقائياً مرة أخرى حتى تلغي الحظر.')) return;
+    setBusy(vendor);
+    const { error } = await SB.rpc(fn, { p_vendor: vendor });
+    setBusy('');
+    if (error) { alert('خطأ: ' + (error.message || 'تعذّر تنفيذ العملية')); return; }
+    load();
+  };
+  const meets = (r) => Number(r.ratings_count) > 100 && Number(r.average_rating || 0) >= 4.5;
+  const near = (r) => Number(r.ratings_count) > 80 && Number(r.average_rating || 0) >= 4.3;
+  const srcLabel = (r) => r.trusted_badge ? (r.badge_source === 'auto' ? 'تلقائي' : 'يدوي') : (r.badge_blocked ? 'محظور (سُحبت إدارياً)' : '—');
+  let shown = rows || [];
+  if (view === 'candidates') shown = shown.filter((r) => !r.trusted_badge && (meets(r) || near(r)));
+  else if (view === 'badged') shown = shown.filter((r) => r.trusted_badge);
+  return (
+    <div>
+      <div className="muted" style={{ fontSize: 12, padding: '0 2px 10px', lineHeight: 1.7 }}>
+        شارة «موثوق» تُمنح تلقائياً عند تجاوز <b>100 تقييم</b> بمعدّل <b>4.5</b> فأعلى، أو يدوياً من هنا. لا تُسحب إلا يدوياً؛ والسحب يمنع المنح التلقائي لاحقاً.
+      </div>
+      <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
+        {[['all', 'كل المتاجر'], ['candidates', 'مرشّحون للشارة'], ['badged', 'الحاصلون عليها']].map(([f, l]) =>
+          <button key={f} className={view === f ? 'on' : ''} onClick={() => setView(f)}>{l}</button>)}
+      </div>
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !shown.length ? <div className="empty">لا توجد متاجر مطابقة.</div>
+          : shown.map((r) => (
+            <div className="card" key={r.vendor_id} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 900, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  {r.name || 'متجر'}
+                  {r.trusted_badge && <span className="tag" style={{ background: 'var(--green-soft)', color: 'var(--green-deep)', fontSize: 11, padding: '4px 9px' }}>موثوق ⭐</span>}
+                  {!r.trusted_badge && meets(r) && <span className="tag" style={{ background: '#FFF4DA', color: 'var(--gold-deep)', fontSize: 11, padding: '4px 9px' }}>مستوفٍ للمعايير</span>}
+                </div>
+                <div className="muted" style={{ fontSize: 11.5, marginTop: 3 }}>
+                  التقييمات: <b style={{ color: 'var(--ink)' }}>{r.ratings_count || 0}</b> · المعدّل: <b style={{ color: 'var(--gold-deep)' }}>{r.average_rating != null ? Number(r.average_rating).toFixed(2) : '—'}</b> · المصدر: <b>{srcLabel(r)}</b>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flex: '0 0 auto' }}>
+                {r.trusted_badge
+                  ? <button className="btn sm danger" disabled={busy === r.vendor_id} onClick={() => act('admin_revoke_trusted_badge', r.vendor_id)}>سحب</button>
+                  : <button className="btn sm" disabled={busy === r.vendor_id} onClick={() => act('admin_grant_trusted_badge', r.vendor_id)}>منح</button>}
+                {r.badge_blocked && <button className="btn sm" disabled={busy === r.vendor_id} onClick={() => act('admin_unblock_trusted_badge', r.vendor_id)}>إلغاء الحظر</button>}
+              </div>
+            </div>
+          ))}
+      <div className="muted" style={{ textAlign: 'center', padding: '6px 0' }}>
+        {rows ? shown.length + ' متجر' : ''}
+      </div>
+    </div>
+  );
+}
+
 function Admin() {
   const [user, setUser] = useState(undefined); // undefined=loading, null=logged out
   const [tab, setTab] = useState('verif');
@@ -1070,7 +1135,7 @@ function Admin() {
   }, []);
   if (user === undefined) return <div className="empty">جارٍ التحميل…</div>;
   if (!user) return <Login onIn={setUser} />;
-  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['levels', 'مستويات البائعين'], ['lozisave', 'خانة التوفير'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
+  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['levels', 'مستويات البائعين'], ['trust', 'شارات الثقة'], ['lozisave', 'خانة التوفير'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
   return (
     <div>
       <div className="topbar"><h1>لوزي · لوحة الإدارة</h1><button onClick={() => { SB.auth.signOut(); setUser(null); }}>خروج</button></div>
@@ -1080,6 +1145,7 @@ function Admin() {
         {tab === 'users' && <Users />}
         {tab === 'orders' && <OrdersAdmin />}
         {tab === 'levels' && <SellerLevels />}
+        {tab === 'trust' && <TrustBadges />}
         {tab === 'lozisave' && <SavingsAdmin />}
         {tab === 'shahti' && <ShahtiReqs />}
         {tab === 'reports' && <Reports />}
