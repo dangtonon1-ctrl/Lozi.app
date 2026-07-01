@@ -1,5 +1,17 @@
 project_id = "niloddwnllhsvrmuxfxw"
 
+# Vendor categories (farmers / retail / wholesale) may use a 4-character
+# password; the per-category rule is enforced in the app and in the
+# vendor-forgot-password edge function. GoTrue has no per-role password policy,
+# so the project floor must be <= 4 or admin.updateUserById() rejects the vendor
+# password with "Password should be at least 6 characters." Customers keep a
+# 6-character minimum via client-side validation. Apply this to the live project
+# in the Dashboard too: Authentication → Sign In / Providers → Password →
+# "Minimum password length" = 4 (the management setting cannot be changed from
+# the tools available in this environment).
+[auth]
+minimum_password_length = 4
+
 # The Auth "Send Email" hook is called by Supabase with a Standard Webhooks
 # signature, not a user JWT — so JWT verification must be disabled for it.
 # (request-otp / verify-otp keep the default verify_jwt = true; they are invoked
