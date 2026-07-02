@@ -1291,8 +1291,21 @@ const CHAT_ROLE = { customer: 'عميل', farmer: 'مزارع', farmer_almond: '
 const roleLabel = (r) => CHAT_ROLE[r] || r || '—';
 const FLAG_AR = { number: 'رقم هاتف', whatsapp: 'واتساب', telegram: 'تلغرام', email: 'بريد' };
 
-function ChatThread({ conv, onBack }) {
+function ChatThread({ conv, me, onBack }) {
   const [msgs, setMsgs] = useState(null);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  // Only savings/admin-managed conversations have LOZI admin as a participant.
+  // The admin can reply only there; every other chat stays read-only oversight.
+  const canReply = !!(me && (me.id === conv.participant_a || me.id === conv.participant_b));
+  const send = async () => {
+    const body = draft.trim();
+    if (!body || sending) return;
+    setSending(true);
+    const { error } = await SB.from('messages').insert({ conversation_id: conv.id, sender_id: me.id, body });
+    setSending(false);
+    if (!error) setDraft(''); // the realtime subscription appends the new message
+  };
   const scroller = React.useRef(null);
   const nameOf = (sid) => sid === conv.participant_a ? (conv.participant_a_name || 'طرف أول')
     : sid === conv.participant_b ? (conv.participant_b_name || 'طرف ثاني') : 'مستخدم';
@@ -1354,11 +1367,19 @@ function ChatThread({ conv, onBack }) {
               </div>
             ))}
       </div>
+      {canReply &&
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+          <input value={draft} onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
+            placeholder="اكتب ردّك كإدارة لوزي…" style={{ flex: 1, minWidth: 0, height: 50 }} />
+          <button className="btn" disabled={sending || !draft.trim()} onClick={send}
+            style={{ width: 'auto', flexShrink: 0, padding: '0 22px' }}>{sending ? '…' : 'إرسال'}</button>
+        </div>}
     </div>
   );
 }
 
-function ChatsAdmin() {
+function ChatsAdmin({ me }) {
   const [rows, setRows] = useState(null);
   const [filter, setFilter] = useState('all'); // all | flagged
   const [q, setQ] = useState('');
@@ -1381,7 +1402,7 @@ function ChatsAdmin() {
       .subscribe();
     return () => { SB.removeChannel(ch); };
   }, []);
-  if (open) return <ChatThread conv={open} onBack={() => { setOpen(null); load(); }} />;
+  if (open) return <ChatThread conv={open} me={me} onBack={() => { setOpen(null); load(); }} />;
   let shown = rows || [];
   if (filter === 'flagged') shown = shown.filter((r) => r.flagged);
   const query = q.trim().toLowerCase();
@@ -1446,7 +1467,7 @@ function Admin() {
         {tab === 'verif' && <Verifications />}
         {tab === 'users' && <Users />}
         {tab === 'orders' && <OrdersAdmin />}
-        {tab === 'chats' && <ChatsAdmin />}
+        {tab === 'chats' && <ChatsAdmin me={user} />}
         {tab === 'levels' && <SellerLevels />}
         {tab === 'trust' && <TrustBadges />}
         {tab === 'lozisave' && <SavingsAdmin />}
