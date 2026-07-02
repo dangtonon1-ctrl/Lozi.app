@@ -1,0 +1,11 @@
+# Cloudflare Pages / Workers Assets header rules.
+# The whole app is a single index.html (all JS/CSS inlined), so the HTML must
+# always be revalidated — otherwise a new deploy keeps showing the old version.
+# max-age=0 + must-revalidate makes the browser send a conditional request every
+# load (fast 304 when unchanged, fresh 200 right after a deploy).
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+/admin.html
+  Cache-Control: public, max-age=0, must-revalidate
