@@ -83,3 +83,33 @@
 .country-field{padding:10px 14px;margin-bottom:12px}
 .field-err{color:var(--danger);font-size:11.5px;font-weight:800;line-height:1.4;margin:0}
 .vs-tabs button{font-size:13.5px}
+
+/* ===== RFQ / price requests (الطلب المسبق) ===== */
+.rfq-banner{display:flex;align-items:center;gap:13px;width:100%;background:linear-gradient(120deg,var(--green-deep),var(--gold-deep));border-radius:20px;padding:14px 16px;margin-top:4px;color:#fff;text-align:start;box-shadow:0 10px 22px rgba(47,94,62,.3)}
+.rfq-screen{padding:8px 18px 26px}
+.rfq-head{display:flex;align-items:center;gap:12px;padding:6px 0 10px}
+.rfq-head h1{font-size:22px;font-weight:900;margin:0;color:var(--brown)}
+.rfq-new-btn{margin:4px 0 16px}
+.rfq-list{display:flex;flex-direction:column;gap:13px}
+.rfq-card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:14px;box-shadow:var(--shadow)}
+.rfq-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+.rfq-city{display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:900;color:var(--ink)}
+.rfq-status{font-size:11px;font-weight:900;padding:4px 11px;border-radius:20px;white-space:nowrap}
+.rfq-status.open{background:var(--green-soft);color:var(--green-deep)}
+.rfq-status.closed{background:var(--sand-2);color:var(--ink-soft)}
+.rfq-status.expired{background:rgba(194,85,63,.13);color:var(--danger)}
+.rfq-items{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.rfq-item{display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:var(--ink);flex-wrap:wrap}
+.rfq-item b{color:var(--green-deep);font-weight:900}
+.rfq-item .note{color:var(--muted);font-weight:600;font-size:12px}
+.rfq-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;font-size:12.5px;font-weight:800;color:var(--ink-soft)}
+.rfq-close-btn{font-size:12.5px;font-weight:800;color:var(--danger);background:rgba(194,85,63,.1);padding:7px 14px;border-radius:12px}
+.rfq-empty{display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center;padding:56px 24px;color:var(--muted)}
+.rfq-empty strong{font-size:16px;color:var(--ink);font-weight:900}
+.rfq-item-row{background:var(--sand);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:11px}
+.rfq-item-row-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:13px;font-weight:900;color:var(--ink-soft)}
+.rfq-row-del{width:30px;height:30px;border-radius:10px;background:rgba(194,85,63,.1);display:flex;align-items:center;justify-content:center}
+.rfq-qty-row{display:flex;gap:10px;align-items:flex-start}
+.rfq-qty-row .field{flex:1;min-width:0}
+.rfq-add-item{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:46px;border-radius:14px;border:1.5px dashed var(--gold-deep);color:var(--gold-deep);font-weight:800;background:transparent;margin-bottom:14px}
+.rfq-dur-row{display:flex;gap:8px;flex-wrap:wrap}
