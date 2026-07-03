@@ -320,7 +320,9 @@
     var other = opts.vendorId || opts.otherId;
     if (!other) { toast("تعذّر تحديد الطرف الآخر"); return; }
     if (other === ME) { toast("لا يمكنك مراسلة نفسك"); return; }
-    SB.rpc("find_or_create_conversation", { p_other: other, p_order: opts.orderId || null })
+    var _rpc = opts.rfqOfferId ? "find_or_create_rfq_conversation" : "find_or_create_conversation";
+    var _args = opts.rfqOfferId ? { p_other: other, p_offer: opts.rfqOfferId } : { p_other: other, p_order: opts.orderId || null };
+    SB.rpc(_rpc, _args)
       .then(function (r) {
         if (r.error || !r.data) { toast("تعذّر فتح المحادثة"); return; }
         var convId = r.data;
@@ -329,7 +331,7 @@
           var nm = row ? firstName(row.name) : firstName(opts.storeName);
           var role = row ? roleAr(row.role) : "";
           state.cameFrom = "direct";
-          openThread({ id: convId, order_id: opts.orderId || null }, nm, role, row && row.is_admin);
+          openThread({ id: convId, order_id: opts.orderId || null, rfq_offer_id: opts.rfqOfferId || null }, nm, role, row && row.is_admin);
         });
       });
   }
