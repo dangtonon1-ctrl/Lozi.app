@@ -1,106 +1,16078 @@
-(()=>{const STATE_FILE=".image-slots.state.json",LS_KEY="lozi.image-slots.v1",hasOmelette=()=>!!(window.omelette&&window.omelette.writeFile);let lsOk=!1;try{const k="__is_probe__";localStorage.setItem(k,"1"),localStorage.removeItem(k),lsOk=!0}catch(e){lsOk=!1}const dataUrlBytes=u=>{const i=u.indexOf(","),b=i>=0?u.slice(i+1):u;return Math.floor(b.length*.75)},ACCEPT=["image/png","image/jpeg","image/webp","image/avif"],subs=new Set;let slots={};const tombstones=new Set;let loaded=!1,loadP=null;function merge(j){if(j&&typeof j=="object"){const merged=Object.assign({},j,slots);for(const k in slots)merged[k]&&!merged[k].u&&j[k]&&(merged[k].u=typeof j[k]=="string"?j[k]:j[k].u);for(const id of tombstones)delete merged[id];slots=merged}tombstones.clear()}function load(){return loadP||(hasOmelette()?loadP=fetch(STATE_FILE).then(r=>r.ok?r.json():null).then(merge).catch(()=>{}).then(()=>{loaded=!0,subs.forEach(fn=>fn())}):loadP=Promise.resolve().then(()=>{try{merge(JSON.parse(localStorage.getItem(LS_KEY)||"null"))}catch(e){tombstones.clear()}loaded=!0,subs.forEach(fn=>fn())}),loadP)}let saving=!1,saveDirty=!1;function save(){const w=window.omelette&&window.omelette.writeFile;if(w){if(saving){saveDirty=!0;return}saving=!0,Promise.resolve(w(STATE_FILE,JSON.stringify(slots))).catch(()=>{}).then(()=>{saving=!1,saveDirty&&(saveDirty=!1,save())});return}if(lsOk)try{localStorage.setItem(LS_KEY,JSON.stringify(slots))}catch(e){}}const S_MAX=5,clampS=s=>Math.max(1,Math.min(S_MAX,s));function getSlot(id){const v=slots[id];return v?typeof v=="string"?{u:v,s:1,x:0,y:0}:v:null}function setSlot(id,val){id&&(val?(slots[id]=val,tombstones.delete(id)):(delete slots[id],loaded||tombstones.add(id)),subs.forEach(fn=>fn()),loaded?save():load().then(save))}async function toDataUrl(file,targetW){const bitmap=await createImageBitmap(file);try{const cap=Math.min(1600,Math.max(1,Math.round(targetW*2))||1600),scale=Math.min(1,cap/Math.max(bitmap.width,bitmap.height)),w=Math.max(1,Math.round(bitmap.width*scale)),h=Math.max(1,Math.round(bitmap.height*scale)),canvas=document.createElement("canvas");canvas.width=w,canvas.height=h;const ctx=canvas.getContext("2d");ctx.imageSmoothingEnabled=!0,ctx.imageSmoothingQuality="high",ctx.drawImage(bitmap,0,0,w,h);let type="image/webp";canvas.toDataURL(type,.8).indexOf("data:image/webp")!==0&&(type="image/jpeg");let q=.85,url=canvas.toDataURL(type,q);for(;dataUrlBytes(url)>327680&&q>.55;)q=Math.round((q-.07)*100)/100,url=canvas.toDataURL(type,q);return url}finally{bitmap.close&&bitmap.close()}}const stylesheet=":host{display:inline-block;position:relative;vertical-align:top;  font:13px/1.3 system-ui,-apple-system,sans-serif;color:rgba(0,0,0,.55);width:240px;height:160px}.frame{position:absolute;inset:0;overflow:hidden;background:rgba(0,0,0,.04)}.frame img{position:absolute;max-width:none;transform:translate(-50%,-50%);  -webkit-user-drag:none;user-select:none;touch-action:none}.spill{position:absolute;transform:translate(-50%,-50%);display:none;z-index:1;  cursor:grab;touch-action:none}:host([data-panning]) .spill{cursor:grabbing}.spill .ghost{position:absolute;inset:0;width:100%;height:100%;opacity:.35;  pointer-events:none;-webkit-user-drag:none;user-select:none;  box-shadow:0 0 0 1px rgba(0,0,0,.2),0 12px 32px rgba(0,0,0,.2)}.spill .handle{position:absolute;width:12px;height:12px;border-radius:50%;  background:#fff;box-shadow:0 0 0 1.5px #c96442,0 1px 3px rgba(0,0,0,.3);  transform:translate(-50%,-50%)}.spill .handle[data-c=nw]{left:0;top:0;cursor:nwse-resize}.spill .handle[data-c=ne]{left:100%;top:0;cursor:nesw-resize}.spill .handle[data-c=sw]{left:0;top:100%;cursor:nesw-resize}.spill .handle[data-c=se]{left:100%;top:100%;cursor:nwse-resize}:host([data-reframe]){z-index:10}:host([data-reframe]) .spill{display:block}:host([data-reframe]) .frame{box-shadow:0 0 0 2px #c96442}.empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;  justify-content:center;gap:6px;text-align:center;padding:12px;box-sizing:border-box;  cursor:pointer;user-select:none}.empty svg{opacity:.45}.empty .cap{max-width:90%;font-weight:500;letter-spacing:.01em}.empty .sub{font-size:11px}.empty .sub u{text-underline-offset:2px;text-decoration-color:rgba(0,0,0,.25)}.empty:hover .sub u{color:rgba(0,0,0,.75);text-decoration-color:currentColor}:host([data-over]) .frame{outline:2px solid #c96442;outline-offset:-2px;  background:rgba(201,100,66,.10)}.ring{position:absolute;inset:0;pointer-events:none;border:1.5px dashed rgba(0,0,0,.25);  transition:border-color .12s}:host([data-over]) .ring{border-color:#c96442}:host([data-filled]) .ring{display:none}.ctl{position:absolute;top:100%;left:50%;transform:translateX(-50%);padding-top:8px;  display:flex;gap:6px;opacity:0;pointer-events:none;transition:opacity .12s;z-index:2;  white-space:nowrap}:host([data-filled][data-editable]:hover) .ctl,:host([data-reframe]) .ctl  {opacity:1;pointer-events:auto}.ctl button{appearance:none;border:0;border-radius:6px;padding:5px 10px;cursor:pointer;  background:rgba(0,0,0,.65);color:#fff;font:11px/1 system-ui,-apple-system,sans-serif;  backdrop-filter:blur(6px)}.ctl button:hover{background:rgba(0,0,0,.8)}.err{position:absolute;left:8px;bottom:8px;right:8px;color:#b3261e;font-size:11px;  background:rgba(255,255,255,.85);padding:4px 6px;border-radius:5px;pointer-events:none}:host(:not([data-editable])) .ring{display:none}:host(:not([data-editable])) .empty{cursor:default}",icon='<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>';class ImageSlot extends HTMLElement{static get observedAttributes(){return["shape","radius","mask","fit","position","placeholder","src","id"]}constructor(){super();const root=this.attachShadow({mode:"open"});root.innerHTML="<style>"+stylesheet+'</style><div class="frame" part="frame">  <img part="image" alt="" draggable="false" style="display:none">  <div class="empty" part="empty">'+icon+'    <div class="cap"></div>    <div class="sub">or <u>browse files</u></div></div>  <div class="ring" part="ring"></div></div><div class="spill">  <img class="ghost" alt="" draggable="false">  <div class="handle" data-c="nw"></div><div class="handle" data-c="ne"></div>  <div class="handle" data-c="sw"></div><div class="handle" data-c="se"></div></div><div class="ctl"><button data-act="replace" title="Replace image">Replace</button>  <button data-act="clear" title="Remove image">Remove</button></div><input type="file" accept="'+ACCEPT.join(",")+'" hidden>',this._frame=root.querySelector(".frame"),this._ring=root.querySelector(".ring"),this._img=root.querySelector(".frame img"),this._empty=root.querySelector(".empty"),this._cap=root.querySelector(".cap"),this._sub=root.querySelector(".sub"),this._spill=root.querySelector(".spill"),this._ghost=root.querySelector(".ghost"),this._err=null,this._input=root.querySelector("input"),this._depth=0,this._gen=0,this._view={s:1,x:0,y:0},this._subFn=()=>this._render(),this._empty.addEventListener("click",()=>{this.hasAttribute("data-editable")&&this._input.click()}),root.addEventListener("click",e=>{const act=e.target&&e.target.getAttribute&&e.target.getAttribute("data-act");act==="replace"&&(this._exitReframe(!0),this._input.click()),act==="clear"&&(this._exitReframe(!1),this._gen++,this._local=null,this.id?setSlot(this.id,null):this._render())}),this._input.addEventListener("change",()=>{const f=this._input.files&&this._input.files[0];f&&this._ingest(f),this._input.value=""}),this._img.addEventListener("load",()=>this._applyView()),this.addEventListener("dblclick",e=>{!this.hasAttribute("data-editable")||!this._reframes()||(e.preventDefault(),this.hasAttribute("data-reframe")?this._exitReframe(!0):this._enterReframe())}),this._spill.addEventListener("pointerdown",e=>{if(e.button!==0||!this.hasAttribute("data-reframe"))return;e.preventDefault(),e.stopPropagation(),this._spill.setPointerCapture(e.pointerId);const rect=this.getBoundingClientRect(),fw=rect.width||1,fh=rect.height||1,corner=e.target.getAttribute&&e.target.getAttribute("data-c");let move;if(corner){const iw=this._img.naturalWidth||1,ih=this._img.naturalHeight||1,base=Math.max(fw/iw,fh/ih),sx=corner.includes("e")?1:-1,sy=corner.includes("s")?1:-1,s0=this._view.s,w0=iw*base*s0,h0=ih*base*s0,cx0=(50+this._view.x)/100*fw,cy0=(50+this._view.y)/100*fh,ox=cx0-sx*w0/2,oy=cy0-sy*h0/2,diag0=Math.hypot(w0,h0),ux=sx*w0/diag0,uy=sy*h0/diag0;move=ev=>{const proj=(ev.clientX-rect.left-ox)*ux+(ev.clientY-rect.top-oy)*uy,s=clampS(s0*proj/diag0),d=diag0*s/s0;this._view.s=s,this._view.x=(ox+ux*d/2)/fw*100-50,this._view.y=(oy+uy*d/2)/fh*100-50,this._clampView(),this._applyView()}}else{this.setAttribute("data-panning","");const start={px:e.clientX,py:e.clientY,x:this._view.x,y:this._view.y};move=ev=>{this._view.x=start.x+(ev.clientX-start.px)/fw*100,this._view.y=start.y+(ev.clientY-start.py)/fh*100,this._clampView(),this._applyView()}}const up=()=>{try{this._spill.releasePointerCapture(e.pointerId)}catch(e2){}this._spill.removeEventListener("pointermove",move),this._spill.removeEventListener("pointerup",up),this._spill.removeEventListener("pointercancel",up),this.removeAttribute("data-panning"),this._dragUp=null};this._dragUp=up,this._spill.addEventListener("pointermove",move),this._spill.addEventListener("pointerup",up),this._spill.addEventListener("pointercancel",up)}),this.addEventListener("wheel",e=>{if(!this.hasAttribute("data-reframe"))return;e.preventDefault();const r=this.getBoundingClientRect(),cx=(e.clientX-r.left)/r.width*100-50,cy=(e.clientY-r.top)/r.height*100-50,prev=this._view.s,next=clampS(prev*Math.pow(1.0015,-e.deltaY));if(next===prev)return;const k=next/prev;this._view.s=next,this._view.x=cx*(1-k)+this._view.x*k,this._view.y=cy*(1-k)+this._view.y*k,this._clampView(),this._applyView()},{passive:!1})}connectedCallback(){!this.id&&!ImageSlot._warned&&(ImageSlot._warned=!0,console.warn("<image-slot> without an id will not persist its dropped image.")),this.addEventListener("dragenter",this),this.addEventListener("dragover",this),this.addEventListener("dragleave",this),this.addEventListener("drop",this),subs.add(this._subFn),this._ro=new ResizeObserver(()=>this._render()),this._ro.observe(this),load(),this._render()}disconnectedCallback(){subs.delete(this._subFn),this.removeEventListener("dragenter",this),this.removeEventListener("dragover",this),this.removeEventListener("dragleave",this),this.removeEventListener("drop",this),this._ro&&(this._ro.disconnect(),this._ro=null),this._exitReframe(!1)}_enterReframe(){this.hasAttribute("data-reframe")||(this.setAttribute("data-reframe",""),this._applyView(),this._outside=e=>{e.composedPath&&e.composedPath().includes(this)||this._exitReframe(!0)},this._esc=e=>{e.key==="Escape"&&this._exitReframe(!0)},document.addEventListener("pointerdown",this._outside,!0),document.addEventListener("keydown",this._esc,!0))}_exitReframe(commit){this.hasAttribute("data-reframe")&&(this._dragUp&&this._dragUp(),this.removeAttribute("data-reframe"),this.removeAttribute("data-panning"),this._outside&&document.removeEventListener("pointerdown",this._outside,!0),this._esc&&document.removeEventListener("keydown",this._esc,!0),this._outside=this._esc=null,commit&&this._commitView())}attributeChangedCallback(){this.shadowRoot&&this._render()}handleEvent(e){if(e.type==="dragenter"||e.type==="dragover")e.preventDefault(),e.stopPropagation(),e.dataTransfer&&(e.dataTransfer.dropEffect="copy"),e.type==="dragenter"&&this._depth++,this.setAttribute("data-over","");else if(e.type==="dragleave")--this._depth<=0&&(this._depth=0,this.removeAttribute("data-over"));else if(e.type==="drop"){e.preventDefault(),e.stopPropagation(),this._depth=0,this.removeAttribute("data-over");const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];f&&this._ingest(f)}}async _ingest(file){if(this._setError(null),!file||ACCEPT.indexOf(file.type)<0){this._setError("الرجاء اختيار صورة بصيغة PNG أو JPEG أو WebP أو AVIF.");return}if(file.size>10485760){this._setError("حجم الصورة أكبر من ١٠ ميجابايت. الرجاء اختيار صورة أصغر.");return}const gen=++this._gen;try{const w=this.clientWidth||this.offsetWidth||1600,url=await toDataUrl(file,w);if(gen!==this._gen)return;this._exitReframe(!1);const val={u:url,s:1,x:0,y:0};setSlot(this.id||"",val),this.id||(this._local=val,this._render())}catch(err){if(gen!==this._gen)return;this._setError("تعذّر قراءة هذه الصورة."),console.warn("<image-slot> ingest failed:",err)}}_setError(msg){if(this._err&&(this._err.remove(),this._err=null),!msg)return;const d=document.createElement("div");d.className="err",d.textContent=msg,this.shadowRoot.appendChild(d),this._err=d,setTimeout(()=>{this._err===d&&(d.remove(),this._err=null)},3e3)}_reframes(){return this.hasAttribute("data-filled")&&(this.getAttribute("fit")||"cover")==="cover"}_geom(){const iw=this._img.naturalWidth,ih=this._img.naturalHeight,fw=this.clientWidth,fh=this.clientHeight;return!iw||!ih||!fw||!fh?null:{iw,ih,fw,fh,base:Math.max(fw/iw,fh/ih)}}_clampView(){const g=this._geom();if(!g)return;const mx=Math.max(0,(g.iw*g.base*this._view.s/g.fw-1)*50),my=Math.max(0,(g.ih*g.base*this._view.s/g.fh-1)*50);this._view.x=Math.max(-mx,Math.min(mx,this._view.x)),this._view.y=Math.max(-my,Math.min(my,this._view.y))}_applyView(){const g=this._geom(),fit=this.getAttribute("fit")||"cover";if(fit!=="cover"||!g){this._img.style.width="100%",this._img.style.height="100%",this._img.style.left="50%",this._img.style.top="50%",this._img.style.objectFit=fit,this._img.style.objectPosition=this.getAttribute("position")||"50% 50%";return}const k=g.base*this._view.s,w=g.iw*k/g.fw*100+"%",h=g.ih*k/g.fh*100+"%",l=50+this._view.x+"%",t=50+this._view.y+"%";this._img.style.width=w,this._img.style.height=h,this._img.style.left=l,this._img.style.top=t,this._img.style.objectFit="",this._spill.style.width=w,this._spill.style.height=h,this._spill.style.left=l,this._spill.style.top=t}_commitView(){const v={s:this._view.s,x:this._view.x,y:this._view.y};this._userUrl&&(v.u=this._userUrl),this.id?setSlot(this.id,v):this._local=v}_render(){const mask=this.getAttribute("mask"),shape=(this.getAttribute("shape")||"rounded").toLowerCase();let radius="";if(shape==="circle")radius="50%";else if(shape==="pill")radius="9999px";else if(shape==="rounded"){const n=parseFloat(this.getAttribute("radius"));radius=(Number.isFinite(n)?n:12)+"px"}this._frame.style.borderRadius=mask?"":radius,this._frame.style.clipPath=mask||"",this._ring.style.borderRadius=mask?"":radius,this._ring.style.display=mask?"none":"";const editable=hasOmelette();this.toggleAttribute("data-editable",editable),this._sub.style.display=editable?"":"none";let stored=this.id?getSlot(this.id):this._local;stored&&stored.u&&!/^data:image\//i.test(stored.u)&&(stored=null);const srcAttr=this.getAttribute("src")||"";this._userUrl=stored&&stored.u||null;const url=this._userUrl||srcAttr;this.hasAttribute("data-reframe")||(this._view={s:stored&&Number.isFinite(stored.s)?clampS(stored.s):1,x:stored&&Number.isFinite(stored.x)?stored.x:0,y:stored&&Number.isFinite(stored.y)?stored.y:0}),this._cap.textContent=this.getAttribute("placeholder")||"صورة",url?(this._img.getAttribute("src")!==url&&(this._img.src=url,this._ghost.src=url),this._img.style.display="block",this._empty.style.display="none",this.setAttribute("data-filled",""),this._clampView(),this._applyView()):(this._img.style.display="none",this._img.removeAttribute("src"),this._ghost.removeAttribute("src"),this._empty.style.display="flex",this.removeAttribute("data-filled"))}}customElements.get("image-slot")||customElements.define("image-slot",ImageSlot)})();
+(() => {
+  const STATE_FILE = ".image-slots.state.json",
+    LS_KEY = "lozi.image-slots.v1",
+    hasOmelette = () => !!(window.omelette && window.omelette.writeFile);
+  let lsOk = !1;
+  try {
+    const k = "__is_probe__";
+    (localStorage.setItem(k, "1"), localStorage.removeItem(k), (lsOk = !0));
+  } catch (e) {
+    lsOk = !1;
+  }
+  const dataUrlBytes = (u) => {
+      const i = u.indexOf(","),
+        b = i >= 0 ? u.slice(i + 1) : u;
+      return Math.floor(b.length * 0.75);
+    },
+    ACCEPT = ["image/png", "image/jpeg", "image/webp", "image/avif"],
+    subs = new Set();
+  let slots = {};
+  const tombstones = new Set();
+  let loaded = !1,
+    loadP = null;
+  function merge(j) {
+    if (j && typeof j == "object") {
+      const merged = Object.assign({}, j, slots);
+      for (const k in slots)
+        merged[k] &&
+          !merged[k].u &&
+          j[k] &&
+          (merged[k].u = typeof j[k] == "string" ? j[k] : j[k].u);
+      for (const id of tombstones) delete merged[id];
+      slots = merged;
+    }
+    tombstones.clear();
+  }
+  function load() {
+    return (
+      loadP ||
+      (hasOmelette()
+        ? (loadP = fetch(STATE_FILE)
+            .then((r) => (r.ok ? r.json() : null))
+            .then(merge)
+            .catch(() => {})
+            .then(() => {
+              ((loaded = !0), subs.forEach((fn) => fn()));
+            }))
+        : (loadP = Promise.resolve().then(() => {
+            try {
+              merge(JSON.parse(localStorage.getItem(LS_KEY) || "null"));
+            } catch (e) {
+              tombstones.clear();
+            }
+            ((loaded = !0), subs.forEach((fn) => fn()));
+          })),
+      loadP)
+    );
+  }
+  let saving = !1,
+    saveDirty = !1;
+  function save() {
+    const w = window.omelette && window.omelette.writeFile;
+    if (w) {
+      if (saving) {
+        saveDirty = !0;
+        return;
+      }
+      ((saving = !0),
+        Promise.resolve(w(STATE_FILE, JSON.stringify(slots)))
+          .catch(() => {})
+          .then(() => {
+            ((saving = !1), saveDirty && ((saveDirty = !1), save()));
+          }));
+      return;
+    }
+    if (lsOk)
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(slots));
+      } catch (e) {}
+  }
+  const S_MAX = 5,
+    clampS = (s) => Math.max(1, Math.min(S_MAX, s));
+  function getSlot(id) {
+    const v = slots[id];
+    return v ? (typeof v == "string" ? { u: v, s: 1, x: 0, y: 0 } : v) : null;
+  }
+  function setSlot(id, val) {
+    id &&
+      (val
+        ? ((slots[id] = val), tombstones.delete(id))
+        : (delete slots[id], loaded || tombstones.add(id)),
+      subs.forEach((fn) => fn()),
+      loaded ? save() : load().then(save));
+  }
+  async function toDataUrl(file, targetW) {
+    const bitmap = await createImageBitmap(file);
+    try {
+      const cap = Math.min(1600, Math.max(1, Math.round(targetW * 2)) || 1600),
+        scale = Math.min(1, cap / Math.max(bitmap.width, bitmap.height)),
+        w = Math.max(1, Math.round(bitmap.width * scale)),
+        h = Math.max(1, Math.round(bitmap.height * scale)),
+        canvas = document.createElement("canvas");
+      ((canvas.width = w), (canvas.height = h));
+      const ctx = canvas.getContext("2d");
+      ((ctx.imageSmoothingEnabled = !0),
+        (ctx.imageSmoothingQuality = "high"),
+        ctx.drawImage(bitmap, 0, 0, w, h));
+      let type = "image/webp";
+      canvas.toDataURL(type, 0.8).indexOf("data:image/webp") !== 0 &&
+        (type = "image/jpeg");
+      let q = 0.85,
+        url = canvas.toDataURL(type, q);
+      for (; dataUrlBytes(url) > 327680 && q > 0.55; )
+        ((q = Math.round((q - 0.07) * 100) / 100),
+          (url = canvas.toDataURL(type, q)));
+      return url;
+    } finally {
+      bitmap.close && bitmap.close();
+    }
+  }
+  const stylesheet =
+      ":host{display:inline-block;position:relative;vertical-align:top;  font:13px/1.3 system-ui,-apple-system,sans-serif;color:rgba(0,0,0,.55);width:240px;height:160px}.frame{position:absolute;inset:0;overflow:hidden;background:rgba(0,0,0,.04)}.frame img{position:absolute;max-width:none;transform:translate(-50%,-50%);  -webkit-user-drag:none;user-select:none;touch-action:none}.spill{position:absolute;transform:translate(-50%,-50%);display:none;z-index:1;  cursor:grab;touch-action:none}:host([data-panning]) .spill{cursor:grabbing}.spill .ghost{position:absolute;inset:0;width:100%;height:100%;opacity:.35;  pointer-events:none;-webkit-user-drag:none;user-select:none;  box-shadow:0 0 0 1px rgba(0,0,0,.2),0 12px 32px rgba(0,0,0,.2)}.spill .handle{position:absolute;width:12px;height:12px;border-radius:50%;  background:#fff;box-shadow:0 0 0 1.5px #c96442,0 1px 3px rgba(0,0,0,.3);  transform:translate(-50%,-50%)}.spill .handle[data-c=nw]{left:0;top:0;cursor:nwse-resize}.spill .handle[data-c=ne]{left:100%;top:0;cursor:nesw-resize}.spill .handle[data-c=sw]{left:0;top:100%;cursor:nesw-resize}.spill .handle[data-c=se]{left:100%;top:100%;cursor:nwse-resize}:host([data-reframe]){z-index:10}:host([data-reframe]) .spill{display:block}:host([data-reframe]) .frame{box-shadow:0 0 0 2px #c96442}.empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;  justify-content:center;gap:6px;text-align:center;padding:12px;box-sizing:border-box;  cursor:pointer;user-select:none}.empty svg{opacity:.45}.empty .cap{max-width:90%;font-weight:500;letter-spacing:.01em}.empty .sub{font-size:11px}.empty .sub u{text-underline-offset:2px;text-decoration-color:rgba(0,0,0,.25)}.empty:hover .sub u{color:rgba(0,0,0,.75);text-decoration-color:currentColor}:host([data-over]) .frame{outline:2px solid #c96442;outline-offset:-2px;  background:rgba(201,100,66,.10)}.ring{position:absolute;inset:0;pointer-events:none;border:1.5px dashed rgba(0,0,0,.25);  transition:border-color .12s}:host([data-over]) .ring{border-color:#c96442}:host([data-filled]) .ring{display:none}.ctl{position:absolute;top:100%;left:50%;transform:translateX(-50%);padding-top:8px;  display:flex;gap:6px;opacity:0;pointer-events:none;transition:opacity .12s;z-index:2;  white-space:nowrap}:host([data-filled][data-editable]:hover) .ctl,:host([data-reframe]) .ctl  {opacity:1;pointer-events:auto}.ctl button{appearance:none;border:0;border-radius:6px;padding:5px 10px;cursor:pointer;  background:rgba(0,0,0,.65);color:#fff;font:11px/1 system-ui,-apple-system,sans-serif;  backdrop-filter:blur(6px)}.ctl button:hover{background:rgba(0,0,0,.8)}.err{position:absolute;left:8px;bottom:8px;right:8px;color:#b3261e;font-size:11px;  background:rgba(255,255,255,.85);padding:4px 6px;border-radius:5px;pointer-events:none}:host(:not([data-editable])) .ring{display:none}:host(:not([data-editable])) .empty{cursor:default}",
+    icon =
+      '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>';
+  class ImageSlot extends HTMLElement {
+    static get observedAttributes() {
+      return [
+        "shape",
+        "radius",
+        "mask",
+        "fit",
+        "position",
+        "placeholder",
+        "src",
+        "id",
+      ];
+    }
+    constructor() {
+      super();
+      const root = this.attachShadow({ mode: "open" });
+      ((root.innerHTML =
+        "<style>" +
+        stylesheet +
+        '</style><div class="frame" part="frame">  <img part="image" alt="" draggable="false" style="display:none">  <div class="empty" part="empty">' +
+        icon +
+        '    <div class="cap"></div>    <div class="sub">or <u>browse files</u></div></div>  <div class="ring" part="ring"></div></div><div class="spill">  <img class="ghost" alt="" draggable="false">  <div class="handle" data-c="nw"></div><div class="handle" data-c="ne"></div>  <div class="handle" data-c="sw"></div><div class="handle" data-c="se"></div></div><div class="ctl"><button data-act="replace" title="Replace image">Replace</button>  <button data-act="clear" title="Remove image">Remove</button></div><input type="file" accept="' +
+        ACCEPT.join(",") +
+        '" hidden>'),
+        (this._frame = root.querySelector(".frame")),
+        (this._ring = root.querySelector(".ring")),
+        (this._img = root.querySelector(".frame img")),
+        (this._empty = root.querySelector(".empty")),
+        (this._cap = root.querySelector(".cap")),
+        (this._sub = root.querySelector(".sub")),
+        (this._spill = root.querySelector(".spill")),
+        (this._ghost = root.querySelector(".ghost")),
+        (this._err = null),
+        (this._input = root.querySelector("input")),
+        (this._depth = 0),
+        (this._gen = 0),
+        (this._view = { s: 1, x: 0, y: 0 }),
+        (this._subFn = () => this._render()),
+        this._empty.addEventListener("click", () => {
+          this.hasAttribute("data-editable") && this._input.click();
+        }),
+        root.addEventListener("click", (e) => {
+          const act =
+            e.target &&
+            e.target.getAttribute &&
+            e.target.getAttribute("data-act");
+          (act === "replace" && (this._exitReframe(!0), this._input.click()),
+            act === "clear" &&
+              (this._exitReframe(!1),
+              this._gen++,
+              (this._local = null),
+              this.id ? setSlot(this.id, null) : this._render()));
+        }),
+        this._input.addEventListener("change", () => {
+          const f = this._input.files && this._input.files[0];
+          (f && this._ingest(f), (this._input.value = ""));
+        }),
+        this._img.addEventListener("load", () => this._applyView()),
+        this.addEventListener("dblclick", (e) => {
+          !this.hasAttribute("data-editable") ||
+            !this._reframes() ||
+            (e.preventDefault(),
+            this.hasAttribute("data-reframe")
+              ? this._exitReframe(!0)
+              : this._enterReframe());
+        }),
+        this._spill.addEventListener("pointerdown", (e) => {
+          if (e.button !== 0 || !this.hasAttribute("data-reframe")) return;
+          (e.preventDefault(),
+            e.stopPropagation(),
+            this._spill.setPointerCapture(e.pointerId));
+          const rect = this.getBoundingClientRect(),
+            fw = rect.width || 1,
+            fh = rect.height || 1,
+            corner = e.target.getAttribute && e.target.getAttribute("data-c");
+          let move;
+          if (corner) {
+            const iw = this._img.naturalWidth || 1,
+              ih = this._img.naturalHeight || 1,
+              base = Math.max(fw / iw, fh / ih),
+              sx = corner.includes("e") ? 1 : -1,
+              sy = corner.includes("s") ? 1 : -1,
+              s0 = this._view.s,
+              w0 = iw * base * s0,
+              h0 = ih * base * s0,
+              cx0 = ((50 + this._view.x) / 100) * fw,
+              cy0 = ((50 + this._view.y) / 100) * fh,
+              ox = cx0 - (sx * w0) / 2,
+              oy = cy0 - (sy * h0) / 2,
+              diag0 = Math.hypot(w0, h0),
+              ux = (sx * w0) / diag0,
+              uy = (sy * h0) / diag0;
+            move = (ev) => {
+              const proj =
+                  (ev.clientX - rect.left - ox) * ux +
+                  (ev.clientY - rect.top - oy) * uy,
+                s = clampS((s0 * proj) / diag0),
+                d = (diag0 * s) / s0;
+              ((this._view.s = s),
+                (this._view.x = ((ox + (ux * d) / 2) / fw) * 100 - 50),
+                (this._view.y = ((oy + (uy * d) / 2) / fh) * 100 - 50),
+                this._clampView(),
+                this._applyView());
+            };
+          } else {
+            this.setAttribute("data-panning", "");
+            const start = {
+              px: e.clientX,
+              py: e.clientY,
+              x: this._view.x,
+              y: this._view.y,
+            };
+            move = (ev) => {
+              ((this._view.x = start.x + ((ev.clientX - start.px) / fw) * 100),
+                (this._view.y = start.y + ((ev.clientY - start.py) / fh) * 100),
+                this._clampView(),
+                this._applyView());
+            };
+          }
+          const up = () => {
+            try {
+              this._spill.releasePointerCapture(e.pointerId);
+            } catch (e2) {}
+            (this._spill.removeEventListener("pointermove", move),
+              this._spill.removeEventListener("pointerup", up),
+              this._spill.removeEventListener("pointercancel", up),
+              this.removeAttribute("data-panning"),
+              (this._dragUp = null));
+          };
+          ((this._dragUp = up),
+            this._spill.addEventListener("pointermove", move),
+            this._spill.addEventListener("pointerup", up),
+            this._spill.addEventListener("pointercancel", up));
+        }),
+        this.addEventListener(
+          "wheel",
+          (e) => {
+            if (!this.hasAttribute("data-reframe")) return;
+            e.preventDefault();
+            const r = this.getBoundingClientRect(),
+              cx = ((e.clientX - r.left) / r.width) * 100 - 50,
+              cy = ((e.clientY - r.top) / r.height) * 100 - 50,
+              prev = this._view.s,
+              next = clampS(prev * Math.pow(1.0015, -e.deltaY));
+            if (next === prev) return;
+            const k = next / prev;
+            ((this._view.s = next),
+              (this._view.x = cx * (1 - k) + this._view.x * k),
+              (this._view.y = cy * (1 - k) + this._view.y * k),
+              this._clampView(),
+              this._applyView());
+          },
+          { passive: !1 },
+        ));
+    }
+    connectedCallback() {
+      (!this.id &&
+        !ImageSlot._warned &&
+        ((ImageSlot._warned = !0),
+        console.warn(
+          "<image-slot> without an id will not persist its dropped image.",
+        )),
+        this.addEventListener("dragenter", this),
+        this.addEventListener("dragover", this),
+        this.addEventListener("dragleave", this),
+        this.addEventListener("drop", this),
+        subs.add(this._subFn),
+        (this._ro = new ResizeObserver(() => this._render())),
+        this._ro.observe(this),
+        load(),
+        this._render());
+    }
+    disconnectedCallback() {
+      (subs.delete(this._subFn),
+        this.removeEventListener("dragenter", this),
+        this.removeEventListener("dragover", this),
+        this.removeEventListener("dragleave", this),
+        this.removeEventListener("drop", this),
+        this._ro && (this._ro.disconnect(), (this._ro = null)),
+        this._exitReframe(!1));
+    }
+    _enterReframe() {
+      this.hasAttribute("data-reframe") ||
+        (this.setAttribute("data-reframe", ""),
+        this._applyView(),
+        (this._outside = (e) => {
+          (e.composedPath && e.composedPath().includes(this)) ||
+            this._exitReframe(!0);
+        }),
+        (this._esc = (e) => {
+          e.key === "Escape" && this._exitReframe(!0);
+        }),
+        document.addEventListener("pointerdown", this._outside, !0),
+        document.addEventListener("keydown", this._esc, !0));
+    }
+    _exitReframe(commit) {
+      this.hasAttribute("data-reframe") &&
+        (this._dragUp && this._dragUp(),
+        this.removeAttribute("data-reframe"),
+        this.removeAttribute("data-panning"),
+        this._outside &&
+          document.removeEventListener("pointerdown", this._outside, !0),
+        this._esc && document.removeEventListener("keydown", this._esc, !0),
+        (this._outside = this._esc = null),
+        commit && this._commitView());
+    }
+    attributeChangedCallback() {
+      this.shadowRoot && this._render();
+    }
+    handleEvent(e) {
+      if (e.type === "dragenter" || e.type === "dragover")
+        (e.preventDefault(),
+          e.stopPropagation(),
+          e.dataTransfer && (e.dataTransfer.dropEffect = "copy"),
+          e.type === "dragenter" && this._depth++,
+          this.setAttribute("data-over", ""));
+      else if (e.type === "dragleave")
+        --this._depth <= 0 &&
+          ((this._depth = 0), this.removeAttribute("data-over"));
+      else if (e.type === "drop") {
+        (e.preventDefault(),
+          e.stopPropagation(),
+          (this._depth = 0),
+          this.removeAttribute("data-over"));
+        const f =
+          e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        f && this._ingest(f);
+      }
+    }
+    async _ingest(file) {
+      if ((this._setError(null), !file || ACCEPT.indexOf(file.type) < 0)) {
+        this._setError("الرجاء اختيار صورة بصيغة PNG أو JPEG أو WebP أو AVIF.");
+        return;
+      }
+      if (file.size > 10485760) {
+        this._setError(
+          "حجم الصورة أكبر من ١٠ ميجابايت. الرجاء اختيار صورة أصغر.",
+        );
+        return;
+      }
+      const gen = ++this._gen;
+      try {
+        const w = this.clientWidth || this.offsetWidth || 1600,
+          url = await toDataUrl(file, w);
+        if (gen !== this._gen) return;
+        this._exitReframe(!1);
+        const val = { u: url, s: 1, x: 0, y: 0 };
+        (setSlot(this.id || "", val),
+          this.id || ((this._local = val), this._render()));
+      } catch (err) {
+        if (gen !== this._gen) return;
+        (this._setError("تعذّر قراءة هذه الصورة."),
+          console.warn("<image-slot> ingest failed:", err));
+      }
+    }
+    _setError(msg) {
+      if ((this._err && (this._err.remove(), (this._err = null)), !msg)) return;
+      const d = document.createElement("div");
+      ((d.className = "err"),
+        (d.textContent = msg),
+        this.shadowRoot.appendChild(d),
+        (this._err = d),
+        setTimeout(() => {
+          this._err === d && (d.remove(), (this._err = null));
+        }, 3e3));
+    }
+    _reframes() {
+      return (
+        this.hasAttribute("data-filled") &&
+        (this.getAttribute("fit") || "cover") === "cover"
+      );
+    }
+    _geom() {
+      const iw = this._img.naturalWidth,
+        ih = this._img.naturalHeight,
+        fw = this.clientWidth,
+        fh = this.clientHeight;
+      return !iw || !ih || !fw || !fh
+        ? null
+        : { iw, ih, fw, fh, base: Math.max(fw / iw, fh / ih) };
+    }
+    _clampView() {
+      const g = this._geom();
+      if (!g) return;
+      const mx = Math.max(0, ((g.iw * g.base * this._view.s) / g.fw - 1) * 50),
+        my = Math.max(0, ((g.ih * g.base * this._view.s) / g.fh - 1) * 50);
+      ((this._view.x = Math.max(-mx, Math.min(mx, this._view.x))),
+        (this._view.y = Math.max(-my, Math.min(my, this._view.y))));
+    }
+    _applyView() {
+      const g = this._geom(),
+        fit = this.getAttribute("fit") || "cover";
+      if (fit !== "cover" || !g) {
+        ((this._img.style.width = "100%"),
+          (this._img.style.height = "100%"),
+          (this._img.style.left = "50%"),
+          (this._img.style.top = "50%"),
+          (this._img.style.objectFit = fit),
+          (this._img.style.objectPosition =
+            this.getAttribute("position") || "50% 50%"));
+        return;
+      }
+      const k = g.base * this._view.s,
+        w = ((g.iw * k) / g.fw) * 100 + "%",
+        h = ((g.ih * k) / g.fh) * 100 + "%",
+        l = 50 + this._view.x + "%",
+        t = 50 + this._view.y + "%";
+      ((this._img.style.width = w),
+        (this._img.style.height = h),
+        (this._img.style.left = l),
+        (this._img.style.top = t),
+        (this._img.style.objectFit = ""),
+        (this._spill.style.width = w),
+        (this._spill.style.height = h),
+        (this._spill.style.left = l),
+        (this._spill.style.top = t));
+    }
+    _commitView() {
+      const v = { s: this._view.s, x: this._view.x, y: this._view.y };
+      (this._userUrl && (v.u = this._userUrl),
+        this.id ? setSlot(this.id, v) : (this._local = v));
+    }
+    _render() {
+      const mask = this.getAttribute("mask"),
+        shape = (this.getAttribute("shape") || "rounded").toLowerCase();
+      let radius = "";
+      if (shape === "circle") radius = "50%";
+      else if (shape === "pill") radius = "9999px";
+      else if (shape === "rounded") {
+        const n = parseFloat(this.getAttribute("radius"));
+        radius = (Number.isFinite(n) ? n : 12) + "px";
+      }
+      ((this._frame.style.borderRadius = mask ? "" : radius),
+        (this._frame.style.clipPath = mask || ""),
+        (this._ring.style.borderRadius = mask ? "" : radius),
+        (this._ring.style.display = mask ? "none" : ""));
+      const editable = hasOmelette();
+      (this.toggleAttribute("data-editable", editable),
+        (this._sub.style.display = editable ? "" : "none"));
+      let stored = this.id ? getSlot(this.id) : this._local;
+      stored && stored.u && !/^data:image\//i.test(stored.u) && (stored = null);
+      const srcAttr = this.getAttribute("src") || "";
+      this._userUrl = (stored && stored.u) || null;
+      const url = this._userUrl || srcAttr;
+      (this.hasAttribute("data-reframe") ||
+        (this._view = {
+          s: stored && Number.isFinite(stored.s) ? clampS(stored.s) : 1,
+          x: stored && Number.isFinite(stored.x) ? stored.x : 0,
+          y: stored && Number.isFinite(stored.y) ? stored.y : 0,
+        }),
+        (this._cap.textContent = this.getAttribute("placeholder") || "صورة"),
+        url
+          ? (this._img.getAttribute("src") !== url &&
+              ((this._img.src = url), (this._ghost.src = url)),
+            (this._img.style.display = "block"),
+            (this._empty.style.display = "none"),
+            this.setAttribute("data-filled", ""),
+            this._clampView(),
+            this._applyView())
+          : ((this._img.style.display = "none"),
+            this._img.removeAttribute("src"),
+            this._ghost.removeAttribute("src"),
+            (this._empty.style.display = "flex"),
+            this.removeAttribute("data-filled")));
+    }
+  }
+  customElements.get("image-slot") ||
+    customElements.define("image-slot", ImageSlot);
+})();
 
-const LOZI_RATE=140;let LOZI_CURRENCY="YER";const setCurrency=c=>{LOZI_CURRENCY=c},getCurrency=()=>LOZI_CURRENCY;function fmtMoney(yer){if(LOZI_CURRENCY==="SAR"){const v=yer/140;return{value:(v>=100?Math.round(v):Math.round(v*10)/10).toLocaleString("en-US"),unit:LOZI_T_UNIT.SAR}}return{value:Math.round(yer).toLocaleString("en-US"),unit:LOZI_T_UNIT.YER}}function moneyStr(yer){const m=fmtMoney(yer);return`${m.value} ${m.unit}`}const LOZI_T_UNIT={YER:"ر.ي",SAR:"ر.س"},ALMOND_TYPES=[{id:"jabri",label:{ar:"جبري",en:"Jabri"}},{id:"khawlani",label:{ar:"خولاني",en:"Khawlani"}},{id:"matari",label:{ar:"مطري",en:"Matari"}}],ALMOND_LABEL=(id,lang)=>{var _a;return((_a=(ALMOND_TYPES.find(x=>x.id===id)||{}).label)==null?void 0:_a[lang])||""},RAISIN_TYPES=[{id:"razqi",label:{ar:"رازقي",en:"Razqi"}},{id:"bayad",label:{ar:"بياض",en:"White"}},{id:"aswad",label:{ar:"أسود",en:"Black"}}],RAISIN_LABEL=(id,lang)=>{var _b;return((_b=(RAISIN_TYPES.find(x=>x.id===id)||{}).label)==null?void 0:_b[lang])||""},VARIETY_LABEL=(id,lang)=>ALMOND_LABEL(id,lang)||RAISIN_LABEL(id,lang)||"",LOZI_T={ar:{dir:"rtl",appName:"لوزي",tagline:"مكسرات يمنية فاخرة",nav_home:"الرئيسية",nav_stores:"الأقسام",nav_savings:"التوفير",nav_cart:"السلة",nav_profile:"حسابي",welcome:"أهلاً بك في لوزي",register_title:"إنشاء حساب",choose_role:"اختر نوع حسابك",choose_role_sub:"لكل فئة تجربة وصلاحيات مختلفة",role_customer:"زبون",role_customer_d:"تصفّح واطلب المكسرات",role_farmer:"مزارع",role_farmer_d:"انشر محصولك من اللوز أو الزبيب",role_retail:"محل تجزئة",role_retail_d:"بيع للزبائن وشراء من الجملة",role_wholesale:"محل جملة",role_wholesale_d:"بيع بالجملة لمحلات التجزئة",farmer_kind:"نوع المحصول",farmer_almond:"لوز",farmer_raisin:"زبيب",country:"الدولة",yemen:"اليمن",yemen_only:"التسجيل متاح حالياً في اليمن فقط",cont:"متابعة",login_sub:"سجّل دخولك لتبدأ التسوّق",google:"المتابعة عبر Google",whatsapp_otp:"رمز عبر واتساب",remember:"تذكّرني",skip:"تخطّي الآن",agree_pre:"بالمتابعة فأنت توافق على",terms_link:"الشروط والأحكام",terms_title:"الشروط والأحكام",terms_draft:"نسخة مبدئية — سيتم اعتماد النص النهائي قريباً",terms_agree:"موافق ومتابعة",pinfo_title:"معلوماتي الشخصية",pinfo_required:"أكمل معلوماتك للمتابعة",pinfo_hint:"مطلوبة عند التسجيل عبر Google",full_name:"الاسم الكامل",full_name_ph:"مثال: محمد أحمد",phone:"رقم الهاتف",phone_ph:"7X XXX XXXX",save:"حفظ",saved:"تم الحفظ ✓",pinfo_edit_hint:"يمكنك تعديل اسمك ورقمك وعنوان موقعك في أي وقت",pinfo_edit_hint_vendor:"يمكنك تعديل عنوان موقعك في أي وقت",my_location:"عنوان موقعي",city:"المدينة",city_ph:"مثال: صنعاء",address:"العنوان التفصيلي",address_ph:"الحي، الشارع، أقرب معلم…",no_location:"لم تحدّد عنوانك بعد",search_ph:"ابحث عن لوز، زبيب، متجر…",pride_line:"مع لوزي، تدعم اقتصاد وطنك · منتج يمني ١٠٠٪",cats:"الأقسام",sec_almond:"اللوز",sec_raisin:"الزبيب",sec_retail:"التجزئة",sec_wholesale:"سوق الجملة",cat_savings:"التوفير",offers:"عروض اليوم",featured_stores:"متاجر مميّزة",see_all:"عرض الكل",stores_title:"الأقسام",almond_type:"نوع اللوز",raisin_type:"نوع الزبيب",all_types:"كل الأنواع",stores_in_sec:"متاجر القسم",products_in_sec:"منتجات القسم",reviews:"تقييم",verified:"موثّق",offers_avail:"العروض المتاحة",no_offers:"لا توجد عروض حالياً",off_discount:"خصم",off_free_min:"توصيل مجاني عند الشراء بـ",off_bundle:"عرض تجميعي",wholesale_badge:"جملة",wholesale_locked:"سوق الجملة متاح لمحلات التجزئة فقط",contact_wa:"تواصل عبر واتساب",store_products:"منتجات المتجر",variety_label:"النوع",add_to_cart:"أضف إلى السلة",added:"تمت الإضافة ✓",description:"الوصف",per:"لكل",buy_mode_weight:"بالوزن",buy_mode_amount:"بالمبلغ",amount_label:"المبلغ (ريال)",amount_ph:"أدخل المبلغ",approx_qty:"الكمية التقريبية",min_amount_note:"الحد الأدنى ٥٠٠ ريال",min_quarter_note:"الحد الأدنى ربع كيلو (٢٥٠ جم)",grams_short:"جم",cart_title:"سلّة المشتريات",cart_per_store_note:"كل متجر طلب مستقل — لا يمكن دمج متاجر مختلفة في طلب واحد.",order_from:"طلب من",checkout_this:"إتمام هذا الطلب",cart_empty:"سلّتك فارغة",cart_empty_sub:"تصفّح المتاجر وأضف ما يعجبك",browse:"تصفّح الأقسام",subtotal:"المجموع الفرعي",delivery_fee:"رسوم التوصيل",total:"الإجمالي",checkout:"إتمام الطلب",checkout_title:"إتمام الطلب",delivery_to:"التوصيل إلى",edit:"تعديل",order_summary:"ملخّص الطلب",payment:"طريقة الدفع",cod:"الدفع عند الاستلام",cod_sub:"ادفع نقداً عند وصول الطلب",pay_prepaid:"دفع مسبق",pay_prepaid_sub:"ادفع الآن عبر تحويل بنكي",prepaid_title:"الدفع المسبق",prepaid_intro:"حوّل قيمة الطلب إلى أحد حساباتنا التالية، ثم أرفق إشعار التحويل لتتم مراجعته.",prepaid_accounts:"حوّل قيمة الطلب إلى أحد الحسابات",prepaid_amount:"قيمة الطلب",prepaid_send:"إرسال إشعار التحويل",prepaid_sent_toast:"تم إرسال إشعار التحويل — طلبك قيد المراجعة",success_review_sub:"تم إرسال إشعار التحويل، وطلبك قيد المراجعة الآن.",order_review_note:"تم إرسال إشعار التحويل. تتم مراجعة الدفع ويبدأ التجهيز بعد التأكيد.",confirm_order:"تأكيد الطلب",order_placed:"تم استلام طلبك!",order_placed_sub:"سنبدأ بتجهيزه حالاً",track_order:"تتبّع الطلب",orders_title:"طلباتي",orders_hint_seller:"هذه مشترياتك أنت من المنصة (محل التجزئة يمكنه الشراء من الجملة). لمتابعة طلبات زبائنك افتح «الطلبات».",orders_hint_wholesale:"هذه مشترياتك أنت من المنصة. لمتابعة طلبات زبائنك افتح «الطلبات».",no_orders:"لا توجد طلبات بعد",reorder:"إعادة الطلب",cancel_order:"إلغاء",st_received:"تم الاستلام",st_payreview:"بانتظار مراجعة الدفع",st_preparing:"قيد التجهيز",st_delivering:"قيد التوصيل",st_delivered:"تم التسليم",order_no:"طلب رقم",items_count:"منتج",order_total:"الإجمالي",nav_dashboard:"الطلبات",dash_retail:"لوحة المتجر",dash_wholesale:"لوحة الجملة",dash_farm:"لوحة المزرعة",dash_new_orders:"طلبات جديدة",dash_active:"قيد التنفيذ",dash_today_sales:"مبيعات اليوم",dash_total_sales:"إجمالي المبيعات",dash_products:"منتج",dash_my_products:"منتجاتي المعروضة",dash_add_short:"إضافة منتج",nav_wallet:"محفظتي",wal_title:"محفظتي",wal_due_label:"العمولة المستحقّة",wal_due_sub:"إجمالي العمولة على الطلبات المكتملة",wal_deadline:"آخر موعد للسداد",wal_deadline_val:"٣٠ يونيو",wal_pay:"سداد العمولة",wal_status_title:"حالة المتجر",wal_st_active:"نشط",wal_st_active_sub:"متجرك يعمل بشكل طبيعي وجميع العمولات مسدّدة.",wal_st_due:"اقترب موعد السداد",wal_st_due_sub:"تبقّى وقت قصير لسداد العمولة المستحقّة لتفادي تعليق المتجر.",wal_st_suspended:"معلّق",wal_st_suspended_sub:"تم تعليق متجرك مؤقتاً لعدم سداد العمولة. سدّد الآن لإعادة التفعيل.",wal_preview:"معاينة الحالة (للعرض فقط)",wal_c_green:"أخضر",wal_c_orange:"برتقالي",wal_c_red:"أحمر",wal_last_pay:"آخر دفعة",wal_last_pay_on:"بتاريخ",wal_pay_review:"قيد المراجعة",wal_pay_approved:"تمت الموافقة",wal_pay_rejected:"مرفوضة",wal_calc_title:"الطلبات المُحتسَبة",wal_calc_sub:"طلبات مكتملة ولّدت العمولة",wal_total_orders:"طلب محتسب",wal_col_order:"الطلب",wal_col_value:"القيمة",wal_col_comm:"العمولة",wal_col_date:"التاريخ",wal_rate_note:"العمولة ٥٪ من قيمة كل طلب مكتمل",wal_prepaid_exempt:"الطلبات المدفوعة مسبقاً (تحويل بنكي) لا تُحتسب كعمولة آجلة — تُسوّى مباشرةً عند تحصيل الإدارة لقيمتها.",wal_pay_title:"سداد العمولة",wal_pay_intro:"حوّل قيمة العمولة المستحقّة إلى أحد الحسابات التالية، ثم أرفق صورة إيصال التحويل.",wal_pay_amount:"المبلغ المطلوب تحويله",wal_pay_submitted:"تم إرسال الإيصال للمراجعة",wal_accounts:"الحسابات البنكية للتحويل",myp_title:"منتجاتي المعروضة",myp_total:"إجمالي المنتجات",myp_visible_count:"معروض للزبائن",myp_visible:"معروض",myp_hidden:"مخفي",myp_toggle:"إظهار/إخفاء",myp_delete:"حذف",myp_removed:"تم حذف المنتج",myp_empty:"لا توجد منتجات معروضة بعد",myp_edit:"تعديل",myp_search_ph:"ابحث في منتجاتي…",myp_no_match:"لا توجد نتائج مطابقة",sort_newest:"الأحدث",sort_price_hi:"الأعلى سعراً",sort_price_lo:"الأقل سعراً",sort_name:"الاسم",sort_visible:"المعروض أولاً",edit_product:"تعديل المنتج",save_edits:"حفظ التعديلات",product_updated:"تم تحديث المنتج والسعر",st_rejected:"مرفوض",flt_rejected:"مرفوضة",rej_reject:"رفض الطلب",rej_confirm_q:"سبب الرفض:",rej_out_of_stock:"نفاد الكمية",rej_cancel:"تراجع",rej_reason_label:"السبب",rej_done:"تم رفض الطلب وإشعار الزبون",sub_sellers_blocked:"قسم التوفير مخصص للزبائن والمزارعين",deliver_wholesale_only:"توصيل الجملة عبر ناقلك الخاص — لا يتوفر توكيل لوزي",dash_add_product:"إضافة منتج / محصول جديد",dash_no_orders:"لا توجد طلبات في هذه الحالة",flt_all:"الكل",flt_new:"جديدة",flt_preparing:"قيد التجهيز",flt_delivering:"قيد التوصيل",flt_done:"مكتملة",st_new:"جديد",act_start_prep:"بدء التجهيز",act_out_delivery:"خرج للتوصيل",act_mark_delivered:"تم التسليم",ord_open_map:"فتح الموقع",ord_call:"اتصال",ord_whatsapp:"واتساب",deliver_by:"التوصيل",deliver_self:"مندوبي الخاص",deliver_lozi:"توكيل مندوب لوزي",deliver_choose:"اختر طريقة التوصيل قبل البدء",deliver_lozi_pending:"بانتظار تعيين مندوب من إدارة لوزي",deliver_lozi_assigned:"تم توكيل إدارة لوزي بالتوصيل",profile_title:"حسابي",guest:"ضيف لوزي",acct_type:"نوع الحساب",p_personal:"معلوماتي الشخصية",p_orders:"طلباتي",p_fav:"المفضّلة",p_reports:"البلاغات",p_sub:"اشتراك التوفير",p_settings:"الإعدادات",fav_title:"المفضّلة",no_fav:"لا توجد منتجات مفضّلة",reports_title:"البلاغات",new_report:"بلاغ جديد",no_reports:"لا توجد بلاغات",report_pick_type:"اختر نوع البلاغ",report_pick_sub:"ساعدنا في الحفاظ على جودة وأمانة لوزي",rep_retail:"بلاغ على محل تجزئة",rep_retail_desc:"جودة، توصيل، تسعيرة أو تعامل متجر تجزئة",rep_farmer:"بلاغ على مزارع",rep_farmer_desc:"مشكلة في منتج مزرعة أو تعامل مزارع",rep_general:"بلاغ عام",rep_general_desc:"اكتب الموضوع والوصف بنفسك",rep_target_store:"محل التجزئة المعني",rep_target_farmer:"المزارع المعني",rep_target_ph:"اكتب اسم المتجر أو المزارع",rep_subject:"الموضوع",rep_subject_ph:"عنوان مختصر للبلاغ",rep_desc:"وصف المشكلة",rep_desc_ph:"اشرح المشكلة بالتفصيل ليتسنى لنا اتخاذ الإجراء…",rep_attach:"إرفاق صورة (اختياري)",rep_submit:"إرسال البلاغ",rep_sent:"تم إرسال بلاغك للإدارة ✓",rep_confidential:"يُرسل البلاغ للإدارة بسرّية تامة ولا يظهر للعامة.",rep_st_review:"قيد المراجعة",rep_st_resolved:"تمت المعالجة",rep_st_rejected:"مرفوض",rep_admin_reply:"رد الإدارة",rep_about:"بخصوص",rep_about_order:"بخصوص الطلب",rep_report_issue:"الإبلاغ عن مشكلة",rep_empty:"لا توجد بلاغات سابقة",rep_empty_sub:"إذا واجهت أي مشكلة، أنشئ بلاغاً وسنتابعه معك.",notif_title:"الإشعارات",notif_empty:"لا توجد إشعارات",notif_empty_sub:"ستصلك هنا تحديثات طلباتك وبلاغاتك والعروض.",notif_today:"اليوم",notif_earlier:"الأقدم",notif_view:"عرض",courier_title:"مندوب التوصيل",courier_call:"اتصال",courier_chat:"واتساب",change_address:"تغيير العنوان",edit_address_title:"عنوان التوصيل",edit_address_note:"غيّر عنوان هذا الطلب إن أحببت توصيله لمكان آخر.",pick_on_map:"تحديد على الخريطة",map_title:"حدّد موقعك",map_hint:"اسحب الخريطة أو انقر لتحريك الدبّوس إلى باب المنزل.",map_confirm:"تأكيد الموقع",map_located:"تم تحديد الموقع على الخريطة",map_pinned_chip:"محدّد على الخريطة",use_my_location:"موقعي الحالي",settings_title:"الإعدادات",language:"اللغة",currency_label:"العملة",currency_yer:"ريال يمني",currency_sar:"ريال سعودي",currency_note:"الريال اليمني هو العملة الأساسية في كل التعاملات",theme_label:"المظهر",theme_light:"نهار",theme_dark:"ليل",theme_auto:"تلقائي",theme_auto_note:"يتحوّل تلقائياً إلى الليلي بعد الغروب (٦ مساءً) وإلى النهاري بعد الشروق (٦ صباحاً)",location:"الموقع",wa_support:"دعم واتساب",sup_title:"دعم واتساب",sup_intro:"فريق لوزي جاهز لمساعدتك. تواصل معنا مباشرة عبر واتساب.",sup_primary:"رئيسي",sup_admin_open:"إدارة الأرقام (مسؤول)",sup_admin_title:"إدارة أرقام الدعم",sup_pin_title:"دخول المسؤول",sup_pin_hint:"أدخل رمز المسؤول لتعديل أرقام الدعم أو إضافة رقم آخر.",sup_pin_ph:"رمز المسؤول",sup_pin_wrong:"رمز غير صحيح، حاول مرة أخرى",sup_enter:"دخول",sup_label_lbl:"اسم/وصف الرقم",sup_label_ph:"مثال: الدعم الرئيسي",sup_number_lbl:"رقم الواتساب",sup_number_ph:"7XXXXXXXX",sup_make_primary:"تعيين كرئيسي",sup_is_primary:"الرقم الرئيسي",sup_add:"إضافة رقم آخر",sup_save:"حفظ التغييرات",sup_saved:"تم حفظ أرقام الدعم ✓",sup_delete:"حذف",sup_exit_admin:"إنهاء وضع المسؤول",sup_min_one:"يجب إبقاء رقم واحد على الأقل بصيغة صحيحة",logout:"تسجيل الخروج",arabic:"العربية",english:"English",savings_title:"قسم التوفير",savings_hero:"منتجات مختارة بأسعار أقل",savings_desc:"منتجات مختارة من لوزي بأسعار أقل.",subscribe_now:"اشترك الآن",members_only:"للمشتركين فقط",special_price:"سعر التوفير",normal_price:"السعر العادي",sub_title:"اشترك في التوفير",sub_intro:"احصل على أسعار خاصة على منتجات لوزي. الاشتراك سنوي عبر تحويل بنكي ثم مراجعة الإدارة ورفع سند الدفع.",sub_accounts:"حوّل قيمة الاشتراك إلى أحد الحسابات",copy:"نسخ",copied:"نُسخ ✓",sub_upload:"أرفق صورة إيصال التحويل",sub_upload_hint:"اسحب صورة الإيصال هنا",sub_submit:"إرسال للمراجعة",sub_pending:"قيد المراجعة",sub_pending_sub:"سنراجع إيصالك ونفعّل اشتراكك خلال وقت قصير.",sub_active:"اشتراكك مفعّل ✓",sub_duration_label:"مدة الاشتراك",sub_duration_val:"سنة كاملة",sub_start:"تاريخ الاشتراك",sub_expiry:"تاريخ الانتهاء",sub_price_label:"قيمة الاشتراك",sub_renew:"تجديد الاشتراك",sub_details:"تفاصيل الاشتراك",sub_not_member:"لست مشتركاً بعد",done:"تم",qty:"الكمية",back:"رجوع",add_product:"أضف منتجك",add_crop:"أضف محصولك",add_product_sub_farmer:"انشر محصولك ليصل إلى الزبائن",add_product_sub_retail:"انشر منتجك في قسم التجزئة",add_product_sub_wholesale:"انشر منتجك في قسم الجملة",publish_to:"سيُنشر في قسم",publish_locked_note:"يمكنك النشر في قسمك فقط — لا يمكن النشر في أقسام أخرى.",crop_name:"اسم المنتج",crop_name_ph:"مثال: لوز جبري",crop_weight:"الوزن",crop_weight_ph:"مثال: ٥٠٠ غ · ١ كجم · ٣ كجم",weight_custom:"وزن مخصص",qadah_label:"قدح",qadah_weight_label:"وزن القدح",qadah_hint:"حدد وزن القدح بالكيلو — يختلف حسب المحصول.",crop_price:"السعر بالريال اليمني",crop_price_ph:"مثال: 7000",publish_crop:"نشر المنتج",crop_published:"تم نشر المنتج ✓",my_farm:"مزرعتي",shahti_badge:"خالي من الشحطي",shahti_meaning:"خالٍ من المرارة",shahti_for_baladi:"حصرية للوز البلدي فقط",shahti_request:"اطلب شارة «خالي من الشحطي»",shahti_only_baladi_note:"لا تشمل اللوز الأفغاني أو الأسترالي ولا لوز التجزئة والجملة.",shahti_cond_sample:"إرسال عينة من اللوز المراد نشره ليتم فحصها.",shahti_cond_inspect:"أرسل العينة إلى موقع الفحص التالي:",shahti_loc_label:"موقع استلام العينات",shahti_loc_name:"محل وكالة بيت المكسرات",shahti_loc_addr:"صنعاء – شارع خولان – عمارة الحبيشي",shahti_phone:"777184208",call_wa:"واتساب",shahti_pending:"بانتظار فحص العينة",shahti_verified_title:"شارة «خالي من الشحطي»",shahti_verified_desc:"تم فحص عينة اللوز واعتمادها — خالٍ من المرارة.",shahti_inspect_by:"جهة الفحص"},en:{dir:"ltr",appName:"LOZI",tagline:"Premium Yemeni Nuts",nav_home:"Home",nav_stores:"Sections",nav_savings:"Savings",nav_cart:"Cart",nav_profile:"Profile",welcome:"Welcome to LOZI",register_title:"Create account",choose_role:"Choose your account type",choose_role_sub:"Each type has a different experience",role_customer:"Customer",role_customer_d:"Browse and order nuts",role_farmer:"Farmer",role_farmer_d:"Publish your almond or raisin crop",role_retail:"Retail shop",role_retail_d:"Sell to customers, buy wholesale",role_wholesale:"Wholesale shop",role_wholesale_d:"Sell wholesale to retailers",farmer_kind:"Crop type",farmer_almond:"Almonds",farmer_raisin:"Raisins",country:"Country",yemen:"Yemen",yemen_only:"Registration is currently available in Yemen only",cont:"Continue",login_sub:"Sign in to start shopping",google:"Continue with Google",whatsapp_otp:"WhatsApp code",remember:"Remember me",skip:"Skip for now",agree_pre:"By continuing you agree to the",terms_link:"Terms & Conditions",terms_title:"Terms & Conditions",terms_draft:"Preliminary draft — final text will be adopted soon",terms_agree:"Agree & continue",pinfo_title:"My personal info",pinfo_required:"Complete your info to continue",pinfo_hint:"Required when registering with Google",full_name:"Full name",full_name_ph:"e.g. Mohammed Ahmed",phone:"Phone number",phone_ph:"7X XXX XXXX",save:"Save",saved:"Saved ✓",pinfo_edit_hint:"You can edit your name, number and location any time",my_location:"My location",city:"City",city_ph:"e.g. Sanaa",address:"Detailed address",address_ph:"District, street, nearest landmark…",no_location:"You haven’t set your address yet",search_ph:"Search almonds, raisins, stores…",pride_line:"With Lozi, you support your national economy · 100% Yemeni",cats:"Sections",sec_almond:"Almonds",sec_raisin:"Raisins",sec_retail:"Retail",sec_wholesale:"Wholesale",cat_savings:"Savings",offers:"Today's offers",featured_stores:"Featured stores",see_all:"See all",stores_title:"Sections",almond_type:"Almond type",raisin_type:"Raisin type",all_types:"All types",stores_in_sec:"Stores",products_in_sec:"Products",reviews:"reviews",verified:"Verified",offers_avail:"Available offers",no_offers:"No current offers",off_discount:"Discount",off_free_min:"Free delivery on orders over",off_bundle:"Bundle offer",wholesale_badge:"Wholesale",wholesale_locked:"Wholesale market is for retail shops only",contact_wa:"Contact on WhatsApp",store_products:"Store products",variety_label:"Type",add_to_cart:"Add to cart",added:"Added ✓",description:"Description",per:"per",buy_mode_weight:"By weight",buy_mode_amount:"By amount",amount_label:"Amount (YER)",amount_ph:"Enter amount",approx_qty:"Approx. quantity",min_amount_note:"Minimum 500 YER",min_quarter_note:"Minimum quarter kilo (250 g)",grams_short:"g",cart_title:"Your cart",cart_per_store_note:"Each store is a separate order — different stores can’t be merged into one order.",order_from:"Order from",checkout_this:"Checkout this order",cart_empty:"Your cart is empty",cart_empty_sub:"Browse stores and add what you like",browse:"Browse sections",subtotal:"Subtotal",delivery_fee:"Delivery fee",total:"Total",checkout:"Checkout",checkout_title:"Checkout",delivery_to:"Delivery to",edit:"Edit",order_summary:"Order summary",payment:"Payment",cod:"Cash on delivery",cod_sub:"Pay cash when your order arrives",pay_prepaid:"Prepay now",pay_prepaid_sub:"Pay now by bank transfer",prepaid_title:"Prepay your order",prepaid_intro:"Transfer the order amount to one of our accounts below, then attach the transfer receipt for review.",prepaid_accounts:"Transfer the order amount to one of these accounts",prepaid_amount:"Order amount",prepaid_send:"Send transfer notification",prepaid_sent_toast:"Transfer notification sent — your order is under review",success_review_sub:"Your transfer notification was sent and your order is now under review.",order_review_note:"Transfer notification sent. Payment is under review; preparation starts once confirmed.",confirm_order:"Confirm order",order_placed:"Order placed!",order_placed_sub:"We'll start preparing it now",track_order:"Track order",orders_title:"My orders",orders_hint_seller:"These are your own purchases from the platform (a retail shop can buy from wholesale). To manage your customers’ orders open “Orders”.",orders_hint_wholesale:"These are your own purchases from the platform. To manage your customers’ orders open “Orders”.",no_orders:"No orders yet",reorder:"Reorder",cancel_order:"Cancel",st_received:"Received",st_payreview:"Payment under review",st_preparing:"Preparing",st_delivering:"Delivering",st_delivered:"Delivered",order_no:"Order",items_count:"items",order_total:"Total",nav_dashboard:"Orders",dash_retail:"Store dashboard",dash_wholesale:"Wholesale dashboard",dash_farm:"Farm dashboard",dash_new_orders:"New orders",dash_active:"In progress",dash_today_sales:"Today's sales",dash_total_sales:"Total sales",dash_products:"products",dash_my_products:"My products on display",dash_add_short:"Add product",nav_wallet:"Wallet",wal_title:"My Wallet",wal_due_label:"Commission due",wal_due_sub:"Total commission on completed orders",wal_deadline:"Payment due date",wal_deadline_val:"June 30",wal_pay:"Pay commission",wal_status_title:"Store status",wal_st_active:"Active",wal_st_active_sub:"Your store is operating normally and all commissions are paid.",wal_st_due:"Payment due soon",wal_st_due_sub:"Little time left to pay the commission due, to avoid suspension.",wal_st_suspended:"Suspended",wal_st_suspended_sub:"Your store is temporarily suspended for unpaid commission. Pay now to reactivate.",wal_preview:"Preview status (demo only)",wal_c_green:"Green",wal_c_orange:"Orange",wal_c_red:"Red",wal_last_pay:"Last payment",wal_last_pay_on:"on",wal_pay_review:"Under review",wal_pay_approved:"Approved",wal_pay_rejected:"Rejected",wal_calc_title:"Counted orders",wal_calc_sub:"Completed orders that generated commission",wal_total_orders:"counted orders",wal_col_order:"Order",wal_col_value:"Value",wal_col_comm:"Commission",wal_col_date:"Date",wal_rate_note:"Commission is 5% of each completed order value",wal_prepaid_exempt:"Prepaid orders (bank transfer) are not counted as deferred commission — they are settled directly when the platform collects the amount.",wal_pay_title:"Pay commission",wal_pay_intro:"Transfer the commission due to one of the accounts below, then attach the transfer receipt.",wal_pay_amount:"Amount to transfer",wal_pay_submitted:"Receipt submitted for review",wal_accounts:"Bank accounts for transfer",myp_title:"My products on display",myp_total:"Total products",myp_visible_count:"Visible to customers",myp_visible:"On display",myp_hidden:"Hidden",myp_toggle:"Show/hide",myp_delete:"Delete",myp_removed:"Product removed",myp_empty:"No products on display yet",myp_edit:"Edit",myp_search_ph:"Search my products…",myp_no_match:"No matching results",sort_newest:"Newest",sort_price_hi:"Highest price",sort_price_lo:"Lowest price",sort_name:"Name",sort_visible:"On display first",edit_product:"Edit product",save_edits:"Save changes",product_updated:"Product and price updated",st_rejected:"Rejected",flt_rejected:"Rejected",rej_reject:"Reject order",rej_confirm_q:"Rejection reason:",rej_out_of_stock:"Out of stock",rej_cancel:"Cancel",rej_reason_label:"Reason",rej_done:"Order rejected and customer notified",sub_sellers_blocked:"Savings is for customers and farmers only",deliver_wholesale_only:"Wholesale delivery via your own carrier — LOZI courier not available",dash_add_product:"Add a new product / crop",dash_no_orders:"No orders in this state",flt_all:"All",flt_new:"New",flt_preparing:"Preparing",flt_delivering:"Delivering",flt_done:"Completed",st_new:"New",act_start_prep:"Start preparing",act_out_delivery:"Out for delivery",act_mark_delivered:"Mark delivered",ord_open_map:"Open map",ord_call:"Call",ord_whatsapp:"WhatsApp",deliver_by:"Delivery",deliver_self:"My own courier",deliver_lozi:"Delegate to LOZI",deliver_choose:"Choose a delivery method first",deliver_lozi_pending:"Waiting for LOZI to assign a courier",deliver_lozi_assigned:"LOZI courier assigned",profile_title:"Profile",guest:"LOZI Guest",acct_type:"Account type",p_personal:"My personal info",p_orders:"My orders",p_fav:"Favorites",p_reports:"Reports",p_sub:"Savings membership",p_settings:"Settings",fav_title:"Favorites",no_fav:"No favorite products",reports_title:"Reports",new_report:"New report",no_reports:"No reports",report_pick_type:"Choose report type",report_pick_sub:"Help us keep LOZI quality and integrity high",rep_retail:"Report a retail store",rep_retail_desc:"Quality, delivery, pricing or conduct of a retail store",rep_farmer:"Report a farmer",rep_farmer_desc:"Issue with a farm product or a farmer’s conduct",rep_general:"General report",rep_general_desc:"Write the subject and description yourself",rep_target_store:"Retail store concerned",rep_target_farmer:"Farmer concerned",rep_target_ph:"Type the store or farmer name",rep_subject:"Subject",rep_subject_ph:"A short title for the report",rep_desc:"Describe the issue",rep_desc_ph:"Explain the issue in detail so we can act…",rep_attach:"Attach a photo (optional)",rep_submit:"Submit report",rep_sent:"Your report was sent to admin ✓",rep_confidential:"Reports are sent to admin confidentially and never shown publicly.",rep_st_review:"Under review",rep_st_resolved:"Resolved",rep_st_rejected:"Rejected",rep_admin_reply:"Admin reply",rep_about:"About",rep_about_order:"About order",rep_report_issue:"Report an issue",rep_empty:"No previous reports",rep_empty_sub:"If you face any problem, file a report and we’ll follow up.",notif_title:"Notifications",notif_empty:"No notifications",notif_empty_sub:"Order updates, report replies and offers will appear here.",notif_today:"Today",notif_earlier:"Earlier",notif_view:"View",courier_title:"Delivery courier",courier_call:"Call",courier_chat:"WhatsApp",change_address:"Change address",edit_address_title:"Delivery address",edit_address_note:"Change this order’s address if you’d like it delivered elsewhere.",pick_on_map:"Pick on map",map_title:"Set your location",map_hint:"Drag the map or tap to move the pin to your door.",map_confirm:"Confirm location",map_located:"Location set on the map",map_pinned_chip:"Pinned on map",use_my_location:"My current location",settings_title:"Settings",language:"Language",currency_label:"Currency",currency_yer:"Yemeni Rial",currency_sar:"Saudi Rial",currency_note:"Yemeni Rial is the base currency for all transactions",theme_label:"Appearance",theme_light:"Day",theme_dark:"Night",theme_auto:"Auto",theme_auto_note:"Switches to night after sunset (6 PM) and back to day after sunrise (6 AM)",location:"Location",wa_support:"WhatsApp support",sup_title:"WhatsApp support",sup_intro:"The LOZI team is here to help. Reach us directly on WhatsApp.",sup_primary:"Primary",sup_admin_open:"Manage numbers (admin)",sup_admin_title:"Manage support numbers",sup_pin_title:"Admin access",sup_pin_hint:"Enter the admin code to edit support numbers or add another.",sup_pin_ph:"Admin code",sup_pin_wrong:"Wrong code, try again",sup_enter:"Enter",sup_label_lbl:"Number label",sup_label_ph:"e.g. Main support",sup_number_lbl:"WhatsApp number",sup_number_ph:"7XXXXXXXX",sup_make_primary:"Set as primary",sup_is_primary:"Primary number",sup_add:"Add another number",sup_save:"Save changes",sup_saved:"Support numbers saved ✓",sup_delete:"Delete",sup_exit_admin:"Exit admin mode",sup_min_one:"Keep at least one valid number",logout:"Log out",arabic:"العربية",english:"English",savings_title:"Savings",savings_hero:"Special prices for members",savings_desc:"Selected LOZI products at lower prices — exclusively for members.",subscribe_now:"Subscribe now",members_only:"Members only",special_price:"Savings price",normal_price:"Normal price",sub_title:"Join Savings",sub_intro:"Get special prices on LOZI products. Yearly subscription via bank transfer, then admin review.",sub_accounts:"Transfer the subscription fee to one account",copy:"Copy",copied:"Copied ✓",sub_upload:"Attach the transfer receipt",sub_upload_hint:"Drag the receipt image here",sub_submit:"Submit for review",sub_pending:"Under review",sub_pending_sub:"We'll review your receipt and activate your membership shortly.",sub_active:"Membership active ✓",sub_duration_label:"Duration",sub_duration_val:"One full year",sub_start:"Start date",sub_expiry:"Expiry date",sub_price_label:"Subscription fee",sub_renew:"Renew membership",sub_details:"Subscription details",sub_not_member:"Not a member yet",done:"Done",qty:"Qty",back:"Back",add_product:"Add your product",add_crop:"Add your crop",add_product_sub_farmer:"Publish your crop to reach customers",add_product_sub_retail:"Publish your product in the Retail section",add_product_sub_wholesale:"Publish your product in the Wholesale section",publish_to:"Will be published in",publish_locked_note:"You can only publish in your own section — no cross-posting.",crop_name:"Product name",crop_name_ph:"e.g. Raw Jabri almonds",crop_weight:"Weight",crop_weight_ph:"e.g. 500 g · 1 kg · 3 kg",weight_custom:"Custom weight",qadah_label:"Qadah",qadah_weight_label:"Qadah weight",qadah_hint:"Set the qadah weight in kg — it varies by crop.",crop_price:"Price in Yemeni Rial",crop_price_ph:"e.g. 7000",publish_crop:"Publish product",crop_published:"Product published ✓",my_farm:"My farm",shahti_badge:"Bitter-free (Shahti-free)",shahti_meaning:"Free from bitterness",shahti_for_baladi:"Exclusive to Baladi almonds",shahti_request:"Request the “Bitter-free” seal",shahti_only_baladi_note:"Excludes Afghan/Australian and retail/wholesale almonds.",shahti_cond_sample:"Send a sample of the almonds to be inspected.",shahti_cond_inspect:"Send the sample to the following inspection location:",shahti_loc_label:"Sample drop-off location",shahti_loc_name:"Bait Al-Mukassarat Agency",shahti_loc_addr:"Sanaa – Khawlan St. – Al-Hubaishi Building",shahti_phone:"777184208",call_wa:"WhatsApp",shahti_pending:"Awaiting sample inspection",shahti_verified_title:"“Bitter-free” seal",shahti_verified_desc:"Almond sample inspected and certified — free from bitterness.",shahti_inspect_by:"Inspected by"}},LOZI_SUB={yer:500,months:12},FARM_ROLES=new Set(["almond_farm","raisin_farm"]);function vendorKey(p){if(LOZI_SAVINGS.some(s=>s.id===p.id))return"lozi";const sid=String(p.store||"");if(sid.startsWith("myfarm")||sid==="mine-almond"||sid==="mine-raisin")return"farmers";if(sid.startsWith("mine-"))return sid;const st=LOZI_STORES.find(s=>s.id===p.store);return st&&FARM_ROLES.has(st.role)?"farmers":st?st.id:"lozi"}function vendorInfo(key,lang){if(key==="farmers")return{name:lang==="ar"?"منتجات المزارعين":"Farmers",verified:!0,icon:"leaf"};if(key==="lozi")return{name:lang==="ar"?"لوزي · التوفير":"LOZI · Savings",verified:!0,icon:"bolt"};const st=LOZI_STORES.find(s=>s.id===key);return{name:st?st.name[lang]:key,verified:st&&st.verified,icon:st&&st.cat==="wholesale"?"warehouse":"store"}}const LOZI_STORES=[],LOZI_PRODUCTS=[],LOZI_SAVINGS=[],LOZI_ACCOUNTS=[{bank:{ar:"حاسب كريمي",en:"Hasab Kuraimi"},name:{ar:"مؤسسة لوزي",en:"LOZI Est."},iban:"1966715",color:"#7A2EC4"},{bank:{ar:"جيب",en:"Jaib"},name:{ar:"مؤسسة لوزي",en:"LOZI Est."},iban:"777184208",color:"#D72638"},{bank:{ar:"جوالي",en:"Jawali"},name:{ar:"مؤسسة لوزي",en:"LOZI Est."},iban:"825084",color:"#E8761A",gradient:"linear-gradient(135deg, #15366B 0%, #F2C200 55%, #ED7B18 100%)"},{bank:{ar:"ون كاش",en:"OneCash"},name:{ar:"مؤسسة لوزي",en:"LOZI Est."},iban:"777184208",color:"#F4951E"}],LOZI_SUPPORT_SEED=[{id:"s1",label:{ar:"الدعم الرئيسي",en:"Main support"},phone:"777184208",primary:!0}],LOZI_ADMIN_PIN="2030",LOZI_ORDERS_SEED=[],LOZI_REPORTS_SEED=[{id:"20518",typeId:"retail",orderId:"0987",target:{ar:"مكسرات الأصيل",en:"Al-Aseel Nuts"},subject:{ar:"وزن ناقص في الطلب",en:"Underweight order"},desc:{ar:"طلبت كيلو لوز ولما وزنته طلع ٠٨٠ غرام فقط.",en:"I ordered 1kg almonds but it weighed only 880g."},status:"resolved",date:{ar:"أمس",en:"Yesterday"},reply:{ar:"تم التحقق مع المتجر وإعادة فرق الوزن لك. شكراً لبلاغك.",en:"Verified with the store and refunded the weight difference. Thanks for reporting."}},{id:"20461",typeId:"general",orderId:null,target:null,subject:{ar:"اقتراح: إضافة دفع إلكتروني",en:"Suggestion: add online payment"},desc:{ar:"حبذا لو تضيفون الدفع عبر المحفظة بجانب الدفع عند الاستلام.",en:"Would love a wallet payment option besides cash on delivery."},status:"review",date:{ar:"قبل ٣ أيام",en:"3 days ago"},reply:null}],LOZI_NOTIFS_SEED=[{id:"n1",type:"status",read:!1,link:"orders",title:{ar:"طلبك في الطريق إليك 🚚",en:"Your order is on the way 🚚"},body:{ar:"الطلب #1031 خرج للتوصيل مع المندوب محمد.",en:"Order #1031 is out for delivery with courier Mohammed."},time:{ar:"قبل ٥ دقائق",en:"5 min ago"}},{id:"n2",type:"order",read:!1,link:"orders",title:{ar:"تم استلام طلبك ✓",en:"Order received ✓"},body:{ar:"بدأ المتجر بتجهيز الطلب #1042.",en:"The store started preparing order #1042."},time:{ar:"قبل ساعة",en:"1 hr ago"}},{id:"n3",type:"report",read:!1,link:"reports",title:{ar:"رد الإدارة على بلاغك",en:"Admin replied to your report"},body:{ar:"تمت معالجة بلاغ «وزن ناقص في الطلب» وإعادة الفرق لك.",en:"Your “underweight order” report was resolved and refunded."},time:{ar:"أمس",en:"Yesterday"}},{id:"n4",type:"offer",read:!0,link:"savings",title:{ar:"عرض توفير جديد 🌰",en:"New savings deal 🌰"},body:{ar:"خصومات حصرية للمشتركين على لوز الموسم الجديد.",en:"Exclusive member discounts on the new-season almonds."},time:{ar:"قبل يومين",en:"2 days ago"}}];Object.assign(window,{LOZI_T,LOZI_T_UNIT,LOZI_STORES,LOZI_PRODUCTS,LOZI_SAVINGS,LOZI_ACCOUNTS,LOZI_SUPPORT_SEED,LOZI_ADMIN_PIN,LOZI_ORDERS_SEED,LOZI_REPORTS_SEED,LOZI_NOTIFS_SEED,LOZI_RATE:140,LOZI_SUB,ALMOND_TYPES,ALMOND_LABEL,RAISIN_TYPES,RAISIN_LABEL,VARIETY_LABEL,setCurrency,getCurrency,fmtMoney,moneyStr,vendorKey,vendorInfo,FARM_ROLES});
-
-const{useState,useRef,useEffect}=React,Ic={chat:"M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z",search:"M11 4a7 7 0 1 0 4.9 12l4 4 1.4-1.4-4-4A7 7 0 0 0 11 4Zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10Z",filter:"M3 5h18l-7 8v6l-4 2v-8L3 5Z",close:"M6 6l12 12M18 6 6 18",home:"M12 3 3 10v10h6v-6h6v6h6V10l-9-7Z",store:"M4 4h16l1 5a2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1-5 0L4 4Zm1 8v8h6v-5h2v5h6v-8",savings:"M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4Zm0 5 1.6 3.3 3.6.5-2.6 2.5.6 3.6L12 15.7 8.8 17.4l.6-3.6L6.8 11l3.6-.5L12 7Z",cart:"M3 4h2l2.4 12.3A2 2 0 0 0 9.4 18h8.2a2 2 0 0 0 2-1.6L21 8H6.2M9 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm9 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",user:"M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0",star:"M12 2.5 14.9 8.4 21.5 9.4 16.7 14 17.9 20.6 12 17.5 6.1 20.6 7.3 14 2.5 9.4 9.1 8.4 12 2.5Z",check:"M5 12.5 10 17.5 19.5 7",back:"M15 5 8 12l7 7",fwd:"M9 5l7 7-7 7",heart:"M12 21s-7.5-4.6-10-9.2C.6 8.8 2 5.5 5.2 5.2 7.3 5 8.9 6.2 12 9c3.1-2.8 4.7-4 6.8-3.8C22 5.5 23.4 8.8 22 11.8 19.5 16.4 12 21 12 21Z",plus:"M12 5v14M5 12h14",minus:"M5 12h14",trash:"M5 7h14M9 7V5h6v2m-1 0v11a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V7",whatsapp:"M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2Zm5.3 13.9c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-3.3-.9s-3.7-3.4-3.8-3.5c-.1-.2-.9-1.2-.9-2.3s.6-1.6.8-1.9c.2-.2.4-.3.6-.3h.5c.2 0 .4 0 .6.5l.7 1.7c.1.2.1.4 0 .5l-.3.5c-.1.2-.3.3-.1.6.1.2.6 1 1.3 1.6.9.8 1.6 1 1.8 1.1.2.1.4.1.5-.1l.6-.7c.2-.2.3-.2.6-.1l1.6.8c.3.1.4.2.5.3.1.2.1.6-.1 1.2Z",location:"M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z",globe:"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 0c2.5 2 4 5.5 4 10s-1.5 8-4 10m0-20c-2.5 2-4 5.5-4 10s1.5 8 4 10M2.5 9h19M2.5 15h19",logout:"M15 12H4m0 0 4-4m-4 4 4 4M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5",bell:"M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Zm4 10a2 2 0 0 0 4 0",copy:"M9 9V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-4M4 9h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z",upload:"M12 16V4m0 0L8 8m4-4 4 4M5 18v1a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1",chevron:"M9 5l7 7-7 7",bolt:"M13 2 4 14h6l-1 8 9-12h-6l1-8Z",shield:"M12 2 4 5v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V5l-8-3Z",flag:"M5 21V4m0 0h11l-2 4 2 4H5",settings:"M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.5 4-1.8.9.3 2-1.9.7-1.2-1.6-2 .4-.6 1.9h-2l-.6-1.9-2-.4L7.5 18l-1.9-.7.3-2L4 12l1.8-.9-.3-2 1.9-.7 1.2 1.6 2-.4.6-1.9h2l.6 1.9 2 .4L18.6 6l1.9.7-.3 2L22 12Z",warehouse:"M3 21V9l9-5 9 5v12M3 21h18M7 21v-6h4v6m4 0v-6h2v6M7 12h4",percent:"M19 5 5 19M8.5 8.5a2 2 0 1 1-3 0 2 2 0 0 1 3 0Zm10 10a2 2 0 1 1-3 0 2 2 0 0 1 3 0Z",tag:"M3 11V4a1 1 0 0 1 1-1h7l9 9a1 1 0 0 1 0 1.4l-6.6 6.6a1 1 0 0 1-1.4 0L3 11Zm4-3.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",truck:"M3 7h11v9H3V7Zm11 3h4l3 3v3h-7v-6ZM7.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm10 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z",leaf:"M4 20c0-8 5-14 16-14 0 11-6 16-14 16-1 0-2-.2-2-.2S4 21 4 20Zm4-1c3-5 6-7 9-8",idcard:"M3 5h18v14H3V5Zm3 4a2 2 0 1 1 4 0 2 2 0 0 1-4 0Zm-1 7c0-2 1.5-3 3-3s3 1 3 3M14 9h5M14 13h5M14 16h3",lock:"M7 11V8a5 5 0 0 1 10 0v3M6 11h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Z",calendar:"M4 6h16v15H4V6Zm0 5h16M8 3v4m8-4v4",phone:"M6.6 3h3l1.5 5-2 1.3a12 12 0 0 0 5.6 5.6l1.3-2 5 1.5v3a2 2 0 0 1-2.2 2A17 17 0 0 1 4.6 5.2 2 2 0 0 1 6.6 3Z",mail:"M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm0 2 8 6 8-6",wallet:"M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2H3Zm0 1h17a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2H4a1 1 0 0 1-1-1V8Zm14 4.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z",sun:"M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-13v2m0 12v2M4 12H2m20 0h-2M5.6 5.6 4.2 4.2m14.2 14.2-1.4-1.4M5.6 18.4l-1.4 1.4M18.4 5.6l1.4-1.4",moon:"M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z",auto:"M12 3a9 9 0 0 0 0 18V3Zm0 0a9 9 0 0 1 0 18"};function Icon({name,size=22,color="currentColor",stroke=2,fill=!1}){const filledOnes=["star","heart","savings","whatsapp","bolt","shield","moon"];if(!Ic[name])return null;const isFill=fill||filledOnes.includes(name);return React.createElement("svg",{width:size,height:size,viewBox:"0 0 24 24",fill:isFill?color:"none",stroke:isFill?"none":color,strokeWidth:stroke,strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:Ic[name]}))}function Img({id,ph,style,radius=14,shape="rounded",className}){return typeof id=="string"&&/^(https?:|data:|blob:)/.test(id)?React.createElement("img",{src:id,alt:ph||"",class:className,style:Object.assign({width:"100%",height:"100%",objectFit:"cover",display:"block",borderRadius:shape==="circle"?"50%":radius+"px"},style||{})}):React.createElement("image-slot",{id,placeholder:ph||"",shape,radius:String(radius),style,class:className})}function Stars({value,size=13}){return React.createElement("span",{style:{display:"inline-flex",gap:1,color:"var(--gold-deep)"}},React.createElement(Icon,{name:"star",size}),React.createElement("b",{style:{color:"var(--ink)",fontSize:size,fontWeight:800}},value.toFixed(1)))}function Badge({kind,t}){return kind==="verified"?React.createElement("span",{className:"badge badge-verified"},React.createElement(Icon,{name:"shield",size:12,color:"#fff"}),t.verified):null}function VerifiedSeal({size=16}){return React.createElement("span",{className:"ver-seal",title:"موثّق",style:{width:size,height:size}},React.createElement(Icon,{name:"check",size:Math.round(size*.62),color:"#fff",stroke:3}))}function Money({v,cls,small}){const m=fmtMoney(v);return React.createElement("span",{className:cls},m.value," ",React.createElement("i",{style:small?{fontSize:".62em"}:null},m.unit))}function offerText(o,t,lang){return o.type==="discount"?`${t.off_discount} ${o.value}%`:o.type==="free_min"?`${t.off_free_min} ${moneyStr(o.min)}`:o.type==="bundle"?`${o.items[lang]} (${o.weight[lang]}) · ${moneyStr(o.value)}`:""}function offerIcon(o){return o.type==="discount"?"percent":o.type==="free_min"?"truck":"tag"}function OfferChip({o,t,lang}){return React.createElement("span",{className:`offer-chip oc-${o.type}`},React.createElement(Icon,{name:offerIcon(o),size:12,color:"currentColor"}),offerText(o,t,lang))}function PrimaryBtn({children,onClick,icon,variant="green",style,disabled}){const iconColor=variant==="ghost"?"var(--ink)":variant==="wa-line"?"#1FA855":"#fff";return React.createElement("button",{className:`btn btn-${variant}`,onClick,disabled,style},icon&&React.createElement(Icon,{name:icon,size:20,color:iconColor}),React.createElement("span",null,children))}function Stepper({value,onMinus,onPlus,t}){return React.createElement("div",{className:"stepper"},React.createElement("button",{onClick:onMinus},React.createElement(Icon,{name:value<=1?"trash":"minus",size:16,color:"var(--ink)"})),React.createElement("span",null,value),React.createElement("button",{onClick:onPlus},React.createElement(Icon,{name:"plus",size:16,color:"var(--ink)"})))}function SecHead({title,action,onAction}){return React.createElement("div",{className:"sec-head"},React.createElement("h3",null,title),action&&React.createElement("button",{className:"sec-action",onClick:onAction},action))}function TopBar({title,onBack,right,t}){return React.createElement("div",{className:"topbar"},onBack?React.createElement("button",{className:"icon-btn",onClick:onBack,"aria-label":t.back},React.createElement(Icon,{name:t.dir==="rtl"?"chevron":"back",size:22,color:"var(--ink)"})):React.createElement("span",{style:{width:38}}),React.createElement("h2",null,title),React.createElement("div",{style:{minWidth:38,display:"flex",justifyContent:"flex-end"}},right))}function BottomNav({active,go,cartCount,t,isSeller}){const items=[{id:"home",icon:"home",label:t.nav_home},{id:"sections",icon:"store",label:t.nav_stores},isSeller?{id:"dashboard",icon:"truck",label:t.nav_dashboard}:{id:"savings",icon:"savings",label:t.nav_savings},{id:"cart",icon:"cart",label:t.nav_cart,badge:cartCount},{id:"profile",icon:"user",label:t.nav_profile}].filter(Boolean);return React.createElement("nav",{className:"bottom-nav"},items.map(it=>{const on=active===it.id;return React.createElement("button",{key:it.id,className:`nav-item ${on?"on":""}`,onClick:()=>go(it.id)},React.createElement("span",{className:"nav-ic"},React.createElement(Icon,{name:it.icon,size:23,color:on?"var(--green-deep)":"var(--muted)",fill:on&&it.id==="savings"}),it.badge?React.createElement("span",{className:"nav-badge"},it.badge):null),React.createElement("span",null,it.label))}))}function Toast({msg}){return msg?React.createElement("div",{className:"toast"},msg):null}function lozUploadXHR(bucket,path,file,token,onProgress){return new Promise(resolve=>{try{const xhr=new XMLHttpRequest;xhr.open("POST",window.LOZI_SUPABASE_URL+"/storage/v1/object/"+bucket+"/"+path,!0),xhr.setRequestHeader("authorization","Bearer "+token),xhr.setRequestHeader("apikey",window.LOZI_SUPABASE_ANON),file.type&&xhr.setRequestHeader("content-type",file.type),xhr.setRequestHeader("x-upsert","true"),xhr.upload.onprogress=e=>{e.lengthComputable&&onProgress&&onProgress(e.loaded/e.total)},xhr.onload=()=>resolve(xhr.status>=200&&xhr.status<300?{ok:!0}:{ok:!1,error:"HTTP "+xhr.status}),xhr.onerror=()=>resolve({ok:!1,error:"network"}),xhr.send(file)}catch(e){resolve({ok:!1,error:e.message})}})}function lozPublicUrl(bucket,path){return window.LOZI_SUPABASE_URL+"/storage/v1/object/public/"+bucket+"/"+path}function UploadRing({pct}){const C=2*Math.PI*34,p=Math.max(0,Math.min(1,pct||0));return React.createElement("div",{className:"upload-ring-overlay"},React.createElement("div",{className:"upload-ring-card"},React.createElement("div",{className:"upload-ring"},React.createElement("svg",{viewBox:"0 0 80 80",width:"84",height:"84"},React.createElement("circle",{className:"ur-bg",cx:"40",cy:"40",r:34}),React.createElement("circle",{className:"ur-fg",cx:"40",cy:"40",r:34,style:{strokeDasharray:C,strokeDashoffset:C*(1-p)}})),React.createElement("span",{className:"ur-pct"},Math.round(p*100),"%")),React.createElement("span",{className:"ur-label"},"جارٍ رفع الصور…")))}Object.assign(window,{Icon,Img,Stars,Badge,VerifiedSeal,Money,OfferChip,offerText,offerIcon,PrimaryBtn,Stepper,SecHead,TopBar,BottomNav,Toast,UploadRing,lozUploadXHR,lozPublicUrl});
-
-const{useState:useStateA}=React;function LoziCarousel({images,ph,t,lang,arrows,dotsClickable,loop,zoomable}){const imgs=(images||[]).filter(Boolean),n=imgs.length,rtl=!t||t.dir!=="ltr";const[slide,setSlide]=React.useState(0),[drag,setDrag]=React.useState(0),[dragging,setDragging]=React.useState(!1),[seen,setSeen]=React.useState({0:!0,1:!0}),[zoomSrc,setZoomSrc]=React.useState(null);const openZoom=u=>{zoomable&&typeof u=="string"&&/^(https?:|data:|blob:)/.test(u)&&setZoomSrc(u)},lightbox=zoomSrc?React.createElement(ImageLightbox,{src:zoomSrc,ph,onClose:()=>setZoomSrc(null)}):null;const wrapRef=React.useRef(null),startRef=React.useRef(null),movedRef=React.useRef(!1),suppressRef=React.useRef(!1);React.useEffect(()=>{setSeen(s=>{const c=Object.assign({},s);[slide-1,slide,slide+1].forEach(i=>{i>=0&&i<n&&(c[i]=!0)});return c})},[slide,n]);React.useEffect(()=>{slide>n-1&&setSlide(Math.max(0,n-1))},[n]);const go=d=>setSlide(s=>{let v=s+d;return v<0?(loop?n-1:0):v>n-1?(loop?0:n-1):v});if(n<=1)return React.createElement(React.Fragment,null,React.createElement("div",{className:"loz-car loz-car-single",onClick:zoomable?()=>openZoom(imgs[0]):null,style:zoomable?{cursor:"zoom-in"}:null},React.createElement(Img,{id:imgs[0]||"",ph:ph||"",radius:0,shape:"rect",style:{width:"100%",height:"100%"}})),lightbox);const W=()=>(wrapRef.current&&wrapRef.current.offsetWidth)||1;const onDown=e=>{if(e.button&&e.button!==0)return;if(e.target&&e.target.closest&&e.target.closest("button,.loz-car-dots"))return;startRef.current={x:e.clientX,id:e.pointerId};movedRef.current=!1};const onMove=e=>{if(!startRef.current)return;let dx=e.clientX-startRef.current.x;if(!movedRef.current){if(Math.abs(dx)<=5)return;movedRef.current=!0;setDragging(!0);try{e.currentTarget.setPointerCapture(startRef.current.id)}catch(_){}}if(!loop&&((slide===0&&dx>0)||(slide===n-1&&dx<0)))dx*=.35;setDrag(dx)};const onUp=()=>{if(!startRef.current)return;const moved=movedRef.current,dx=drag,th=Math.max(40,W()*.18);startRef.current=null;if(moved){setDragging(!1);setDrag(0);dx>th?go(-1):dx<-th&&go(1);suppressRef.current=!0;setTimeout(()=>{suppressRef.current=!1},0)}else openZoom(imgs[slide]);};const stop=e=>{suppressRef.current&&(e.stopPropagation(),e.preventDefault())};const atStart=slide===0,atEnd=slide===n-1;const slides=imgs.map((u,i)=>{const url=typeof u=="string"?u:"",isUrl=/^(https?:|data:|blob:)/.test(url),load=seen[i]||!isUrl;return React.createElement("div",{className:"loz-car-slide",key:i},React.createElement(Img,{id:load?u:"",ph:ph||"",radius:0,shape:"rect",style:{width:"100%",height:"100%"}}))});const track=React.createElement("div",{className:"loz-car-track",style:{transform:"translateX(calc("+(-slide*100)+"% + "+drag+"px))",transition:dragging?"none":"transform .32s cubic-bezier(.22,.61,.36,1)"}},slides);const mkBtn=(d,side,icon,dis,label)=>React.createElement("button",{key:label,className:"loz-car-btn",style:side==="right"?{right:10}:{left:10},disabled:dis,"aria-label":label,onClick:e=>{e.stopPropagation();go(d)}},React.createElement(Icon,{name:icon,size:22,color:"var(--green-deep)"}));const dots=React.createElement("div",{className:"loz-car-dots "+(dotsClickable?"":"static"),style:{direction:rtl?"rtl":"ltr"}},imgs.map((_,i)=>React.createElement("i",{key:i,className:i===slide?"on":"",onClick:dotsClickable?e=>{e.stopPropagation();setSlide(i)}:null})));return React.createElement(React.Fragment,null,React.createElement("div",{className:"loz-car "+(arrows?"":"loz-car-bare"),ref:wrapRef,onPointerDown:onDown,onPointerMove:onMove,onPointerUp:onUp,onPointerCancel:onUp,onClickCapture:stop},track,arrows&&mkBtn(-1,rtl?"right":"left",rtl?"chevron":"back",!loop&&atStart,"السابق"),arrows&&mkBtn(1,rtl?"left":"right",rtl?"back":"chevron",!loop&&atEnd,"التالي"),dots),lightbox)}function ImageLightbox({src,ph,onClose}){const[scale,setScale]=React.useState(1),[pos,setPos]=React.useState({x:0,y:0}),[dy,setDy]=React.useState(0),[active,setActive]=React.useState(!1);const ptrs=React.useRef(new Map()),pinch=React.useRef(null),panRef=React.useRef(null),closeRef=React.useRef(null),movedRef=React.useRef(!1),lastTap=React.useRef(0);React.useEffect(()=>{const prev=document.body.style.overflow;document.body.style.overflow="hidden";const onKey=e=>{e.key==="Escape"&&onClose()};window.addEventListener("keydown",onKey);return()=>{document.body.style.overflow=prev;window.removeEventListener("keydown",onKey)}},[]);const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),down=e=>{e.stopPropagation();try{e.currentTarget.setPointerCapture(e.pointerId)}catch(_){}ptrs.current.set(e.pointerId,{x:e.clientX,y:e.clientY});setActive(!0);movedRef.current=!1;if(ptrs.current.size===2){const v=[...ptrs.current.values()];pinch.current={d:Math.hypot(v[0].x-v[1].x,v[0].y-v[1].y)||1,s:scale};panRef.current=null;closeRef.current=null}else if(scale>1)panRef.current={x:e.clientX,y:e.clientY,px:pos.x,py:pos.y};else closeRef.current={y:e.clientY,dy:0}},move=e=>{if(!ptrs.current.has(e.pointerId))return;ptrs.current.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.current.size>=2&&pinch.current){const v=[...ptrs.current.values()],d=Math.hypot(v[0].x-v[1].x,v[0].y-v[1].y);setScale(clamp(pinch.current.s*(d/pinch.current.d),1,4));movedRef.current=!0}else if(scale>1&&panRef.current){setPos({x:panRef.current.px+(e.clientX-panRef.current.x),y:panRef.current.py+(e.clientY-panRef.current.y)});movedRef.current=!0}else if(closeRef.current){const d=e.clientY-closeRef.current.y;closeRef.current.dy=d;Math.abs(d)>6&&(movedRef.current=!0);setDy(d>0?d:0)}},up=e=>{e.stopPropagation();ptrs.current.delete(e.pointerId);ptrs.current.size<2&&(pinch.current=null);if(closeRef.current&&scale<=1&&closeRef.current.dy>110){onClose();return}if(ptrs.current.size===0){if(!movedRef.current){const now=Date.now();now-lastTap.current<300?(setScale(s=>s>1?1:2.5),setPos({x:0,y:0}),lastTap.current=0):lastTap.current=now}panRef.current=null;closeRef.current=null;setActive(!1);setDy(0);scale<=1&&setPos({x:0,y:0})}},op=clamp(1-dy/380,0,1);return React.createElement("div",{style:{position:"absolute",inset:0,zIndex:300,background:"rgba(8,6,4,"+.94*op+")",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",touchAction:"none",userSelect:"none",animation:"fade .2s ease"},onClick:()=>onClose()},React.createElement("button",{"aria-label":"إغلاق",onClick:e=>{e.stopPropagation();onClose()},style:{position:"absolute",top:12,right:12,width:38,height:38,borderRadius:19,background:"rgba(0,0,0,.42)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2,border:"none"}},React.createElement(Icon,{name:"close",size:22,color:"#fff"})),React.createElement("img",{src:src,alt:ph||"",draggable:!1,onPointerDown:down,onPointerMove:move,onPointerUp:up,onPointerCancel:up,onClick:e=>e.stopPropagation(),style:{maxWidth:"100%",maxHeight:"100%",width:"auto",height:"auto",objectFit:"contain",transform:"translate("+pos.x+"px,"+(pos.y+dy)+"px) scale("+scale+")",transformOrigin:"center center",transition:active?"none":"transform .22s ease",touchAction:"none",cursor:scale>1?"grab":"zoom-in",willChange:"transform"}}))}function ProductCard({p,t,lang,onOpen,onAdd,fav,onFav}){const old=p.old,soldOut=p.stock!=null&&p.stock<=0;return React.createElement("div",{className:`prod-card ${p.bundle?"bundle":""} ${soldOut?"soldout":""}`,onClick:()=>onOpen(p)},React.createElement("div",{className:"prod-img"},React.createElement(LoziCarousel,{images:(p.thumbs&&p.thumbs.length?p.thumbs:p.images&&p.images.length?p.images:[p.img]).filter(Boolean),ph:lang==="ar"?"صورة المنتج":"Product",t,lang,arrows:!1,dotsClickable:!1,loop:!1}),soldOut&&React.createElement("span",{className:"soldout-tag"},"نفد"),!soldOut&&old&&React.createElement("span",{className:"save-tag"},t.special_price),p.bundle&&React.createElement("span",{className:"bundle-tag"},lang==="ar"?"عرض مشكّل":"Bundle"),p.pinned&&React.createElement("span",{className:"pin-tag",title:"مثبّت"},"📌"),p.variety&&React.createElement("span",{className:"variety-tag"},VARIETY_LABEL(p.variety,lang)),p.shahtiStatus==="approved"&&React.createElement("span",{className:"shahti-tag"},React.createElement(ShahtiGlyph,{size:11}),t.shahti_badge),React.createElement("button",{className:`fav-btn ${fav?"on":""}`,onClick:e=>{e.stopPropagation(),onFav(p.id)}},React.createElement(Icon,{name:"heart",size:16,color:fav?"#fff":"var(--ink)",fill:fav}))),React.createElement("div",{className:"prod-body"},React.createElement("div",{className:p.bundle?"prod-name bundle-name":"prod-name"},p.name[lang]),React.createElement("div",{className:"prod-weight"},p.weight[lang]),React.createElement("div",{className:"prod-foot"},React.createElement("div",{className:"price-wrap"},React.createElement(Money,{v:p.price,cls:"price",small:!0}),old&&React.createElement("span",{className:"price-old"},fmtMoney(old).value)),React.createElement("button",{className:"add-mini",disabled:soldOut,onClick:e=>{e.stopPropagation(),soldOut||onAdd(p)}},React.createElement(Icon,{name:"plus",size:18,color:"#fff"})))))}function ShahtiGlyph({size=14,color="#fff"}){return React.createElement("svg",{width:size,height:size,viewBox:"0 0 24 24",fill:"none"},React.createElement("path",{d:"M12 3C8 6 6 10 6 14c0 4 3 7 6 7s6-3 6-7c0-4-2-8-6-11Z",fill:color,opacity:"0.92"}),React.createElement("path",{d:"M9.2 13.4 11 15.2l4-4.4",stroke:"var(--green-deep)",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round"}))}function StoreCard({s,t,lang,onOpen}){return React.createElement("div",{className:"store-card",onClick:()=>onOpen(s)},React.createElement("div",{className:"store-img"},React.createElement(Img,{id:s.img,ph:lang==="ar"?"صورة المتجر":"Store",radius:16}),s.cat==="wholesale"&&React.createElement("span",{className:"wh-corner"},t.wholesale_badge)),React.createElement("div",{className:"store-body"},React.createElement("div",{className:"store-top"},React.createElement("div",{className:"store-name"},s.name[lang],s.verified&&React.createElement(VerifiedSeal,{size:16})),React.createElement(Stars,{value:s.rating})),React.createElement("div",{className:"store-addr"},React.createElement(Icon,{name:"location",size:12,color:"var(--muted)"}),s.addr[lang]," · ",s.reviews," ",t.reviews),s.offers&&s.offers.length>0&&React.createElement("div",{className:"offer-row"},s.offers.map((o,i)=>React.createElement(OfferChip,{key:i,o,t,lang})))))}function Splash({onDone}){return React.useEffect(()=>{const x=setTimeout(onDone,1900);return()=>clearTimeout(x)},[]),React.createElement("div",{className:"screen splash"},React.createElement("div",{className:"splash-logo"},React.createElement("div",{className:"splash-badge"},React.createElement(LoziBadge,{size:96})),React.createElement("div",{className:"logo-word"},"لوزي"),React.createElement("div",{className:"logo-en"},"LOZI")),React.createElement("div",{className:"splash-tag"},"مع لوزي، تدعم اقتصاد وطنك"),React.createElement("div",{className:"splash-dots"},React.createElement("i",null),React.createElement("i",null),React.createElement("i",null)))}function LoziMark({size=48,color="#fff"}){return React.createElement("svg",{width:size,height:size,viewBox:"0 0 64 64",fill:"none"},React.createElement("path",{d:"M32 6C20 14 14 26 14 38c0 12 8 20 18 20s18-8 18-20C50 26 44 14 32 6Z",fill:color}),React.createElement("path",{d:"M32 14c-6 6-9 14-9 22 0 7 4 13 9 14",stroke:"var(--green)",strokeWidth:"3",strokeLinecap:"round",opacity:"0.55"}))}function LoziAlmond({x,y,rot}){return React.createElement("g",{transform:`translate(${x},${y}) rotate(${rot}) scale(.72)`},React.createElement("ellipse",{cx:"0",cy:"22",rx:"13",ry:"4.2",fill:"url(#lzbAlm)"}),React.createElement("path",{d:"M0 -17 C8 -9 11 -1 11 6 C11 13 6 18 0 19 C-6 18 -11 13 -11 6 C-11 -1 -8 -9 0 -17 Z",fill:"#ECD89B",stroke:"#5E3E16",strokeWidth:"1.7",strokeLinejoin:"round"}),React.createElement("g",{fill:"none",stroke:"#B68E45",strokeWidth:"1",strokeLinecap:"round"},React.createElement("path",{d:"M0 -10 C-1.1 -2 -1.1 9 0 15.5",opacity:".75"}),React.createElement("path",{d:"M-4.6 -6.5 C-5.6 0.5 -5.6 9 -4.6 14",opacity:".62"}),React.createElement("path",{d:"M4.6 -6.5 C5.6 0.5 5.6 9 4.6 14",opacity:".62"})),React.createElement("path",{d:"M-3 -12 C-6 -8 -7.5 -3 -7.5 1",fill:"none",stroke:"#FBF1CE",strokeWidth:"1.5",strokeLinecap:"round",opacity:".55"}))}function LoziBadge({size=88}){return React.createElement("svg",{width:size,height:size,viewBox:"0 0 100 100",fill:"none",style:{display:"block",borderRadius:size*.225,boxShadow:"0 12px 30px rgba(33,55,42,.32)"}},React.createElement("defs",null,React.createElement("linearGradient",{id:"lzbBg",gradientUnits:"userSpaceOnUse",x1:"0",y1:"0",x2:"100",y2:"100",gradientTransform:"rotate(15 50 50)"},React.createElement("stop",{offset:"0",stopColor:"#3E5F47"}),React.createElement("stop",{offset:".55",stopColor:"#2C4836"}),React.createElement("stop",{offset:"1",stopColor:"#1E3325"})),React.createElement("radialGradient",{id:"lzbAlm",cx:"50%",cy:"50%",r:"50%"},React.createElement("stop",{offset:"0%",stopColor:"#10220F",stopOpacity:".5"}),React.createElement("stop",{offset:"62%",stopColor:"#10220F",stopOpacity:".2"}),React.createElement("stop",{offset:"100%",stopColor:"#10220F",stopOpacity:"0"}))),React.createElement("rect",{width:"100",height:"100",rx:"22.5",fill:"url(#lzbBg)"}),React.createElement("rect",{x:"13",y:"13",width:"74",height:"74",rx:"16",fill:"none",stroke:"rgba(245,237,210,.26)",strokeWidth:"1.5"}),React.createElement("g",{transform:"translate(50 50) scale(0.84) translate(-50 -50)"},React.createElement("g",{transform:"translate(50,18) scale(.72)"},React.createElement("path",{d:"M0 -3 L0 -13",fill:"none",stroke:"#C9A23E",strokeWidth:"2.6",strokeLinecap:"round"}),React.createElement("path",{d:"M0 -11 C11 -17 21 -15 22 -6 C21 0 10 0 1 -5 C0 -7 0 -9 0 -11 Z",fill:"#8FB154",stroke:"#2C3D1A",strokeWidth:"1.6",strokeLinejoin:"round"}),React.createElement("path",{d:"M3 -8 C9 -10 15 -10 19 -7",fill:"none",stroke:"#2C3D1A",strokeWidth:"1",strokeLinecap:"round",opacity:".6"}),React.createElement("g",{fill:"#F2D24E",stroke:"#8A6A1E",strokeWidth:"1.5"},React.createElement("circle",{cx:"0",cy:"3",r:"7.5"}),React.createElement("circle",{cx:"-11",cy:"14",r:"7.5"}),React.createElement("circle",{cx:"0",cy:"14",r:"7.5"}),React.createElement("circle",{cx:"11",cy:"14",r:"7.5"}),React.createElement("circle",{cx:"-16.5",cy:"25",r:"7.5"}),React.createElement("circle",{cx:"-5.5",cy:"25",r:"7.5"}),React.createElement("circle",{cx:"5.5",cy:"25",r:"7.5"}),React.createElement("circle",{cx:"16.5",cy:"25",r:"7.5"}),React.createElement("circle",{cx:"-11",cy:"36",r:"7.5"}),React.createElement("circle",{cx:"0",cy:"36",r:"7.5"}),React.createElement("circle",{cx:"11",cy:"36",r:"7.5"}),React.createElement("circle",{cx:"0",cy:"47",r:"7.5"})),React.createElement("g",{fill:"#FBEFA6",opacity:".7"},React.createElement("circle",{cx:"-2.3",cy:"0.7",r:"1.8"}),React.createElement("circle",{cx:"-13.3",cy:"11.7",r:"1.8"}),React.createElement("circle",{cx:"-18.8",cy:"22.7",r:"1.8"}),React.createElement("circle",{cx:"-13.3",cy:"33.7",r:"1.8"}))),React.createElement(LoziAlmond,{x:34,y:71,rot:-15}),React.createElement(LoziAlmond,{x:50,y:75,rot:0}),React.createElement(LoziAlmond,{x:66,y:71,rot:15})))}const ROLE_DEFS=[{id:"customer",icon:"user",glyph:"customer"},{id:"farmer",icon:"leaf",glyph:"farmer"},{id:"retail",icon:"store",glyph:"retail"},{id:"wholesale",icon:"warehouse",glyph:"wholesale"}];function Register({t,lang,onDone,onVendorSendOtp,onVendorVerify,onVendorSetPassword,onVendorSignIn,onCustomerSignUp,onSupport,onGoLogin,openTerms,onDevSkip}){const devMode=(function(){try{return/[?&]dev=1/.test(window.location.search)?(localStorage.setItem("lozi_dev","1"),!0):localStorage.getItem("lozi_dev")==="1"}catch(e){return/[?&]dev=1/.test(window.location.search)}})(),[step,setStep]=useStateA("role"),[role,setRole]=useStateA(""),[kind,setKind]=useStateA(""),[name,setName]=useStateA(""),[n1,setN1]=useStateA(""),[n2,setN2]=useStateA(""),[n3,setN3]=useStateA(""),[n4,setN4]=useStateA(""),[agree,setAgree]=useStateA(!1),[phone,setPhone]=useStateA(""),[email,setEmail]=useStateA(""),[password,setPassword]=useStateA(""),[code,setCode]=useStateA(""),[setupToken,setSetupToken]=useStateA(""),[busy,setBusy]=useStateA(!1),[err,setErr]=useStateA(""),[blocked,setBlocked]=useStateA(""),[info,setInfo]=useStateA(""),resolvedRole=role==="farmer"?kind==="raisin"?"farmer_raisin":"farmer_almond":role,isVendor=role==="farmer"||role==="retail"||role==="wholesale",roleReady=role&&(role!=="farmer"||kind),vendorName=[n1,n2,n3,n4].map(s=>s.trim()).filter(Boolean).join(" "),nameTooShort=v=>v.trim().length>0&&v.trim().length<2,nameErr=nameTooShort(n1)||nameTooShort(n2)||nameTooShort(n3)||nameTooShort(n4),namesReady=n1.trim().length>=2&&n2.trim().length>=2&&n3.trim().length>=2&&n4.trim().length>=2,phoneReady=phone.trim().replace(/[^0-9]/g,"").length>=7,emailReady=/\S+@\S+\.\S+/.test(email.trim()),finish=withPerson=>onDone({role:resolvedRole||"customer",person:withPerson?{name,phone}:null}),vendorSend=async()=>{if(!phoneReady)return;setErr(""),setBlocked(""),setBusy(!0);const r=await onVendorSendOtp({phone:phone.trim()});if(setBusy(!1),r&&r.ok)return setStep("otp");if(r&&r.reason==="not_authorized")return setBlocked("not_authorized");if(r&&r.reason==="rate_limited")return setBlocked("rate_limited");setErr(r&&(r.error||r.reason)||"تعذّر إرسال الرمز")},vendorVerify=async()=>{setErr(""),setBusy(!0);const r=await onVendorVerify({phone:phone.trim(),code:code.trim()});if(setBusy(!1),r&&r.ok)return setSetupToken(r.setup_token),setStep("setpw");setErr(r&&(r.error||(r.reason==="invalid_code"?"الرمز غير صحيح أو منتهي":r.reason))||"الرمز غير صحيح")},vendorSetPw=async()=>{if(password.length<4)return setErr("كلمة المرور ٤ أحرف على الأقل");setErr(""),setBusy(!0);const r=await onVendorSetPassword({phone:phone.trim(),setup_token:setupToken,password});if(!r||!r.ok)return setBusy(!1),setErr(r&&(r.error||r.reason)||"تعذّر حفظ كلمة المرور");const s=await onVendorSignIn({phone:phone.trim(),password,role:resolvedRole,name:vendorName});setBusy(!1),(!s||!s.ok)&&setErr(s&&s.error||"تعذّر الدخول")},customerSignUp=async()=>{if(!name.trim()||!emailReady||!phoneReady||password.length<6)return;setErr(""),setInfo(""),setBusy(!0);const r=await onCustomerSignUp({name:name.trim(),email:email.trim(),password,phone:phone.trim()});if(setBusy(!1),r&&r.ok&&r.needsConfirm)return setInfo("تم إنشاء الحساب! افتح بريدك وأكّد الحساب ثم سجّل الدخول.");r&&r.ok||setErr(r&&r.error||"تعذّر إنشاء الحساب")};return React.createElement("div",{className:"screen register"},step==="role"&&React.createElement("div",{className:"reg-step"},React.createElement("div",{className:"reg-brand"},React.createElement(LoziBadge,{size:88})),React.createElement("h1",{className:"reg-title"},t.choose_role),React.createElement("p",{className:"reg-sub"},t.choose_role_sub),React.createElement("div",{className:"role-grid"},ROLE_DEFS.map(r=>React.createElement("button",{key:r.id,className:`role-card ${role===r.id?"on":""}`,onClick:()=>{setRole(r.id),r.id!=="farmer"&&setKind("")}},React.createElement("span",{className:`role-ic role-${r.id}`},React.createElement(Icon,{name:r.icon,size:24,color:"#fff"})),React.createElement("strong",null,t["role_"+r.id]),React.createElement("span",null,t["role_"+r.id+"_d"]),role===r.id&&React.createElement("span",{className:"role-check"},React.createElement(Icon,{name:"check",size:13,color:"#fff",stroke:3}))))),role==="farmer"&&React.createElement("div",{className:"farmer-kind"},React.createElement("div",{className:"fk-label"},t.farmer_kind),React.createElement("div",{className:"seg seg-2"},React.createElement("button",{className:kind==="almond"?"on":"",onClick:()=>setKind("almond")},t.farmer_almond),React.createElement("button",{className:kind==="raisin"?"on":"",onClick:()=>setKind("raisin")},t.farmer_raisin))),React.createElement("div",{className:"reg-foot"},React.createElement("button",{className:"btn btn-green",disabled:!roleReady,onClick:()=>setStep("method")},t.cont),React.createElement("button",{className:"skip-link",onClick:onGoLogin},"لديك حساب؟ تسجيل الدخول"))),step==="method"&&React.createElement("div",{className:"reg-step"},React.createElement("button",{className:"reg-back",onClick:()=>{setErr(""),setBlocked(""),setStep("role")}},React.createElement(Icon,{name:t.dir==="rtl"?"chevron":"back",size:20,color:"var(--ink)"})),React.createElement("div",{className:"reg-brand"},React.createElement(LoziBadge,{size:88})),React.createElement("h1",{className:"reg-title"},isVendor?"مرحباً بك في لوزي":t.welcome),React.createElement("p",{className:"reg-sub"},isVendor?"قم بإنشاء حسابك، لتجعل سوق المكسرات بين يديك":t["role_"+role]+(role==="farmer"&&kind?" · "+t["farmer_"+kind]:"")),React.createElement("div",{className:"country-field"},React.createElement("span",{className:"cf-flag"},"🇾🇪"),React.createElement("div",{className:"cf-text"},React.createElement("strong",null,t.yemen)),React.createElement(Icon,{name:"check",size:16,color:"var(--green-deep)",stroke:3})),isVendor?blocked?React.createElement("div",{className:"form-fields"},React.createElement("p",{className:"terms",style:{color:"var(--danger)",fontWeight:700,fontSize:14}},blocked==="not_authorized"?"رقمك غير مفعّل للتسجيل كمورد. تواصل مع الدعم لتفعيل حسابك.":"تم إرسال رمز خلال آخر ٢٤ ساعة. حاول لاحقاً أو تواصل مع الدعم."),React.createElement("button",{className:"btn btn-wa",onClick:onSupport},React.createElement(Icon,{name:"whatsapp",size:20,color:"#fff"}),React.createElement("span",null,"تواصل مع الدعم عبر واتساب")),React.createElement("button",{className:"skip-link",onClick:()=>setBlocked("")},"رجوع")):React.createElement("div",{className:"form-fields"},React.createElement("p",{className:"reg-hint"},"قم بإدخال الاسم كما في الهوية"),React.createElement("div",{className:"name-grid"},React.createElement("input",{className:nameTooShort(n1)?"field-input invalid":"field-input",value:n1,onChange:e=>setN1(e.target.value),placeholder:"الاسم الأول"}),React.createElement("input",{className:nameTooShort(n2)?"field-input invalid":"field-input",value:n2,onChange:e=>setN2(e.target.value),placeholder:"الاسم الثاني"}),React.createElement("input",{className:nameTooShort(n3)?"field-input invalid":"field-input",value:n3,onChange:e=>setN3(e.target.value),placeholder:"الاسم الثالث"}),React.createElement("input",{className:nameTooShort(n4)?"field-input invalid":"field-input",value:n4,onChange:e=>setN4(e.target.value),placeholder:"اللقب"})),nameErr&&React.createElement("p",{className:"name-err"},"يجب أن يتكون كل اسم من حرفين على الأقل"),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.phone),React.createElement("div",{className:"phone-input"},React.createElement("span",{className:"phone-cc"},"+967"),React.createElement("input",{className:"field-input",value:phone,onChange:e=>setPhone(e.target.value),placeholder:t.phone_ph,inputMode:"tel"}))),err&&React.createElement("p",{className:"terms",style:{color:"var(--danger)"}},String(err)),React.createElement("label",{className:"terms-check"},React.createElement("input",{type:"checkbox",checked:agree,onChange:e=>setAgree(e.target.checked)}),React.createElement("span",null,"أوافق على ",React.createElement("button",{type:"button",className:"terms-link",onClick:openTerms},"الشروط والأحكام"))),React.createElement("button",{className:"btn btn-green",disabled:busy||!namesReady||!phoneReady||!agree,onClick:vendorSend},React.createElement(Icon,{name:"phone",size:20,color:"#fff"}),React.createElement("span",null,busy?"جارٍ الإرسال...":"متابعة")),devMode&&React.createElement("button",{className:"skip-link",style:{color:"var(--gold-deep)",fontWeight:800},onClick:()=>onDevSkip&&onDevSkip(resolvedRole)},"تخطّي — دخول تجريبي بدون رمز")):React.createElement("div",{className:"form-fields"},React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.full_name),React.createElement("input",{className:"field-input",value:name,onChange:e=>setName(e.target.value),placeholder:t.full_name_ph})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"البريد الإلكتروني"),React.createElement("input",{className:"field-input",type:"email",value:email,onChange:e=>setEmail(e.target.value),placeholder:"name@example.com",inputMode:"email",autoCapitalize:"off"})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"كلمة المرور"),React.createElement("input",{className:"field-input",type:"password",value:password,onChange:e=>setPassword(e.target.value),placeholder:"••••••••"})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.phone),React.createElement("div",{className:"phone-input"},React.createElement("span",{className:"phone-cc"},"+967"),React.createElement("input",{className:"field-input",value:phone,onChange:e=>setPhone(e.target.value),placeholder:t.phone_ph,inputMode:"tel"}))),info&&React.createElement("p",{className:"terms",style:{color:"var(--green-deep)",fontWeight:700}},info),err&&React.createElement("p",{className:"terms",style:{color:"var(--danger)"}},String(err)),React.createElement("button",{className:"btn btn-green",disabled:busy||!name.trim()||!emailReady||!phoneReady||password.length<6,onClick:customerSignUp},React.createElement(Icon,{name:"check",size:20,color:"#fff",stroke:3}),React.createElement("span",null,busy?"جارٍ الإنشاء...":"إنشاء حساب")),React.createElement("p",{className:"terms"},t.agree_pre," ",React.createElement("button",{className:"terms-link",onClick:openTerms},t.terms_link)))),step==="otp"&&React.createElement("div",{className:"reg-step"},React.createElement("button",{className:"reg-back",onClick:()=>{setErr(""),setStep("method")}},React.createElement(Icon,{name:t.dir==="rtl"?"chevron":"back",size:20,color:"var(--ink)"})),React.createElement("div",{className:"reg-brand"},React.createElement("div",{className:"logo-mark lg"},React.createElement(Icon,{name:"phone",size:42,color:"var(--green-deep)"}))),React.createElement("h1",{className:"reg-title"},"أدخل رمز التحقق"),React.createElement("p",{className:"reg-sub"},"أرسلنا رمزاً عبر SMS إلى +967 "+phone),React.createElement("div",{className:"form-fields"},React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"رمز التحقق"),React.createElement("input",{className:"field-input",value:code,onChange:e=>setCode(e.target.value.replace(/[^0-9]/g,"")),placeholder:"٦ أرقام",inputMode:"numeric",maxLength:6,style:{textAlign:"center",letterSpacing:".4em",fontSize:20}}))),err&&React.createElement("p",{className:"terms",style:{color:"var(--danger)"}},String(err)),React.createElement("div",{className:"reg-foot"},React.createElement("button",{className:"btn btn-green",disabled:busy||code.trim().length<4,onClick:vendorVerify},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,busy?"جارٍ التحقق...":"تأكيد")),React.createElement("button",{className:"skip-link",onClick:vendorSend,disabled:busy},"إعادة إرسال الرمز"))),step==="setpw"&&React.createElement("div",{className:"reg-step"},React.createElement("div",{className:"reg-brand"},React.createElement("div",{className:"logo-mark lg"},React.createElement(Icon,{name:"shield",size:42,color:"var(--green-deep)"}))),React.createElement("h1",{className:"reg-title"},"إعداد كلمة المرور"),React.createElement("p",{className:"reg-sub"},"ستدخل لاحقاً برقم هاتفك وكلمة المرور هذه."),React.createElement("div",{className:"form-fields"},React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"كلمة المرور"),React.createElement("input",{className:"field-input",type:"password",value:password,onChange:e=>setPassword(e.target.value),placeholder:"••••••••"}))),err&&React.createElement("p",{className:"terms",style:{color:"var(--danger)"}},String(err)),React.createElement("div",{className:"reg-foot"},React.createElement("button",{className:"btn btn-green",disabled:busy||password.length<4,onClick:vendorSetPw},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,busy?"جارٍ...":"حفظ ودخول")))))}function GoogleG(){return React.createElement("svg",{width:"20",height:"20",viewBox:"0 0 48 48"},React.createElement("path",{fill:"#4285F4",d:"M45 24c0-1.6-.1-2.8-.4-4H24v8h12c-.2 2-1.6 5-4.6 7l7 5.4C42.6 36.6 45 31 45 24Z"}),React.createElement("path",{fill:"#34A853",d:"M24 46c5.9 0 10.8-2 14.4-5.3l-7-5.4c-1.9 1.3-4.5 2.2-7.4 2.2-5.7 0-10.5-3.8-12.2-9l-7.3 5.6C7.8 41.5 15.3 46 24 46Z"}),React.createElement("path",{fill:"#FBBC05",d:"M11.8 28.5c-.4-1.3-.7-2.7-.7-4.5s.3-3.2.7-4.5l-7.3-5.6C2.9 17 2 20.4 2 24s.9 7 2.5 10.1l7.3-5.6Z"}),React.createElement("path",{fill:"#EA4335",d:"M24 10.8c3.2 0 5.4 1.4 6.6 2.5l4.9-4.8C32.8 5.7 27.9 3.8 24 3.8 15.3 3.8 7.8 8.3 4.5 14.9l7.3 5.6C13.5 14.6 18.3 10.8 24 10.8Z"}))}const SEC_GLYPH={almond:"almond",raisin:"raisin",retail:"store",wholesale:"warehouse",savings:"bolt"};function Home({t,lang,go,role,avail,catalog,storesMap,isSeller,sellSection,notifCount=0,onBell,onAddCrop,openStore,openProduct,addToCart,favs,toggleFav,loadStatus,onRetry}){const cats=[{id:"almond",label:t.sec_almond,go:()=>go("sections",{section:"almond"})},{id:"raisin",label:t.sec_raisin,go:()=>go("sections",{section:"raisin"})},{id:"retail",label:t.sec_retail,go:()=>go("sections",{section:"retail"})},{id:"savings",label:t.cat_savings,go:()=>go("savings")}],showWholesale=avail.includes("wholesale"),featured=(()=>{const seen={},out=[];(catalog||[]).forEach(p=>{const v=p._vendor;if(!v||p.cat==="wholesale")return;if(!seen[v]){seen[v]={vendor:v,name:(storesMap&&storesMap[v]&&storesMap[v].name)||(lang==="ar"?"متجر":"Store"),image:storesMap&&storesMap[v]&&storesMap[v].image,products:[]};out.push(seen[v]);}seen[v].products.push(p);});return out.slice(0,4);})(),popular=(catalog||LOZI_PRODUCTS).filter(p=>(p.cat==="almond"||p.cat==="raisin")&&p.sale!=="wholesale").slice(0,4),isFarmer=sellSection==="almond"||sellSection==="raisin",sellLabel=isFarmer?t.add_crop:t.add_product,sellSub=isFarmer?t.add_product_sub_farmer:sellSection==="wholesale"?t.add_product_sub_wholesale:t.add_product_sub_retail,dataLoading=loadStatus==="loading"&&!(catalog&&catalog.length),dataError=loadStatus==="error"&&!(catalog&&catalog.length);return React.createElement("div",{className:"screen home"},React.createElement("header",{className:"home-head"},React.createElement("div",{className:"home-greet"},React.createElement("span",{className:"home-loc"},React.createElement(Icon,{name:"location",size:14,color:"var(--green-deep)"}),lang==="ar"?"صنعاء، اليمن":"Sanaa, Yemen"),React.createElement("h1",null,t.appName)),React.createElement("button",{className:"bell-btn",onClick:onBell},React.createElement(Icon,{name:"bell",size:20,color:"var(--ink)"}),notifCount>0&&React.createElement("i",{className:"bell-dot"}))),React.createElement("button",{className:"search-bar",onClick:()=>go("sections")},React.createElement(Icon,{name:"search",size:20,color:"var(--muted)"}),React.createElement("span",null,t.search_ph)),React.createElement("div",{className:"cat-row"},cats.map(c=>React.createElement("button",{key:c.id,className:`cat-tile cat-${c.id}`,onClick:c.go},React.createElement("span",{className:"cat-ic"},React.createElement(CatGlyph,{id:c.id})),React.createElement("span",null,c.label)))),isSeller&&React.createElement("button",{className:`farmer-banner ${isFarmer?"":"seller"}`,onClick:onAddCrop},React.createElement("span",{className:"fb-ic"},React.createElement(Icon,{name:isFarmer?"leaf":sellSection==="wholesale"?"warehouse":"store",size:26,color:"#fff"})),React.createElement("div",{className:"wb-txt"},React.createElement("strong",null,sellLabel),React.createElement("span",null,sellSub)),React.createElement(Icon,{name:"plus",size:22,color:"#fff"})),showWholesale&&React.createElement("button",{className:"wholesale-banner",onClick:()=>go("sections",{section:"wholesale"})},React.createElement("span",{className:"wb-ic"},React.createElement(Icon,{name:"warehouse",size:26,color:"#fff"})),React.createElement("div",{className:"wb-txt"},React.createElement("strong",null,t.sec_wholesale),React.createElement("span",null,lang==="ar"?"أسعار الجملة لمحلات التجزئة":"Wholesale prices for retailers")),React.createElement(Icon,{name:t.dir==="rtl"?"back":"fwd",size:20,color:"#fff"})),React.createElement(SecHead,{title:t.featured_stores,action:t.see_all,onAction:()=>go("sections")}),dataError?React.createElement(ErrorRetry,{onRetry}):React.createElement("div",{className:"store-list"},dataLoading?React.createElement(SkeletonStores,{count:3}):featured.map(v=>React.createElement("div",{key:v.vendor,className:"store-card",onClick:()=>go("vstore",{vendorId:v.vendor})},React.createElement("div",{className:"store-img"},React.createElement(Img,{id:v.image||"store",ph:lang==="ar"?"المتجر":"Store",radius:16})),React.createElement("div",{className:"store-body"},React.createElement("div",{className:"store-top"},React.createElement("div",{className:"store-name"},v.name),storesMap&&storesMap[v.vendor]&&storesMap[v.vendor].trustedBadge?React.createElement(TrustBadge,{size:16,withLabel:!0}):null),storesMap&&storesMap[v.vendor]&&storesMap[v.vendor].rating!=null?React.createElement("div",{className:"store-trust"},React.createElement("span",{className:"store-rate"},React.createElement(Icon,{name:"star",size:12,color:"var(--gold-deep)"}),Number(storesMap[v.vendor].rating).toFixed(1),storesMap[v.vendor].ratingsCount?" ("+storesMap[v.vendor].ratingsCount+")":"")):null,React.createElement("div",{className:"store-addr"},React.createElement(Icon,{name:"store",size:12,color:"var(--muted)"}),(lang==="ar"?v.products.length+" منتج":v.products.length+" products")),React.createElement("div",{className:"store-minprice"},(lang==="ar"?"يبدأ من ":"From "),React.createElement(Money,{v:Math.min.apply(null,v.products.map(p=>Number(p.price)||0)),cls:"price",small:!0})))))),!dataError&&React.createElement(SecHead,{title:t.offers}),!dataError&&React.createElement("div",{className:"prod-grid"},dataLoading?React.createElement(SkeletonGrid,{count:4}):popular.map(p=>React.createElement(ProductCard,{key:p.id,p,t,lang,onOpen:openProduct,onAdd:addToCart,fav:favs.includes(p.id),onFav:toggleFav}))))}function CatGlyph({id}){return id==="almond"?React.createElement("svg",{width:"26",height:"26",viewBox:"0 0 24 24"},React.createElement("path",{d:"M12 3C8 6 6 10 6 14c0 4 3 7 6 7s6-3 6-7c0-4-2-8-6-11Z",fill:"#fff"})):id==="raisin"?React.createElement("svg",{width:"26",height:"26",viewBox:"0 0 24 24",fill:"#fff"},React.createElement("circle",{cx:"9",cy:"10",r:"3.5"}),React.createElement("circle",{cx:"15",cy:"9",r:"3"}),React.createElement("circle",{cx:"12",cy:"15",r:"3.5"})):id==="retail"?React.createElement(Icon,{name:"store",size:"24",color:"#fff"}):id==="wholesale"?React.createElement(Icon,{name:"warehouse",size:24,color:"#fff"}):React.createElement(Icon,{name:"bolt",size:24,color:"#fff"})}function TrustBadge({size=16,withLabel}){return React.createElement("span",{className:"trust-badge",title:"متجر موثوق"},React.createElement(Icon,{name:"star",size:Math.round(size*.72),color:"#fff"}),withLabel?React.createElement("span",{className:"tb-label"},"موثوق"):null)}
-function FilterSheet({open,onClose,onApply,onClear,value,varieties,showBundle,lang}){const[d,setD]=React.useState(value);React.useEffect(()=>{if(open)setD(value)},[open]);if(!open)return null;const tog=(k)=>setD(Object.assign({},d,{[k]:!d[k]})),togVar=(id)=>{const has=d.varieties.includes(id);setD(Object.assign({},d,{varieties:has?d.varieties.filter((x)=>x!==id):d.varieties.concat([id])}))},setP=(k,v)=>setD(Object.assign({},d,{[k]:String(v).replace(/[^0-9]/g,"")})),row=(label,k)=>React.createElement("button",{type:"button",className:"flt-toggle"+(d[k]?" on":""),onClick:()=>tog(k)},React.createElement("span",null,label),React.createElement("span",{className:"flt-sw"}));return React.createElement("div",{className:"modal-overlay",onClick:onClose},React.createElement("div",{className:"sheet",onClick:(e)=>e.stopPropagation()},React.createElement("div",{className:"sheet-handle"}),React.createElement("div",{className:"sheet-scroll"},React.createElement("h2",{className:"flt-title"},"الفلاتر"),varieties&&varieties.length?React.createElement("div",{className:"flt-group"},React.createElement("div",{className:"flt-label"},"الصنف"),React.createElement("div",{className:"flt-chips"},varieties.map((v)=>React.createElement("button",{key:v.id,type:"button",className:"chip"+(d.varieties.includes(v.id)?" on":""),onClick:()=>togVar(v.id)},(v.label&&(v.label[lang]||v.label.ar))||v.id)))):null,React.createElement("div",{className:"flt-group"},React.createElement("div",{className:"flt-label"},"السعر (ريال)"),React.createElement("div",{className:"flt-price"},React.createElement("input",{className:"flt-input",inputMode:"numeric",placeholder:"من",value:d.priceMin,onChange:(e)=>setP("priceMin",e.target.value)}),React.createElement("span",{className:"flt-dash"},"—"),React.createElement("input",{className:"flt-input",inputMode:"numeric",placeholder:"إلى",value:d.priceMax,onChange:(e)=>setP("priceMax",e.target.value)}))),React.createElement("div",{className:"flt-group"},row("خالٍ من المرارة","shahti"),row("توصيل مجاني","freeDelivery"),showBundle?row("عروض المشكّل","bundle"):null,row("خصم عام","discount"))),React.createElement("div",{className:"sheet-foot flt-foot"},React.createElement("button",{type:"button",className:"flt-clear",onClick:onClear},"مسح الفلاتر"),React.createElement("button",{type:"button",className:"flt-apply",onClick:()=>onApply(d)},"تطبيق"))))}
-function SectionBrowse({t,lang,go,avail,catalog,init,initType,storesMap,openStore,openProduct,addToCart,favs,toggleFav,loadStatus,onRetry,browse,sectionVarieties}){
-const start=avail.includes(init)?init:avail[0],
-[sec,setSec]=useStateA(start),
-[type,setType]=useStateA(initType||"all"),
-[q,setQ]=useStateA(""),
-[sort,setSort]=useStateA("default"),
-[catFilter,setCatFilter]=useStateA("all"),
-[filters,setFilters]=useStateA({varieties:[],priceMin:"",priceMax:"",shahti:!1,freeDelivery:!1,bundle:!1,discount:!1}),
-[filterOpen,setFilterOpen]=useStateA(!1),
-[srvRows,setSrvRows]=useStateA(null),
-PRODUCTS=catalog||LOZI_PRODUCTS,
-BROWSE=srvRows!=null?srvRows:PRODUCTS,
-varList=(s)=>(sectionVarieties&&sectionVarieties[s])||[],
-hasVar=(s)=>varList(s).length>0,
-effVars=filters.varieties&&filters.varieties.length?filters.varieties:(type!=="all"?[type]:[]),
-rpcSort=sort==="default"?"best":sort,
-isRetail=sec==="retail",
-activeFilters=(filters.varieties&&filters.varieties.length?1:0)+(filters.priceMin!==""||filters.priceMax!==""?1:0)+(filters.shahti?1:0)+(filters.freeDelivery?1:0)+(filters.bundle?1:0)+(filters.discount?1:0),
-clearFilters=()=>{setFilters({varieties:[],priceMin:"",priceMax:"",shahti:!1,freeDelivery:!1,bundle:!1,discount:!1});setType("all");setFilterOpen(!1)},
-storeRating=(vid)=>storesMap&&storesMap[vid]&&storesMap[vid].rating,
-secLabel={almond:t.sec_almond,raisin:t.sec_raisin,retail:t.sec_retail,wholesale:t.sec_wholesale},
-catLabel={almond:t.sec_almond,raisin:t.sec_raisin,retail:t.sec_retail,wholesale:t.sec_wholesale},
-storeName=(vid)=>(storesMap&&storesMap[vid]&&storesMap[vid].name)||(lang==="ar"?"متجر":"Store"),
-storeImg=(vid)=>storesMap&&storesMap[vid]&&storesMap[vid].image,
-priceOf=(p)=>Number(p.price)||0,
-nameStr=(p)=>{const n=p.name;return((n&&(n[lang]||n.ar||n.en))||"")+"";},
-inSec=(p)=>sec==="wholesale"?p.cat==="wholesale":(p.cat===sec&&p.cat!=="wholesale"),
-applySort=(arr)=>sort==="price_asc"?arr.slice().sort((a,b)=>priceOf(a)-priceOf(b)):sort==="price_desc"?arr.slice().sort((a,b)=>priceOf(b)-priceOf(a)):sort==="rating"?arr.slice().sort((a,b)=>(storeRating(b._vendor)||-1)-(storeRating(a._vendor)||-1)):arr,
-query=q.trim().toLowerCase(),
-searching=query.length>0,
-openVendor=(vid)=>vid&&go("vstore",{vendorId:vid}),
-filterBar=React.createElement("div",{className:"sb-filter"},
-React.createElement("div",{className:"search-bar live"},
-React.createElement(Icon,{name:"search",size:18,color:"var(--muted)"}),
-React.createElement("input",{className:"search-input",value:q,onChange:(e)=>setQ(e.target.value),placeholder:t.search_ph,inputMode:"search"}),
-q&&React.createElement("button",{className:"search-clear",onClick:()=>setQ("")},React.createElement(Icon,{name:"close",size:16,color:"var(--muted)"}))),
-React.createElement("select",{className:"sb-sort",value:sort,onChange:(e)=>setSort(e.target.value)},
-React.createElement("option",{value:"default"},lang==="ar"?"الترتيب: الأنسب":"Sort: Best"),
-React.createElement("option",{value:"price_asc"},lang==="ar"?"السعر: الأرخص أولاً":"Price: Low→High"),
-React.createElement("option",{value:"price_desc"},lang==="ar"?"السعر: الأغلى أولاً":"Price: High→Low"),React.createElement("option",{value:"rating"},lang==="ar"?"الأعلى تقييماً":"Top rated"),React.createElement("option",{value:"newest"},lang==="ar"?"الأحدث":"Newest")),React.createElement("button",{type:"button",className:"sb-filterbtn"+(activeFilters?" on":""),onClick:()=>setFilterOpen(!0),title:"الفلاتر"},React.createElement(Icon,{name:"filter",size:18,color:activeFilters?"#fff":"var(--green-deep)"}),activeFilters?React.createElement("span",{className:"filter-badge"},activeFilters):null));
-React.useEffect(()=>{let live=!0;if(!browse){setSrvRows(null);return ()=>{live=!1}}browse({section:sec,sort:rpcSort,varieties:effVars,priceMin:filters.priceMin,priceMax:filters.priceMax,shahti:filters.shahti,freeDelivery:filters.freeDelivery,bundle:filters.bundle,discount:filters.discount,limit:200}).then((rows)=>{if(live)setSrvRows(rows)});return ()=>{live=!1}},[sec,type,sort,filters]);
-const filterSheet=React.createElement(FilterSheet,{open:filterOpen,onClose:()=>setFilterOpen(!1),onApply:(d)=>{setFilters(d);setFilterOpen(!1)},onClear:clearFilters,value:filters,varieties:varList(sec),showBundle:isRetail,lang});
-if(loadStatus==="loading"&&!(PRODUCTS&&PRODUCTS.length))return React.createElement("div",{className:"screen sections"},React.createElement("div",{className:"stores-head"},React.createElement("h2",null,t.stores_title)),filterBar,React.createElement(SkeletonStores,{count:4}));
-if(loadStatus==="error"&&!(PRODUCTS&&PRODUCTS.length))return React.createElement("div",{className:"screen sections"},React.createElement("div",{className:"stores-head"},React.createElement("h2",null,t.stores_title)),filterBar,React.createElement(ErrorRetry,{onRetry}));
-if(searching){
-let results=PRODUCTS.filter((p)=>(catFilter==="all"||p.cat===catFilter)&&(nameStr(p)+" "+storeName(p._vendor)).toLowerCase().includes(query));
-results=applySort(results);
-const cats=["all"].concat(avail);
-return React.createElement("div",{className:"screen sections"},
-React.createElement("div",{className:"stores-head"},React.createElement("h2",null,t.stores_title)),
-filterBar,
-React.createElement("div",{className:"type-row"},cats.map((c)=>React.createElement("button",{key:c,className:`chip ${catFilter===c?"on":""}`,onClick:()=>setCatFilter(c)},c==="all"?(lang==="ar"?"كل الأقسام":"All sections"):catLabel[c]))),
-React.createElement(SecHead,{title:(lang==="ar"?"نتائج البحث":"Search results")+" ("+results.length+")"}),
-results.length?React.createElement("div",{className:"prod-grid pad"},results.map((p)=>React.createElement("div",{key:p.id,className:"search-result"},
-React.createElement("button",{className:"sr-store",onClick:(e)=>{e.stopPropagation();openVendor(p._vendor);}},React.createElement(Icon,{name:"store",size:12,color:"var(--green-deep)"}),storeName(p._vendor)),
-React.createElement(ProductCard,{p,t,lang,onOpen:openProduct,onAdd:addToCart,fav:favs.includes(p.id),onFav:toggleFav})))):
-React.createElement("div",{className:"empty"},React.createElement("div",{className:"empty-ic"},React.createElement(Icon,{name:"search",size:38,color:"var(--gold-deep)"})),React.createElement("h3",null,lang==="ar"?"لا توجد نتائج مطابقة":"No matching results")),filterSheet);
+const LOZI_RATE = 140;
+let LOZI_CURRENCY = "YER";
+const setCurrency = (c) => {
+    LOZI_CURRENCY = c;
+  },
+  getCurrency = () => LOZI_CURRENCY;
+function fmtMoney(yer) {
+  if (LOZI_CURRENCY === "SAR") {
+    const v = yer / 140;
+    return {
+      value: (v >= 100
+        ? Math.round(v)
+        : Math.round(v * 10) / 10
+      ).toLocaleString("en-US"),
+      unit: LOZI_T_UNIT.SAR,
+    };
+  }
+  return {
+    value: Math.round(yer).toLocaleString("en-US"),
+    unit: LOZI_T_UNIT.YER,
+  };
 }
-if(sec==="wholesale"&&!avail.includes("wholesale"))
-return React.createElement("div",{className:"screen sections"},
-React.createElement("div",{className:"stores-head"},React.createElement("h2",null,t.stores_title)),
-filterBar,
-React.createElement("div",{className:"empty"},React.createElement("div",{className:"empty-ic"},React.createElement(Icon,{name:"warehouse",size:38,color:"var(--gold-deep)"})),React.createElement("h3",null,t.wholesale_locked)));
-const inThisSec=BROWSE.filter(inSec).filter((p)=>!hasVar(sec)||type==="all"||p.variety===type),
-seen={},vendors=[];
-inThisSec.forEach((p)=>{const v=p._vendor;if(!v)return;if(!seen[v]){seen[v]={vendor:v,name:storeName(v),image:storeImg(v),products:[]};vendors.push(seen[v]);}seen[v].products.push(p);});
-let vlist=vendors;
-if(sort==="price_asc"||sort==="price_desc")vlist=vendors.slice().sort((a,b)=>{const ma=Math.min.apply(null,a.products.map(priceOf)),mb=Math.min.apply(null,b.products.map(priceOf));return sort==="price_asc"?ma-mb:mb-ma;});
-else if(sort==="rating")vlist=vendors.slice().sort((a,b)=>(storeRating(b.vendor)||-1)-(storeRating(a.vendor)||-1));
-const storeCardLive=(v)=>React.createElement("div",{key:v.vendor,className:"store-card",onClick:()=>openVendor(v.vendor)},
-React.createElement("div",{className:"store-img"},React.createElement(Img,{id:v.image||"store",ph:lang==="ar"?"المتجر":"Store",radius:16}),
-sec==="wholesale"&&React.createElement("span",{className:"wh-corner"},t.wholesale_badge)),
-React.createElement("div",{className:"store-body"},
-React.createElement("div",{className:"store-top"},React.createElement("div",{className:"store-name"},v.name),storesMap&&storesMap[v.vendor]&&storesMap[v.vendor].trustedBadge?React.createElement(TrustBadge,{size:16,withLabel:!0}):null),storesMap&&storesMap[v.vendor]&&storesMap[v.vendor].rating!=null?React.createElement("div",{className:"store-trust"},React.createElement("span",{className:"store-rate"},React.createElement(Icon,{name:"star",size:12,color:"var(--gold-deep)"}),Number(storesMap[v.vendor].rating).toFixed(1),storesMap[v.vendor].ratingsCount?" ("+storesMap[v.vendor].ratingsCount+")":"")):null,
-React.createElement("div",{className:"store-addr"},React.createElement(Icon,{name:"store",size:12,color:"var(--muted)"}),(lang==="ar"?v.products.length+" منتج":v.products.length+" products")),
-React.createElement("div",{className:"store-minprice"},(lang==="ar"?"يبدأ من ":"From "),React.createElement(Money,{v:Math.min.apply(null,v.products.map(priceOf)),cls:"price",small:!0}))));
-return React.createElement("div",{className:"screen sections"},
-React.createElement("div",{className:"stores-head"},React.createElement("h2",null,t.stores_title)),
-filterBar,
-React.createElement("div",{className:"seg-row"},avail.map((s)=>React.createElement("button",{key:s,className:`seg-pill ${sec===s?"on":""} ${s==="wholesale"?"wh":""}`,onClick:()=>{setSec(s);setType("all");}},
-s==="wholesale"&&React.createElement(Icon,{name:"warehouse",size:13,color:sec===s?"#fff":"var(--gold-deep)"}),secLabel[s]))),
-sec==="wholesale"&&React.createElement("div",{className:"wh-note"},React.createElement(Icon,{name:"warehouse",size:15,color:"var(--gold-deep)"}),lang==="ar"?"أسعار جملة — لمحلات التجزئة":"Wholesale prices — for retailers"),
-hasVar(sec)&&React.createElement("div",{className:"type-row"},React.createElement("button",{className:`chip ${type==="all"?"on":""}`,onClick:()=>setType("all")},t.all_types),
-varList(sec).map((a)=>React.createElement("button",{key:a.id,className:`chip ${type===a.id?"on":""}`,onClick:()=>setType(a.id)},(a.label&&(a.label[lang]||a.label.ar))||a.id))),
-React.createElement(SecHead,{title:t.stores_in_sec||(lang==="ar"?"المتاجر":"Stores")}),
-vlist.length?React.createElement("div",{className:"store-list pad-sm"},vlist.map(storeCardLive)):
-React.createElement("div",{className:"empty"},React.createElement("div",{className:"empty-ic"},React.createElement(Icon,{name:"store",size:38,color:"var(--gold-deep)"})),React.createElement("h3",null,activeFilters?"لا توجد نتائج مطابقة للفلاتر":(lang==="ar"?"لا توجد متاجر في هذا القسم بعد":"No stores in this section yet")),activeFilters?React.createElement("button",{className:"flt-empty-clear",onClick:clearFilters},"مسح الفلاتر"):null),filterSheet);
+function moneyStr(yer) {
+  const m = fmtMoney(yer);
+  return `${m.value} ${m.unit}`;
 }
-function StoreProfile({s,t,lang,onBack,openProduct,addToCart,favs,toggleFav}){const prods=LOZI_PRODUCTS.filter(p=>p.store===s.id);return React.createElement("div",{className:"screen store-profile"},React.createElement("div",{className:"sp-hero"},React.createElement(Img,{id:`${s.img}-cover`,ph:lang==="ar"?"غلاف المتجر":"Cover",radius:0,shape:"rect",style:{width:"100%",height:"100%"}}),React.createElement("button",{className:"hero-back",onClick:onBack},React.createElement(Icon,{name:t.dir==="rtl"?"chevron":"back",size:22,color:"var(--ink)"})),React.createElement("div",{className:"sp-hero-grad"})),React.createElement("div",{className:"sp-card"},React.createElement("div",{className:"sp-logo"},React.createElement(Img,{id:s.img,ph:"",radius:18,style:{width:64,height:64}})),React.createElement("div",{className:"sp-info"},React.createElement("h2",null,s.name[lang],s.verified&&React.createElement(VerifiedSeal,{size:18})),React.createElement("div",{className:"sp-rate"},React.createElement(Stars,{value:s.rating,size:15}),React.createElement("span",null,"· ",s.reviews," ",t.reviews)),React.createElement("div",{className:"sp-addr"},React.createElement(Icon,{name:"location",size:13,color:"var(--muted)"}),s.addr[lang]))),s.offers&&s.offers.length>0&&React.createElement("div",{className:"offers-block"},React.createElement("div",{className:"ob-head"},React.createElement(Icon,{name:"tag",size:15,color:"var(--green-deep)"}),t.offers_avail),React.createElement("div",{className:"ob-list"},s.offers.map((o,i)=>React.createElement("div",{key:i,className:`ob-item ob-${o.type}`},React.createElement("span",{className:"ob-ic"},React.createElement(Icon,{name:offerIcon(o),size:16,color:"#fff"})),React.createElement("span",{className:"ob-text"},offerText(o,t,lang)))))),React.createElement(SecHead,{title:t.store_products}),React.createElement("div",{className:"prod-grid pad"},prods.map(p=>React.createElement(ProductCard,{key:p.id,p,t,lang,onOpen:openProduct,onAdd:addToCart,fav:favs.includes(p.id),onFav:toggleFav}))))}function Login({t,lang,onCustomerSignIn,onCustomerForgot,onVendorSignIn,onVendorSendOtp,onVendorVerify,onVendorSetPassword,onSupport,goRegister}){const[tab,setTab]=useStateA("customer"),[email,setEmail]=useStateA(""),[phone,setPhone]=useStateA(""),[password,setPassword]=useStateA(""),[busy,setBusy]=useStateA(!1),[err,setErr]=useStateA(""),[forgot,setForgot]=useStateA(""),[code,setCode]=useStateA(""),[setupToken,setSetupToken]=useStateA(""),[newpw,setNewpw]=useStateA(""),[custForgot,setCustForgot]=useStateA(""),emailOk=/\S+@\S+\.\S+/.test(email.trim()),phoneOk=phone.trim().replace(/[^0-9]/g,"").length>=7,customerLogin=async()=>{setErr(""),setBusy(!0);const r=await onCustomerSignIn({email:email.trim(),password});setBusy(!1),(!r||!r.ok)&&setErr(r&&r.error||"البريد أو كلمة المرور غير صحيحة")},customerForgotSend=async()=>{if(!emailOk)return setErr("أدخل بريدك الإلكتروني");setErr(""),setBusy(!0);const r=await onCustomerForgot({email:email.trim()});if(setBusy(!1),r&&r.ok)return setCustForgot("sent");setErr(r&&r.error||"تعذّر إرسال رابط الاستعادة")},vendorLogin=async()=>{setErr(""),setBusy(!0);const r=await onVendorSignIn({phone:phone.trim(),password});setBusy(!1),(!r||!r.ok)&&setErr(r&&r.error||"الرقم أو كلمة المرور غير صحيحة")},forgotSend=async()=>{setErr(""),setBusy(!0);const r=await onVendorSendOtp({phone:phone.trim(),purpose:"reset"});if(setBusy(!1),r&&r.ok)return setForgot("code");setErr(r&&(r.error||(r.reason==="rate_limited"?"تم إرسال رمز مؤخراً، حاول لاحقاً":r.reason==="no_account"?"لا يوجد حساب بهذا الرقم":r.reason))||"تعذّر إرسال الرمز")},forgotVerify=async()=>{setErr(""),setBusy(!0);const r=await onVendorVerify({phone:phone.trim(),code:code.trim(),purpose:"reset"});if(setBusy(!1),r&&r.ok)return setSetupToken(r.setup_token),setForgot("newpw");setErr(r&&(r.error||"الرمز غير صحيح")||"الرمز غير صحيح")},forgotSet=async()=>{if(newpw.length<4)return setErr("كلمة المرور ٤ أحرف على الأقل");setErr(""),setBusy(!0);const r=await onVendorSetPassword({phone:phone.trim(),setup_token:setupToken,password:newpw});if(!r||!r.ok)return setBusy(!1),setErr(r&&(r.error||"تعذّر الحفظ")||"تعذّر الحفظ");const s=await onVendorSignIn({phone:phone.trim(),password:newpw});setBusy(!1),(!s||!s.ok)&&setErr(s&&s.error||"تعذّر الدخول")};return React.createElement("div",{className:"screen register"},React.createElement("div",{className:"reg-step"},React.createElement("div",{className:"reg-brand"},React.createElement(LoziBadge,{size:88})),React.createElement("h1",{className:"reg-title"},"تسجيل الدخول"),React.createElement("div",{className:"seg seg-2",style:{marginBottom:14}},React.createElement("button",{className:tab==="customer"?"on":"",onClick:()=>{setTab("customer"),setErr(""),setForgot("")}},"زبون"),React.createElement("button",{className:tab==="vendor"?"on":"",onClick:()=>{setTab("vendor"),setErr(""),setForgot("")}},"متجر / مزارع")),tab==="customer"&&custForgot===""&&React.createElement("div",{className:"form-fields"},React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"البريد الإلكتروني"),React.createElement("input",{className:"field-input",type:"email",value:email,onChange:e=>setEmail(e.target.value),placeholder:"name@example.com",inputMode:"email",autoCapitalize:"off"})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"كلمة المرور"),React.createElement("input",{className:"field-input",type:"password",value:password,onChange:e=>setPassword(e.target.value),placeholder:"••••••••"})),err&&React.createElement("p",{className:"terms",style:{color:"var(--danger)"}},String(err)),React.createElement("button",{className:"btn btn-green",disabled:busy||!emailOk||!password,onClick:customerLogin},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,busy?"جارٍ...":"دخول")),React.createElement("button",{className:"skip-link",onClick:()=>{setErr(""),setCustForgot("on")}},"نسيت كلمة المرور؟")),tab==="customer"&&custForgot==="on"&&React.createElement("div",{className:"form-fields"},React.createElement("p",{className:"reg-sub"},"أدخل بريدك وسنرسل لك رابطاً لإعادة تعيين كلمة المرور."),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"البريد الإلكتروني"),React.createElement("input",{className:"field-input",type:"email",value:email,onChange:e=>setEmail(e.target.value),placeholder:"name@example.com",inputMode:"email",autoCapitalize:"off"})),err&&React.createElement("p",{className:"terms",style:{color:"var(--danger)"}},String(err)),React.createElement("button",{className:"btn btn-green",disabled:busy||!emailOk,onClick:customerForgotSend},React.createElement(Icon,{name:"mail",size:18,color:"#fff"}),React.createElement("span",null,busy?"جارٍ...":"إرسال رابط الاستعادة")),React.createElement("button",{className:"skip-link",onClick:()=>{setCustForgot(""),setErr("")}},"رجوع")),tab==="customer"&&custForgot==="sent"&&React.createElement("div",{className:"form-fields"},React.createElement("p",{className:"terms",style:{color:"var(--green-deep)",fontWeight:700}},"📩 أرسلنا رابط إعادة التعيين إلى بريدك. افتح الرسالة واضغط الرابط لاختيار كلمة مرور جديدة."),React.createElement("button",{className:"skip-link",onClick:()=>{setCustForgot(""),setErr("")}},"رجوع لتسجيل الدخول")),tab==="vendor"&&forgot===""&&React.createElement("div",{className:"form-fields"},React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"رقم الهاتف"),React.createElement("div",{className:"phone-input"},React.createElement("span",{className:"phone-cc"},"+967"),React.createElement("input",{className:"field-input",value:phone,onChange:e=>setPhone(e.target.value),placeholder:"7XXXXXXXX",inputMode:"tel"}))),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"كلمة المرور"),React.createElement("input",{className:"field-input",type:"password",value:password,onChange:e=>setPassword(e.target.value),placeholder:"••••••••"})),err&&React.createElement("p",{className:"terms",style:{color:"var(--danger)"}},String(err)),React.createElement("button",{className:"btn btn-green",disabled:busy||!phoneOk||!password,onClick:vendorLogin},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,busy?"جارٍ...":"دخول")),React.createElement("button",{className:"skip-link",onClick:()=>{setErr(""),setForgot("phone")}},"نسيت كلمة المرور؟")),tab==="vendor"&&forgot==="phone"&&React.createElement("div",{className:"form-fields"},React.createElement("p",{className:"reg-sub"},"أدخل رقمك لإرسال رمز التحقق"),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"رقم الهاتف"),React.createElement("div",{className:"phone-input"},React.createElement("span",{className:"phone-cc"},"+967"),React.createElement("input",{className:"field-input",value:phone,onChange:e=>setPhone(e.target.value),placeholder:"7XXXXXXXX",inputMode:"tel"}))),err&&React.createElement("p",{className:"terms",style:{color:"var(--danger)"}},String(err)),React.createElement("button",{className:"btn btn-green",disabled:busy||!phoneOk,onClick:forgotSend},React.createElement(Icon,{name:"phone",size:18,color:"#fff"}),React.createElement("span",null,busy?"جارٍ...":"إرسال رمز")),React.createElement("button",{className:"skip-link",onClick:()=>{setForgot(""),setErr("")}},"رجوع")),tab==="vendor"&&forgot==="code"&&React.createElement("div",{className:"form-fields"},React.createElement("p",{className:"reg-sub"},"أرسلنا رمزاً إلى +967 "+phone),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"رمز التحقق"),React.createElement("input",{className:"field-input",value:code,onChange:e=>setCode(e.target.value.replace(/[^0-9]/g,"")),placeholder:"٦ أرقام",inputMode:"numeric",maxLength:6,style:{textAlign:"center",letterSpacing:".4em",fontSize:20}})),err&&React.createElement("p",{className:"terms",style:{color:"var(--danger)"}},String(err)),React.createElement("button",{className:"btn btn-green",disabled:busy||code.trim().length<4,onClick:forgotVerify},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,busy?"جارٍ...":"تأكيد"))),tab==="vendor"&&forgot==="newpw"&&React.createElement("div",{className:"form-fields"},React.createElement("p",{className:"reg-sub"},"اختر كلمة مرور جديدة"),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"كلمة المرور الجديدة"),React.createElement("input",{className:"field-input",type:"password",value:newpw,onChange:e=>setNewpw(e.target.value),placeholder:"••••••••"})),err&&React.createElement("p",{className:"terms",style:{color:"var(--danger)"}},String(err)),React.createElement("button",{className:"btn btn-green",disabled:busy||newpw.length<4,onClick:forgotSet},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,busy?"جارٍ...":"حفظ ودخول"))),React.createElement("button",{className:"skip-link",onClick:onSupport,style:{marginTop:6}},"تواصل مع الدعم عبر واتساب"),React.createElement("button",{className:"skip-link",onClick:goRegister},"ليس لديك حساب؟ إنشاء حساب جديد")))}function ResetPassword({onSetNewPassword}){const[password,setPassword]=useStateA(""),[busy,setBusy]=useStateA(!1),[err,setErr]=useStateA(""),submit=async()=>{if(password.length<6)return setErr("كلمة المرور ٦ أحرف على الأقل");setErr(""),setBusy(!0);const r=await onSetNewPassword({password});setBusy(!1),(!r||!r.ok)&&setErr(r&&r.error||"تعذّر حفظ كلمة المرور")};return React.createElement("div",{className:"screen register"},React.createElement("div",{className:"reg-step"},React.createElement("div",{className:"reg-brand"},React.createElement("div",{className:"logo-mark lg"},React.createElement(Icon,{name:"shield",size:42,color:"var(--green-deep)"}))),React.createElement("h1",{className:"reg-title"},"إعادة تعيين كلمة المرور"),React.createElement("p",{className:"reg-sub"},"اختر كلمة مرور جديدة لحسابك."),React.createElement("div",{className:"form-fields"},React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"كلمة المرور الجديدة"),React.createElement("input",{className:"field-input",type:"password",value:password,onChange:e=>setPassword(e.target.value),placeholder:"••••••••"}))),err&&React.createElement("p",{className:"terms",style:{color:"var(--danger)"}},String(err)),React.createElement("div",{className:"reg-foot"},React.createElement("button",{className:"btn btn-green",disabled:busy||password.length<6,onClick:submit},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,busy?"جارٍ...":"حفظ والدخول")))))}function VendorStore({t,lang,vendorId,me,products,onBack,openProduct,addToCart,favs,toggleFav,showToast,sectionVarieties}){const[store,setStore]=useStateA(null),[reviews,setReviews]=useStateA(null),[writing,setWriting]=useStateA(!1),[rating,setRating]=useStateA(5),[comment,setComment]=useStateA(""),[busy,setBusy]=useStateA(!1),[canReview,setCanReview]=useStateA(!1),[vsSort,setVsSort]=useStateA("default"),[vsFilters,setVsFilters]=useStateA({varieties:[],priceMin:"",priceMax:"",shahti:!1,freeDelivery:!1,bundle:!1,discount:!1}),[vsFilterOpen,setVsFilterOpen]=useStateA(!1),load=()=>{!window.LOZI_SB||!vendorId||(window.LOZI_SB.from("stores").select("name,description,hours,image_path,trusted_badge,badge_source,average_rating,ratings_count,shahti_free,free_delivery,offers").eq("vendor_id",vendorId).maybeSingle().then(({data})=>setStore(data||{})),window.LOZI_SB.from("reviews").select("*").eq("store_vendor_id",vendorId).order("created_at",{ascending:!1}).then(({data})=>{setReviews(data||[]);me&&me.id&&window.LOZI_SB.from("orders").select("id").eq("customer_id",me.id).eq("seller_vendor_id",vendorId).in("status",["delivered","done"]).limit(1).then(({data:o})=>setCanReview(!!(o&&o.length)))}))};React.useEffect(load,[vendorId]);const avg=reviews&&reviews.length?reviews.reduce((a,r)=>a+r.rating,0)/reviews.length:0,submit=async()=>{if(!comment.trim()||busy)return;if(!me||!me.id){showToast&&showToast("سجّل الدخول لكتابة تقييم");return}setBusy(!0);const{error}=await window.LOZI_SB.from("reviews").insert({store_vendor_id:vendorId,user_id:me.id,rating,comment:comment.trim(),reviewer_name:me.name||null});if(setBusy(!1),error){showToast&&showToast(error.code==="23505"?"لقد قيّمت هذا المتجر مسبقاً":/policy|row-level/i.test(error.message||"")?"يمكنك التقييم بعد استلام طلب من هذا المتجر":"خطأ: "+error.message);return}setWriting(!1),setComment(""),setRating(5),load(),showToast&&showToast("شكراً لتقييمك ✓")},s=store||{};const vsSec0=(products&&products[0]&&products[0].cat)||"",vsVars=(sectionVarieties&&sectionVarieties[vsSec0])||[],vsActive=(vsFilters.varieties.length?1:0)+(vsFilters.priceMin!==""||vsFilters.priceMax!==""?1:0)+(vsFilters.shahti?1:0)+(vsFilters.freeDelivery?1:0)+(vsFilters.bundle?1:0)+(vsFilters.discount?1:0),vsPrice=(p)=>Number(p.price)||0,storeFree=s.free_delivery===!0||!!(s.offers&&s.offers.freeDelivery===!0),storeBundle=!!(s.offers&&s.offers.bundle&&s.offers.bundle.active!==!1),storeDiscount=!!(s.offers&&s.offers.discount&&Number(s.offers.discount.percent)>0),clearVs=()=>{setVsFilters({varieties:[],priceMin:"",priceMax:"",shahti:!1,freeDelivery:!1,bundle:!1,discount:!1});setVsFilterOpen(!1)};let vsShown=(products||[]).filter(p=>(!vsFilters.varieties.length||vsFilters.varieties.includes(p.variety))&&(vsFilters.priceMin===""||vsPrice(p)>=Number(vsFilters.priceMin))&&(vsFilters.priceMax===""||vsPrice(p)<=Number(vsFilters.priceMax))&&(!vsFilters.shahti||p.shahtiStatus==="approved")&&(!vsFilters.freeDelivery||storeFree)&&(!vsFilters.bundle||storeBundle)&&(!vsFilters.discount||p.old!=null||storeDiscount));vsShown=vsSort==="price_asc"?vsShown.slice().sort((a,b)=>vsPrice(a)-vsPrice(b)):vsSort==="price_desc"?vsShown.slice().sort((a,b)=>vsPrice(b)-vsPrice(a)):vsSort==="default"?vsShown.slice().sort((a,b)=>(((b.stock==null||b.stock>0)?1:0)-((a.stock==null||a.stock>0)?1:0))||(((b.shahtiStatus==="approved")?1:0)-((a.shahtiStatus==="approved")?1:0))):vsShown;const vsFilterSheet=React.createElement(FilterSheet,{open:vsFilterOpen,onClose:()=>setVsFilterOpen(!1),onApply:(d)=>{setVsFilters(d);setVsFilterOpen(!1)},onClear:clearVs,value:vsFilters,varieties:vsVars,showBundle:vsSec0==="retail",lang});return React.createElement("div",{className:"screen vendor-store"},React.createElement("div",{className:"sp-hero"},s.image_path?React.createElement(Img,{id:s.image_path,ph:"",radius:0,shape:"rect",style:{width:"100%",height:"100%"}}):React.createElement("div",{className:"vs-hero-bg"}),React.createElement("button",{className:"hero-back",onClick:onBack},React.createElement(Icon,{name:t.dir==="rtl"?"chevron":"back",size:22,color:"var(--ink)"}))),React.createElement("div",{className:"vs-body"},React.createElement("h1",{className:"vs-name"},s.name||"متجر",products&&products.some(p=>p.shahtiStatus==="approved"&&p.active!==!1)&&React.createElement("span",{className:"vs-seal",title:"خالٍ من المرارة"},React.createElement(ShahtiGlyph,{size:16})),s.trusted_badge&&React.createElement(TrustBadge,{size:18,withLabel:!0})),React.createElement("div",{className:"vs-rate"},React.createElement(Stars,{value:avg,size:16}),React.createElement("span",{className:"vs-rcount"},"· ",reviews?reviews.length:0," تقييم")),me&&me.id&&vendorId&&me.id!==vendorId&&React.createElement("button",{className:"vs-msg-btn",onClick:()=>window.LoziChat&&window.LoziChat.open({vendorId:vendorId,storeName:s.name}),style:{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",width:"100%",margin:"2px 0 14px",padding:"13px",border:"none",borderRadius:"14px",background:"var(--green-deep,#264B32)",color:"#fff",fontWeight:800,fontSize:"15px",fontFamily:"inherit",cursor:"pointer"}},React.createElement(Icon,{name:"chat",size:18,color:"#fff"}),"مراسلة المتجر"),s.description&&React.createElement("p",{className:"vs-desc"},s.description),s.hours&&React.createElement("div",{className:"vs-hours"},React.createElement(Icon,{name:"calendar",size:14,color:"var(--green-deep)"}),s.hours),products&&products.length>0&&React.createElement("div",null,React.createElement(SecHead,{title:"المنتجات"}),React.createElement("div",{className:"sb-filter vs-sortrow"},React.createElement("select",{className:"sb-sort",style:{flex:1},value:vsSort,onChange:(e)=>setVsSort(e.target.value)},React.createElement("option",{value:"default"},"الترتيب: الأنسب"),React.createElement("option",{value:"price_asc"},"السعر: الأرخص أولاً"),React.createElement("option",{value:"price_desc"},"السعر: الأغلى أولاً"),React.createElement("option",{value:"newest"},"الأحدث")),React.createElement("button",{type:"button",className:"sb-filterbtn"+(vsActive?" on":""),onClick:()=>setVsFilterOpen(!0),title:"الفلاتر"},React.createElement(Icon,{name:"filter",size:18,color:vsActive?"#fff":"var(--green-deep)"}),vsActive?React.createElement("span",{className:"filter-badge"},vsActive):null)),vsShown.length?React.createElement("div",{className:"prod-grid pad"},vsShown.map(p=>React.createElement(ProductCard,{key:p.id,p,t,lang,onOpen:openProduct,onAdd:addToCart,fav:favs.includes(p.id),onFav:toggleFav}))):React.createElement("div",{className:"empty"},React.createElement("h3",null,"لا توجد نتائج مطابقة للفلاتر"),React.createElement("button",{className:"flt-empty-clear",onClick:clearVs},"مسح الفلاتر"))),vsFilterSheet,React.createElement("div",{className:"vs-rev-head"},React.createElement(SecHead,{title:"التقييمات"}),(me&&me.id&&reviews&&reviews.some(r=>r.user_id===me.id))?React.createElement("span",{className:"vs-write-hint",style:{fontSize:"12px",color:"var(--muted)",fontWeight:700}},"لقد قيّمت هذا المتجر ✓"):canReview?React.createElement("button",{className:"vs-write",onClick:()=>setWriting(!0)},React.createElement(Icon,{name:"plus",size:15,color:"var(--green-deep)"}),"اكتب تقييماً"):me&&me.id?React.createElement("span",{className:"vs-write-hint",style:{fontSize:"12px",color:"var(--muted)",fontWeight:700}},"يمكنك التقييم بعد استلام طلبك من هذا المتجر"):null),reviews===null?React.createElement(Spinner,{label:"جارٍ تحميل التقييمات…"}):reviews.length?React.createElement("div",{className:"vs-reviews"},reviews.map(r=>React.createElement("div",{className:"rev-card",key:r.id},React.createElement("div",{className:"rev-top"},React.createElement("strong",null,r.reviewer_name||"عميل"),React.createElement(Stars,{value:r.rating,size:13})),r.comment&&React.createElement("p",{className:"rev-comment"},r.comment),r.reply&&React.createElement("div",{className:"rev-reply"},React.createElement("b",null,"ردّ المتجر:")," ",r.reply)))):React.createElement("div",{className:"sdash-empty"},React.createElement("div",{className:"sdash-empty-ic"},React.createElement(Icon,{name:"star",size:30,color:"var(--gold-deep)"})),React.createElement("p",null,"لا توجد تقييمات بعد — ستظهر هنا بعد أول عملية بيع."))),writing&&React.createElement("div",{className:"modal-overlay",onClick:()=>setWriting(!1)},React.createElement("div",{className:"sheet",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"sheet-handle"}),React.createElement("div",{className:"sheet-scroll"},React.createElement("div",{className:"sub-head"},React.createElement("div",{className:"sub-badge",style:{background:"var(--green)"}},React.createElement(Icon,{name:"star",size:22,color:"#fff"})),React.createElement("h2",null,"اكتب تقييمك")),React.createElement("div",{className:"rate-pick"},[1,2,3,4,5].map(n=>React.createElement("button",{key:n,className:"rate-star",onClick:()=>setRating(n)},React.createElement(Icon,{name:"star",size:32,color:n<=rating?"var(--gold-deep)":"var(--sand-2)"})))),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"تعليقك"),React.createElement("textarea",{className:"field-input store-desc",rows:4,value:comment,onChange:e=>setComment(e.target.value),placeholder:"كيف كانت تجربتك مع المتجر؟"}))),React.createElement("div",{className:"sheet-foot"},React.createElement("button",{className:"btn btn-green",disabled:!comment.trim()||busy,onClick:submit},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,busy?"جارٍ الإرسال…":"إرسال التقييم"))))))}Object.assign(window,{Splash,Register,Login,ResetPassword,Home,SectionBrowse,StoreProfile,VendorStore,ProductCard,StoreCard,LoziMark,ShahtiGlyph});
+const LOZI_T_UNIT = { YER: "ر.ي", SAR: "ر.س" },
+  ALMOND_TYPES = [
+    { id: "jabri", label: { ar: "جبري", en: "Jabri" } },
+    { id: "khawlani", label: { ar: "خولاني", en: "Khawlani" } },
+    { id: "matari", label: { ar: "مطري", en: "Matari" } },
+  ],
+  ALMOND_LABEL = (id, lang) => {
+    var _a;
+    return (
+      ((_a = (ALMOND_TYPES.find((x) => x.id === id) || {}).label) == null
+        ? void 0
+        : _a[lang]) || ""
+    );
+  },
+  RAISIN_TYPES = [
+    { id: "razqi", label: { ar: "رازقي", en: "Razqi" } },
+    { id: "bayad", label: { ar: "بياض", en: "White" } },
+    { id: "aswad", label: { ar: "أسود", en: "Black" } },
+  ],
+  RAISIN_LABEL = (id, lang) => {
+    var _b;
+    return (
+      ((_b = (RAISIN_TYPES.find((x) => x.id === id) || {}).label) == null
+        ? void 0
+        : _b[lang]) || ""
+    );
+  },
+  VARIETY_LABEL = (id, lang) =>
+    ALMOND_LABEL(id, lang) || RAISIN_LABEL(id, lang) || "",
+  LOZI_T = {
+    ar: {
+      dir: "rtl",
+      appName: "لوزي",
+      tagline: "مكسرات يمنية فاخرة",
+      nav_home: "الرئيسية",
+      nav_stores: "الأقسام",
+      nav_savings: "التوفير",
+      nav_cart: "السلة",
+      nav_profile: "حسابي",
+      welcome: "أهلاً بك في لوزي",
+      register_title: "إنشاء حساب",
+      choose_role: "اختر نوع حسابك",
+      choose_role_sub: "لكل فئة تجربة وصلاحيات مختلفة",
+      role_customer: "زبون",
+      role_customer_d: "تصفّح واطلب المكسرات",
+      role_farmer: "مزارع",
+      role_farmer_d: "انشر محصولك من اللوز أو الزبيب",
+      role_retail: "محل تجزئة",
+      role_retail_d: "بيع للزبائن وشراء من الجملة",
+      role_wholesale: "محل جملة",
+      role_wholesale_d: "بيع بالجملة لمحلات التجزئة",
+      farmer_kind: "نوع المحصول",
+      farmer_almond: "لوز",
+      farmer_raisin: "زبيب",
+      country: "الدولة",
+      yemen: "اليمن",
+      yemen_only: "التسجيل متاح حالياً في اليمن فقط",
+      cont: "متابعة",
+      login_sub: "سجّل دخولك لتبدأ التسوّق",
+      google: "المتابعة عبر Google",
+      whatsapp_otp: "رمز عبر واتساب",
+      remember: "تذكّرني",
+      skip: "تخطّي الآن",
+      agree_pre: "بالمتابعة فأنت توافق على",
+      terms_link: "الشروط والأحكام",
+      terms_title: "الشروط والأحكام",
+      terms_draft: "نسخة مبدئية — سيتم اعتماد النص النهائي قريباً",
+      terms_agree: "موافق ومتابعة",
+      pinfo_title: "معلوماتي الشخصية",
+      pinfo_required: "أكمل معلوماتك للمتابعة",
+      pinfo_hint: "مطلوبة عند التسجيل عبر Google",
+      full_name: "الاسم الكامل",
+      full_name_ph: "مثال: محمد أحمد",
+      phone: "رقم الهاتف",
+      phone_ph: "7X XXX XXXX",
+      save: "حفظ",
+      saved: "تم الحفظ ✓",
+      pinfo_edit_hint: "يمكنك تعديل اسمك ورقمك وعنوان موقعك في أي وقت",
+      pinfo_edit_hint_vendor: "يمكنك تعديل عنوان موقعك في أي وقت",
+      my_location: "عنوان موقعي",
+      city: "المدينة",
+      city_ph: "مثال: صنعاء",
+      address: "العنوان التفصيلي",
+      address_ph: "الحي، الشارع، أقرب معلم…",
+      no_location: "لم تحدّد عنوانك بعد",
+      search_ph: "ابحث عن لوز، زبيب، متجر…",
+      pride_line: "مع لوزي، تدعم اقتصاد وطنك · منتج يمني ١٠٠٪",
+      cats: "الأقسام",
+      sec_almond: "اللوز",
+      sec_raisin: "الزبيب",
+      sec_retail: "التجزئة",
+      sec_wholesale: "سوق الجملة",
+      cat_savings: "التوفير",
+      offers: "عروض اليوم",
+      featured_stores: "متاجر مميّزة",
+      see_all: "عرض الكل",
+      stores_title: "الأقسام",
+      almond_type: "نوع اللوز",
+      raisin_type: "نوع الزبيب",
+      all_types: "كل الأنواع",
+      stores_in_sec: "متاجر القسم",
+      products_in_sec: "منتجات القسم",
+      reviews: "تقييم",
+      verified: "موثّق",
+      offers_avail: "العروض المتاحة",
+      no_offers: "لا توجد عروض حالياً",
+      off_discount: "خصم",
+      off_free_min: "توصيل مجاني عند الشراء بـ",
+      off_bundle: "عرض تجميعي",
+      wholesale_badge: "جملة",
+      wholesale_locked: "سوق الجملة متاح لمحلات التجزئة فقط",
+      contact_wa: "تواصل عبر واتساب",
+      store_products: "منتجات المتجر",
+      variety_label: "النوع",
+      add_to_cart: "أضف إلى السلة",
+      added: "تمت الإضافة ✓",
+      description: "الوصف",
+      per: "لكل",
+      buy_mode_weight: "بالوزن",
+      buy_mode_amount: "بالمبلغ",
+      amount_label: "المبلغ (ريال)",
+      amount_ph: "أدخل المبلغ",
+      approx_qty: "الكمية التقريبية",
+      min_amount_note: "الحد الأدنى ٥٠٠ ريال",
+      min_quarter_note: "الحد الأدنى ربع كيلو (٢٥٠ جم)",
+      grams_short: "جم",
+      cart_title: "سلّة المشتريات",
+      cart_per_store_note:
+        "كل متجر طلب مستقل — لا يمكن دمج متاجر مختلفة في طلب واحد.",
+      order_from: "طلب من",
+      checkout_this: "إتمام هذا الطلب",
+      cart_empty: "سلّتك فارغة",
+      cart_empty_sub: "تصفّح المتاجر وأضف ما يعجبك",
+      browse: "تصفّح الأقسام",
+      subtotal: "المجموع الفرعي",
+      delivery_fee: "رسوم التوصيل",
+      total: "الإجمالي",
+      checkout: "إتمام الطلب",
+      checkout_title: "إتمام الطلب",
+      delivery_to: "التوصيل إلى",
+      edit: "تعديل",
+      order_summary: "ملخّص الطلب",
+      payment: "طريقة الدفع",
+      cod: "الدفع عند الاستلام",
+      cod_sub: "ادفع نقداً عند وصول الطلب",
+      pay_prepaid: "دفع مسبق",
+      pay_prepaid_sub: "ادفع الآن عبر تحويل بنكي",
+      prepaid_title: "الدفع المسبق",
+      prepaid_intro:
+        "حوّل قيمة الطلب إلى أحد حساباتنا التالية، ثم أرفق إشعار التحويل لتتم مراجعته.",
+      prepaid_accounts: "حوّل قيمة الطلب إلى أحد الحسابات",
+      prepaid_amount: "قيمة الطلب",
+      prepaid_send: "إرسال إشعار التحويل",
+      prepaid_sent_toast: "تم إرسال إشعار التحويل — طلبك قيد المراجعة",
+      success_review_sub: "تم إرسال إشعار التحويل، وطلبك قيد المراجعة الآن.",
+      order_review_note:
+        "تم إرسال إشعار التحويل. تتم مراجعة الدفع ويبدأ التجهيز بعد التأكيد.",
+      confirm_order: "تأكيد الطلب",
+      order_placed: "تم استلام طلبك!",
+      order_placed_sub: "سنبدأ بتجهيزه حالاً",
+      track_order: "تتبّع الطلب",
+      orders_title: "طلباتي",
+      orders_hint_seller:
+        "هذه مشترياتك أنت من المنصة (محل التجزئة يمكنه الشراء من الجملة). لمتابعة طلبات زبائنك افتح «الطلبات».",
+      orders_hint_wholesale:
+        "هذه مشترياتك أنت من المنصة. لمتابعة طلبات زبائنك افتح «الطلبات».",
+      no_orders: "لا توجد طلبات بعد",
+      reorder: "إعادة الطلب",
+      cancel_order: "إلغاء",
+      st_received: "تم الاستلام",
+      st_payreview: "بانتظار مراجعة الدفع",
+      st_preparing: "قيد التجهيز",
+      st_delivering: "قيد التوصيل",
+      st_delivered: "تم التسليم",
+      order_no: "طلب رقم",
+      items_count: "منتج",
+      order_total: "الإجمالي",
+      nav_dashboard: "الطلبات",
+      dash_retail: "لوحة المتجر",
+      dash_wholesale: "لوحة الجملة",
+      dash_farm: "لوحة المزرعة",
+      dash_new_orders: "طلبات جديدة",
+      dash_active: "قيد التنفيذ",
+      dash_today_sales: "مبيعات اليوم",
+      dash_total_sales: "إجمالي المبيعات",
+      dash_products: "منتج",
+      dash_my_products: "منتجاتي المعروضة",
+      dash_add_short: "إضافة منتج",
+      nav_wallet: "محفظتي",
+      wal_title: "محفظتي",
+      wal_due_label: "العمولة المستحقّة",
+      wal_due_sub: "إجمالي العمولة على الطلبات المكتملة",
+      wal_deadline: "آخر موعد للسداد",
+      wal_deadline_val: "٣٠ يونيو",
+      wal_pay: "سداد العمولة",
+      wal_status_title: "حالة المتجر",
+      wal_st_active: "نشط",
+      wal_st_active_sub: "متجرك يعمل بشكل طبيعي وجميع العمولات مسدّدة.",
+      wal_st_due: "اقترب موعد السداد",
+      wal_st_due_sub:
+        "تبقّى وقت قصير لسداد العمولة المستحقّة لتفادي تعليق المتجر.",
+      wal_st_suspended: "معلّق",
+      wal_st_suspended_sub:
+        "تم تعليق متجرك مؤقتاً لعدم سداد العمولة. سدّد الآن لإعادة التفعيل.",
+      wal_preview: "معاينة الحالة (للعرض فقط)",
+      wal_c_green: "أخضر",
+      wal_c_orange: "برتقالي",
+      wal_c_red: "أحمر",
+      wal_last_pay: "آخر دفعة",
+      wal_last_pay_on: "بتاريخ",
+      wal_pay_review: "قيد المراجعة",
+      wal_pay_approved: "تمت الموافقة",
+      wal_pay_rejected: "مرفوضة",
+      wal_calc_title: "الطلبات المُحتسَبة",
+      wal_calc_sub: "طلبات مكتملة ولّدت العمولة",
+      wal_total_orders: "طلب محتسب",
+      wal_col_order: "الطلب",
+      wal_col_value: "القيمة",
+      wal_col_comm: "العمولة",
+      wal_col_date: "التاريخ",
+      wal_rate_note: "العمولة ٥٪ من قيمة كل طلب مكتمل",
+      wal_prepaid_exempt:
+        "الطلبات المدفوعة مسبقاً (تحويل بنكي) لا تُحتسب كعمولة آجلة — تُسوّى مباشرةً عند تحصيل الإدارة لقيمتها.",
+      wal_pay_title: "سداد العمولة",
+      wal_pay_intro:
+        "حوّل قيمة العمولة المستحقّة إلى أحد الحسابات التالية، ثم أرفق صورة إيصال التحويل.",
+      wal_pay_amount: "المبلغ المطلوب تحويله",
+      wal_pay_submitted: "تم إرسال الإيصال للمراجعة",
+      wal_accounts: "الحسابات البنكية للتحويل",
+      myp_title: "منتجاتي المعروضة",
+      myp_total: "إجمالي المنتجات",
+      myp_visible_count: "معروض للزبائن",
+      myp_visible: "معروض",
+      myp_hidden: "مخفي",
+      myp_toggle: "إظهار/إخفاء",
+      myp_delete: "حذف",
+      myp_removed: "تم حذف المنتج",
+      myp_empty: "لا توجد منتجات معروضة بعد",
+      myp_edit: "تعديل",
+      myp_search_ph: "ابحث في منتجاتي…",
+      myp_no_match: "لا توجد نتائج مطابقة",
+      sort_newest: "الأحدث",
+      sort_price_hi: "الأعلى سعراً",
+      sort_price_lo: "الأقل سعراً",
+      sort_name: "الاسم",
+      sort_visible: "المعروض أولاً",
+      edit_product: "تعديل المنتج",
+      save_edits: "حفظ التعديلات",
+      product_updated: "تم تحديث المنتج والسعر",
+      st_rejected: "مرفوض",
+      flt_rejected: "مرفوضة",
+      rej_reject: "رفض الطلب",
+      rej_confirm_q: "سبب الرفض:",
+      rej_out_of_stock: "نفاد الكمية",
+      rej_cancel: "تراجع",
+      rej_reason_label: "السبب",
+      rej_done: "تم رفض الطلب وإشعار الزبون",
+      sub_sellers_blocked: "قسم التوفير مخصص للزبائن والمزارعين",
+      deliver_wholesale_only:
+        "توصيل الجملة عبر ناقلك الخاص — لا يتوفر توكيل لوزي",
+      dash_add_product: "إضافة منتج / محصول جديد",
+      dash_no_orders: "لا توجد طلبات في هذه الحالة",
+      flt_all: "الكل",
+      flt_new: "جديدة",
+      flt_preparing: "قيد التجهيز",
+      flt_delivering: "قيد التوصيل",
+      flt_done: "مكتملة",
+      st_new: "جديد",
+      act_start_prep: "بدء التجهيز",
+      act_out_delivery: "خرج للتوصيل",
+      act_mark_delivered: "تم التسليم",
+      ord_open_map: "فتح الموقع",
+      ord_call: "اتصال",
+      ord_whatsapp: "واتساب",
+      deliver_by: "التوصيل",
+      deliver_self: "مندوبي الخاص",
+      deliver_lozi: "توكيل مندوب لوزي",
+      deliver_choose: "اختر طريقة التوصيل قبل البدء",
+      deliver_lozi_pending: "بانتظار تعيين مندوب من إدارة لوزي",
+      deliver_lozi_assigned: "تم توكيل إدارة لوزي بالتوصيل",
+      profile_title: "حسابي",
+      guest: "ضيف لوزي",
+      acct_type: "نوع الحساب",
+      p_personal: "معلوماتي الشخصية",
+      p_orders: "طلباتي",
+      p_fav: "المفضّلة",
+      p_reports: "البلاغات",
+      p_sub: "اشتراك التوفير",
+      p_settings: "الإعدادات",
+      fav_title: "المفضّلة",
+      no_fav: "لا توجد منتجات مفضّلة",
+      reports_title: "البلاغات",
+      new_report: "بلاغ جديد",
+      no_reports: "لا توجد بلاغات",
+      report_pick_type: "اختر نوع البلاغ",
+      report_pick_sub: "ساعدنا في الحفاظ على جودة وأمانة لوزي",
+      rep_retail: "بلاغ على محل تجزئة",
+      rep_retail_desc: "جودة، توصيل، تسعيرة أو تعامل متجر تجزئة",
+      rep_farmer: "بلاغ على مزارع",
+      rep_farmer_desc: "مشكلة في منتج مزرعة أو تعامل مزارع",
+      rep_general: "بلاغ عام",
+      rep_general_desc: "اكتب الموضوع والوصف بنفسك",
+      rep_target_store: "محل التجزئة المعني",
+      rep_target_farmer: "المزارع المعني",
+      rep_target_ph: "اكتب اسم المتجر أو المزارع",
+      rep_subject: "الموضوع",
+      rep_subject_ph: "عنوان مختصر للبلاغ",
+      rep_desc: "وصف المشكلة",
+      rep_desc_ph: "اشرح المشكلة بالتفصيل ليتسنى لنا اتخاذ الإجراء…",
+      rep_attach: "إرفاق صورة (اختياري)",
+      rep_submit: "إرسال البلاغ",
+      rep_sent: "تم إرسال بلاغك للإدارة ✓",
+      rep_confidential: "يُرسل البلاغ للإدارة بسرّية تامة ولا يظهر للعامة.",
+      rep_st_review: "قيد المراجعة",
+      rep_st_resolved: "تمت المعالجة",
+      rep_st_rejected: "مرفوض",
+      rep_admin_reply: "رد الإدارة",
+      rep_about: "بخصوص",
+      rep_about_order: "بخصوص الطلب",
+      rep_report_issue: "الإبلاغ عن مشكلة",
+      rep_empty: "لا توجد بلاغات سابقة",
+      rep_empty_sub: "إذا واجهت أي مشكلة، أنشئ بلاغاً وسنتابعه معك.",
+      notif_title: "الإشعارات",
+      notif_empty: "لا توجد إشعارات",
+      notif_empty_sub: "ستصلك هنا تحديثات طلباتك وبلاغاتك والعروض.",
+      notif_today: "اليوم",
+      notif_earlier: "الأقدم",
+      notif_view: "عرض",
+      courier_title: "مندوب التوصيل",
+      courier_call: "اتصال",
+      courier_chat: "واتساب",
+      change_address: "تغيير العنوان",
+      edit_address_title: "عنوان التوصيل",
+      edit_address_note: "غيّر عنوان هذا الطلب إن أحببت توصيله لمكان آخر.",
+      pick_on_map: "تحديد على الخريطة",
+      map_title: "حدّد موقعك",
+      map_hint: "اسحب الخريطة أو انقر لتحريك الدبّوس إلى باب المنزل.",
+      map_confirm: "تأكيد الموقع",
+      map_located: "تم تحديد الموقع على الخريطة",
+      map_pinned_chip: "محدّد على الخريطة",
+      use_my_location: "موقعي الحالي",
+      settings_title: "الإعدادات",
+      language: "اللغة",
+      currency_label: "العملة",
+      currency_yer: "ريال يمني",
+      currency_sar: "ريال سعودي",
+      currency_note: "الريال اليمني هو العملة الأساسية في كل التعاملات",
+      theme_label: "المظهر",
+      theme_light: "نهار",
+      theme_dark: "ليل",
+      theme_auto: "تلقائي",
+      theme_auto_note:
+        "يتحوّل تلقائياً إلى الليلي بعد الغروب (٦ مساءً) وإلى النهاري بعد الشروق (٦ صباحاً)",
+      location: "الموقع",
+      wa_support: "دعم واتساب",
+      sup_title: "دعم واتساب",
+      sup_intro: "فريق لوزي جاهز لمساعدتك. تواصل معنا مباشرة عبر واتساب.",
+      sup_primary: "رئيسي",
+      sup_admin_open: "إدارة الأرقام (مسؤول)",
+      sup_admin_title: "إدارة أرقام الدعم",
+      sup_pin_title: "دخول المسؤول",
+      sup_pin_hint: "أدخل رمز المسؤول لتعديل أرقام الدعم أو إضافة رقم آخر.",
+      sup_pin_ph: "رمز المسؤول",
+      sup_pin_wrong: "رمز غير صحيح، حاول مرة أخرى",
+      sup_enter: "دخول",
+      sup_label_lbl: "اسم/وصف الرقم",
+      sup_label_ph: "مثال: الدعم الرئيسي",
+      sup_number_lbl: "رقم الواتساب",
+      sup_number_ph: "7XXXXXXXX",
+      sup_make_primary: "تعيين كرئيسي",
+      sup_is_primary: "الرقم الرئيسي",
+      sup_add: "إضافة رقم آخر",
+      sup_save: "حفظ التغييرات",
+      sup_saved: "تم حفظ أرقام الدعم ✓",
+      sup_delete: "حذف",
+      sup_exit_admin: "إنهاء وضع المسؤول",
+      sup_min_one: "يجب إبقاء رقم واحد على الأقل بصيغة صحيحة",
+      logout: "تسجيل الخروج",
+      arabic: "العربية",
+      english: "English",
+      savings_title: "قسم التوفير",
+      savings_hero: "منتجات مختارة بأسعار أقل",
+      savings_desc: "منتجات مختارة من لوزي بأسعار أقل.",
+      subscribe_now: "اشترك الآن",
+      members_only: "للمشتركين فقط",
+      special_price: "سعر التوفير",
+      normal_price: "السعر العادي",
+      sub_title: "اشترك في التوفير",
+      sub_intro:
+        "احصل على أسعار خاصة على منتجات لوزي. الاشتراك سنوي عبر تحويل بنكي ثم مراجعة الإدارة ورفع سند الدفع.",
+      sub_accounts: "حوّل قيمة الاشتراك إلى أحد الحسابات",
+      copy: "نسخ",
+      copied: "نُسخ ✓",
+      sub_upload: "أرفق صورة إيصال التحويل",
+      sub_upload_hint: "اسحب صورة الإيصال هنا",
+      sub_submit: "إرسال للمراجعة",
+      sub_pending: "قيد المراجعة",
+      sub_pending_sub: "سنراجع إيصالك ونفعّل اشتراكك خلال وقت قصير.",
+      sub_active: "اشتراكك مفعّل ✓",
+      sub_duration_label: "مدة الاشتراك",
+      sub_duration_val: "سنة كاملة",
+      sub_start: "تاريخ الاشتراك",
+      sub_expiry: "تاريخ الانتهاء",
+      sub_price_label: "قيمة الاشتراك",
+      sub_renew: "تجديد الاشتراك",
+      sub_details: "تفاصيل الاشتراك",
+      sub_not_member: "لست مشتركاً بعد",
+      done: "تم",
+      qty: "الكمية",
+      back: "رجوع",
+      add_product: "أضف منتجك",
+      add_crop: "أضف محصولك",
+      add_product_sub_farmer: "انشر محصولك ليصل إلى الزبائن",
+      add_product_sub_retail: "انشر منتجك في قسم التجزئة",
+      add_product_sub_wholesale: "انشر منتجك في قسم الجملة",
+      publish_to: "سيُنشر في قسم",
+      publish_locked_note:
+        "يمكنك النشر في قسمك فقط — لا يمكن النشر في أقسام أخرى.",
+      crop_name: "اسم المنتج",
+      crop_name_ph: "مثال: لوز جبري",
+      crop_weight: "الوزن",
+      crop_weight_ph: "مثال: ٥٠٠ غ · ١ كجم · ٣ كجم",
+      weight_custom: "وزن مخصص",
+      qadah_label: "قدح",
+      qadah_weight_label: "وزن القدح",
+      qadah_hint: "حدد وزن القدح بالكيلو — يختلف حسب المحصول.",
+      crop_price: "السعر بالريال اليمني",
+      crop_price_ph: "مثال: 7000",
+      publish_crop: "نشر المنتج",
+      crop_published: "تم نشر المنتج ✓",
+      my_farm: "مزرعتي",
+      shahti_badge: "خالي من الشحطي",
+      shahti_meaning: "خالٍ من المرارة",
+      shahti_for_baladi: "حصرية للوز البلدي فقط",
+      shahti_request: "اطلب شارة «خالي من الشحطي»",
+      shahti_only_baladi_note:
+        "لا تشمل اللوز الأفغاني أو الأسترالي ولا لوز التجزئة والجملة.",
+      shahti_cond_sample: "إرسال عينة من اللوز المراد نشره ليتم فحصها.",
+      shahti_cond_inspect: "أرسل العينة إلى موقع الفحص التالي:",
+      shahti_loc_label: "موقع استلام العينات",
+      shahti_loc_name: "محل وكالة بيت المكسرات",
+      shahti_loc_addr: "صنعاء – شارع خولان – عمارة الحبيشي",
+      shahti_phone: "777184208",
+      call_wa: "واتساب",
+      shahti_pending: "بانتظار فحص العينة",
+      shahti_verified_title: "شارة «خالي من الشحطي»",
+      shahti_verified_desc: "تم فحص عينة اللوز واعتمادها — خالٍ من المرارة.",
+      shahti_inspect_by: "جهة الفحص",
+    },
+    en: {
+      dir: "ltr",
+      appName: "LOZI",
+      tagline: "Premium Yemeni Nuts",
+      nav_home: "Home",
+      nav_stores: "Sections",
+      nav_savings: "Savings",
+      nav_cart: "Cart",
+      nav_profile: "Profile",
+      welcome: "Welcome to LOZI",
+      register_title: "Create account",
+      choose_role: "Choose your account type",
+      choose_role_sub: "Each type has a different experience",
+      role_customer: "Customer",
+      role_customer_d: "Browse and order nuts",
+      role_farmer: "Farmer",
+      role_farmer_d: "Publish your almond or raisin crop",
+      role_retail: "Retail shop",
+      role_retail_d: "Sell to customers, buy wholesale",
+      role_wholesale: "Wholesale shop",
+      role_wholesale_d: "Sell wholesale to retailers",
+      farmer_kind: "Crop type",
+      farmer_almond: "Almonds",
+      farmer_raisin: "Raisins",
+      country: "Country",
+      yemen: "Yemen",
+      yemen_only: "Registration is currently available in Yemen only",
+      cont: "Continue",
+      login_sub: "Sign in to start shopping",
+      google: "Continue with Google",
+      whatsapp_otp: "WhatsApp code",
+      remember: "Remember me",
+      skip: "Skip for now",
+      agree_pre: "By continuing you agree to the",
+      terms_link: "Terms & Conditions",
+      terms_title: "Terms & Conditions",
+      terms_draft: "Preliminary draft — final text will be adopted soon",
+      terms_agree: "Agree & continue",
+      pinfo_title: "My personal info",
+      pinfo_required: "Complete your info to continue",
+      pinfo_hint: "Required when registering with Google",
+      full_name: "Full name",
+      full_name_ph: "e.g. Mohammed Ahmed",
+      phone: "Phone number",
+      phone_ph: "7X XXX XXXX",
+      save: "Save",
+      saved: "Saved ✓",
+      pinfo_edit_hint: "You can edit your name, number and location any time",
+      my_location: "My location",
+      city: "City",
+      city_ph: "e.g. Sanaa",
+      address: "Detailed address",
+      address_ph: "District, street, nearest landmark…",
+      no_location: "You haven’t set your address yet",
+      search_ph: "Search almonds, raisins, stores…",
+      pride_line: "With Lozi, you support your national economy · 100% Yemeni",
+      cats: "Sections",
+      sec_almond: "Almonds",
+      sec_raisin: "Raisins",
+      sec_retail: "Retail",
+      sec_wholesale: "Wholesale",
+      cat_savings: "Savings",
+      offers: "Today's offers",
+      featured_stores: "Featured stores",
+      see_all: "See all",
+      stores_title: "Sections",
+      almond_type: "Almond type",
+      raisin_type: "Raisin type",
+      all_types: "All types",
+      stores_in_sec: "Stores",
+      products_in_sec: "Products",
+      reviews: "reviews",
+      verified: "Verified",
+      offers_avail: "Available offers",
+      no_offers: "No current offers",
+      off_discount: "Discount",
+      off_free_min: "Free delivery on orders over",
+      off_bundle: "Bundle offer",
+      wholesale_badge: "Wholesale",
+      wholesale_locked: "Wholesale market is for retail shops only",
+      contact_wa: "Contact on WhatsApp",
+      store_products: "Store products",
+      variety_label: "Type",
+      add_to_cart: "Add to cart",
+      added: "Added ✓",
+      description: "Description",
+      per: "per",
+      buy_mode_weight: "By weight",
+      buy_mode_amount: "By amount",
+      amount_label: "Amount (YER)",
+      amount_ph: "Enter amount",
+      approx_qty: "Approx. quantity",
+      min_amount_note: "Minimum 500 YER",
+      min_quarter_note: "Minimum quarter kilo (250 g)",
+      grams_short: "g",
+      cart_title: "Your cart",
+      cart_per_store_note:
+        "Each store is a separate order — different stores can’t be merged into one order.",
+      order_from: "Order from",
+      checkout_this: "Checkout this order",
+      cart_empty: "Your cart is empty",
+      cart_empty_sub: "Browse stores and add what you like",
+      browse: "Browse sections",
+      subtotal: "Subtotal",
+      delivery_fee: "Delivery fee",
+      total: "Total",
+      checkout: "Checkout",
+      checkout_title: "Checkout",
+      delivery_to: "Delivery to",
+      edit: "Edit",
+      order_summary: "Order summary",
+      payment: "Payment",
+      cod: "Cash on delivery",
+      cod_sub: "Pay cash when your order arrives",
+      pay_prepaid: "Prepay now",
+      pay_prepaid_sub: "Pay now by bank transfer",
+      prepaid_title: "Prepay your order",
+      prepaid_intro:
+        "Transfer the order amount to one of our accounts below, then attach the transfer receipt for review.",
+      prepaid_accounts: "Transfer the order amount to one of these accounts",
+      prepaid_amount: "Order amount",
+      prepaid_send: "Send transfer notification",
+      prepaid_sent_toast:
+        "Transfer notification sent — your order is under review",
+      success_review_sub:
+        "Your transfer notification was sent and your order is now under review.",
+      order_review_note:
+        "Transfer notification sent. Payment is under review; preparation starts once confirmed.",
+      confirm_order: "Confirm order",
+      order_placed: "Order placed!",
+      order_placed_sub: "We'll start preparing it now",
+      track_order: "Track order",
+      orders_title: "My orders",
+      orders_hint_seller:
+        "These are your own purchases from the platform (a retail shop can buy from wholesale). To manage your customers’ orders open “Orders”.",
+      orders_hint_wholesale:
+        "These are your own purchases from the platform. To manage your customers’ orders open “Orders”.",
+      no_orders: "No orders yet",
+      reorder: "Reorder",
+      cancel_order: "Cancel",
+      st_received: "Received",
+      st_payreview: "Payment under review",
+      st_preparing: "Preparing",
+      st_delivering: "Delivering",
+      st_delivered: "Delivered",
+      order_no: "Order",
+      items_count: "items",
+      order_total: "Total",
+      nav_dashboard: "Orders",
+      dash_retail: "Store dashboard",
+      dash_wholesale: "Wholesale dashboard",
+      dash_farm: "Farm dashboard",
+      dash_new_orders: "New orders",
+      dash_active: "In progress",
+      dash_today_sales: "Today's sales",
+      dash_total_sales: "Total sales",
+      dash_products: "products",
+      dash_my_products: "My products on display",
+      dash_add_short: "Add product",
+      nav_wallet: "Wallet",
+      wal_title: "My Wallet",
+      wal_due_label: "Commission due",
+      wal_due_sub: "Total commission on completed orders",
+      wal_deadline: "Payment due date",
+      wal_deadline_val: "June 30",
+      wal_pay: "Pay commission",
+      wal_status_title: "Store status",
+      wal_st_active: "Active",
+      wal_st_active_sub:
+        "Your store is operating normally and all commissions are paid.",
+      wal_st_due: "Payment due soon",
+      wal_st_due_sub:
+        "Little time left to pay the commission due, to avoid suspension.",
+      wal_st_suspended: "Suspended",
+      wal_st_suspended_sub:
+        "Your store is temporarily suspended for unpaid commission. Pay now to reactivate.",
+      wal_preview: "Preview status (demo only)",
+      wal_c_green: "Green",
+      wal_c_orange: "Orange",
+      wal_c_red: "Red",
+      wal_last_pay: "Last payment",
+      wal_last_pay_on: "on",
+      wal_pay_review: "Under review",
+      wal_pay_approved: "Approved",
+      wal_pay_rejected: "Rejected",
+      wal_calc_title: "Counted orders",
+      wal_calc_sub: "Completed orders that generated commission",
+      wal_total_orders: "counted orders",
+      wal_col_order: "Order",
+      wal_col_value: "Value",
+      wal_col_comm: "Commission",
+      wal_col_date: "Date",
+      wal_rate_note: "Commission is 5% of each completed order value",
+      wal_prepaid_exempt:
+        "Prepaid orders (bank transfer) are not counted as deferred commission — they are settled directly when the platform collects the amount.",
+      wal_pay_title: "Pay commission",
+      wal_pay_intro:
+        "Transfer the commission due to one of the accounts below, then attach the transfer receipt.",
+      wal_pay_amount: "Amount to transfer",
+      wal_pay_submitted: "Receipt submitted for review",
+      wal_accounts: "Bank accounts for transfer",
+      myp_title: "My products on display",
+      myp_total: "Total products",
+      myp_visible_count: "Visible to customers",
+      myp_visible: "On display",
+      myp_hidden: "Hidden",
+      myp_toggle: "Show/hide",
+      myp_delete: "Delete",
+      myp_removed: "Product removed",
+      myp_empty: "No products on display yet",
+      myp_edit: "Edit",
+      myp_search_ph: "Search my products…",
+      myp_no_match: "No matching results",
+      sort_newest: "Newest",
+      sort_price_hi: "Highest price",
+      sort_price_lo: "Lowest price",
+      sort_name: "Name",
+      sort_visible: "On display first",
+      edit_product: "Edit product",
+      save_edits: "Save changes",
+      product_updated: "Product and price updated",
+      st_rejected: "Rejected",
+      flt_rejected: "Rejected",
+      rej_reject: "Reject order",
+      rej_confirm_q: "Rejection reason:",
+      rej_out_of_stock: "Out of stock",
+      rej_cancel: "Cancel",
+      rej_reason_label: "Reason",
+      rej_done: "Order rejected and customer notified",
+      sub_sellers_blocked: "Savings is for customers and farmers only",
+      deliver_wholesale_only:
+        "Wholesale delivery via your own carrier — LOZI courier not available",
+      dash_add_product: "Add a new product / crop",
+      dash_no_orders: "No orders in this state",
+      flt_all: "All",
+      flt_new: "New",
+      flt_preparing: "Preparing",
+      flt_delivering: "Delivering",
+      flt_done: "Completed",
+      st_new: "New",
+      act_start_prep: "Start preparing",
+      act_out_delivery: "Out for delivery",
+      act_mark_delivered: "Mark delivered",
+      ord_open_map: "Open map",
+      ord_call: "Call",
+      ord_whatsapp: "WhatsApp",
+      deliver_by: "Delivery",
+      deliver_self: "My own courier",
+      deliver_lozi: "Delegate to LOZI",
+      deliver_choose: "Choose a delivery method first",
+      deliver_lozi_pending: "Waiting for LOZI to assign a courier",
+      deliver_lozi_assigned: "LOZI courier assigned",
+      profile_title: "Profile",
+      guest: "LOZI Guest",
+      acct_type: "Account type",
+      p_personal: "My personal info",
+      p_orders: "My orders",
+      p_fav: "Favorites",
+      p_reports: "Reports",
+      p_sub: "Savings membership",
+      p_settings: "Settings",
+      fav_title: "Favorites",
+      no_fav: "No favorite products",
+      reports_title: "Reports",
+      new_report: "New report",
+      no_reports: "No reports",
+      report_pick_type: "Choose report type",
+      report_pick_sub: "Help us keep LOZI quality and integrity high",
+      rep_retail: "Report a retail store",
+      rep_retail_desc:
+        "Quality, delivery, pricing or conduct of a retail store",
+      rep_farmer: "Report a farmer",
+      rep_farmer_desc: "Issue with a farm product or a farmer’s conduct",
+      rep_general: "General report",
+      rep_general_desc: "Write the subject and description yourself",
+      rep_target_store: "Retail store concerned",
+      rep_target_farmer: "Farmer concerned",
+      rep_target_ph: "Type the store or farmer name",
+      rep_subject: "Subject",
+      rep_subject_ph: "A short title for the report",
+      rep_desc: "Describe the issue",
+      rep_desc_ph: "Explain the issue in detail so we can act…",
+      rep_attach: "Attach a photo (optional)",
+      rep_submit: "Submit report",
+      rep_sent: "Your report was sent to admin ✓",
+      rep_confidential:
+        "Reports are sent to admin confidentially and never shown publicly.",
+      rep_st_review: "Under review",
+      rep_st_resolved: "Resolved",
+      rep_st_rejected: "Rejected",
+      rep_admin_reply: "Admin reply",
+      rep_about: "About",
+      rep_about_order: "About order",
+      rep_report_issue: "Report an issue",
+      rep_empty: "No previous reports",
+      rep_empty_sub:
+        "If you face any problem, file a report and we’ll follow up.",
+      notif_title: "Notifications",
+      notif_empty: "No notifications",
+      notif_empty_sub:
+        "Order updates, report replies and offers will appear here.",
+      notif_today: "Today",
+      notif_earlier: "Earlier",
+      notif_view: "View",
+      courier_title: "Delivery courier",
+      courier_call: "Call",
+      courier_chat: "WhatsApp",
+      change_address: "Change address",
+      edit_address_title: "Delivery address",
+      edit_address_note:
+        "Change this order’s address if you’d like it delivered elsewhere.",
+      pick_on_map: "Pick on map",
+      map_title: "Set your location",
+      map_hint: "Drag the map or tap to move the pin to your door.",
+      map_confirm: "Confirm location",
+      map_located: "Location set on the map",
+      map_pinned_chip: "Pinned on map",
+      use_my_location: "My current location",
+      settings_title: "Settings",
+      language: "Language",
+      currency_label: "Currency",
+      currency_yer: "Yemeni Rial",
+      currency_sar: "Saudi Rial",
+      currency_note: "Yemeni Rial is the base currency for all transactions",
+      theme_label: "Appearance",
+      theme_light: "Day",
+      theme_dark: "Night",
+      theme_auto: "Auto",
+      theme_auto_note:
+        "Switches to night after sunset (6 PM) and back to day after sunrise (6 AM)",
+      location: "Location",
+      wa_support: "WhatsApp support",
+      sup_title: "WhatsApp support",
+      sup_intro:
+        "The LOZI team is here to help. Reach us directly on WhatsApp.",
+      sup_primary: "Primary",
+      sup_admin_open: "Manage numbers (admin)",
+      sup_admin_title: "Manage support numbers",
+      sup_pin_title: "Admin access",
+      sup_pin_hint:
+        "Enter the admin code to edit support numbers or add another.",
+      sup_pin_ph: "Admin code",
+      sup_pin_wrong: "Wrong code, try again",
+      sup_enter: "Enter",
+      sup_label_lbl: "Number label",
+      sup_label_ph: "e.g. Main support",
+      sup_number_lbl: "WhatsApp number",
+      sup_number_ph: "7XXXXXXXX",
+      sup_make_primary: "Set as primary",
+      sup_is_primary: "Primary number",
+      sup_add: "Add another number",
+      sup_save: "Save changes",
+      sup_saved: "Support numbers saved ✓",
+      sup_delete: "Delete",
+      sup_exit_admin: "Exit admin mode",
+      sup_min_one: "Keep at least one valid number",
+      logout: "Log out",
+      arabic: "العربية",
+      english: "English",
+      savings_title: "Savings",
+      savings_hero: "Special prices for members",
+      savings_desc:
+        "Selected LOZI products at lower prices — exclusively for members.",
+      subscribe_now: "Subscribe now",
+      members_only: "Members only",
+      special_price: "Savings price",
+      normal_price: "Normal price",
+      sub_title: "Join Savings",
+      sub_intro:
+        "Get special prices on LOZI products. Yearly subscription via bank transfer, then admin review.",
+      sub_accounts: "Transfer the subscription fee to one account",
+      copy: "Copy",
+      copied: "Copied ✓",
+      sub_upload: "Attach the transfer receipt",
+      sub_upload_hint: "Drag the receipt image here",
+      sub_submit: "Submit for review",
+      sub_pending: "Under review",
+      sub_pending_sub:
+        "We'll review your receipt and activate your membership shortly.",
+      sub_active: "Membership active ✓",
+      sub_duration_label: "Duration",
+      sub_duration_val: "One full year",
+      sub_start: "Start date",
+      sub_expiry: "Expiry date",
+      sub_price_label: "Subscription fee",
+      sub_renew: "Renew membership",
+      sub_details: "Subscription details",
+      sub_not_member: "Not a member yet",
+      done: "Done",
+      qty: "Qty",
+      back: "Back",
+      add_product: "Add your product",
+      add_crop: "Add your crop",
+      add_product_sub_farmer: "Publish your crop to reach customers",
+      add_product_sub_retail: "Publish your product in the Retail section",
+      add_product_sub_wholesale:
+        "Publish your product in the Wholesale section",
+      publish_to: "Will be published in",
+      publish_locked_note:
+        "You can only publish in your own section — no cross-posting.",
+      crop_name: "Product name",
+      crop_name_ph: "e.g. Raw Jabri almonds",
+      crop_weight: "Weight",
+      crop_weight_ph: "e.g. 500 g · 1 kg · 3 kg",
+      weight_custom: "Custom weight",
+      qadah_label: "Qadah",
+      qadah_weight_label: "Qadah weight",
+      qadah_hint: "Set the qadah weight in kg — it varies by crop.",
+      crop_price: "Price in Yemeni Rial",
+      crop_price_ph: "e.g. 7000",
+      publish_crop: "Publish product",
+      crop_published: "Product published ✓",
+      my_farm: "My farm",
+      shahti_badge: "Bitter-free (Shahti-free)",
+      shahti_meaning: "Free from bitterness",
+      shahti_for_baladi: "Exclusive to Baladi almonds",
+      shahti_request: "Request the “Bitter-free” seal",
+      shahti_only_baladi_note:
+        "Excludes Afghan/Australian and retail/wholesale almonds.",
+      shahti_cond_sample: "Send a sample of the almonds to be inspected.",
+      shahti_cond_inspect:
+        "Send the sample to the following inspection location:",
+      shahti_loc_label: "Sample drop-off location",
+      shahti_loc_name: "Bait Al-Mukassarat Agency",
+      shahti_loc_addr: "Sanaa – Khawlan St. – Al-Hubaishi Building",
+      shahti_phone: "777184208",
+      call_wa: "WhatsApp",
+      shahti_pending: "Awaiting sample inspection",
+      shahti_verified_title: "“Bitter-free” seal",
+      shahti_verified_desc:
+        "Almond sample inspected and certified — free from bitterness.",
+      shahti_inspect_by: "Inspected by",
+    },
+  },
+  LOZI_SUB = { yer: 500, months: 12 },
+  FARM_ROLES = new Set(["almond_farm", "raisin_farm"]);
+function vendorKey(p) {
+  if (LOZI_SAVINGS.some((s) => s.id === p.id)) return "lozi";
+  const sid = String(p.store || "");
+  if (
+    sid.startsWith("myfarm") ||
+    sid === "mine-almond" ||
+    sid === "mine-raisin"
+  )
+    return "farmers";
+  if (sid.startsWith("mine-")) return sid;
+  const st = LOZI_STORES.find((s) => s.id === p.store);
+  return st && FARM_ROLES.has(st.role) ? "farmers" : st ? st.id : "lozi";
+}
+function vendorInfo(key, lang) {
+  if (key === "farmers")
+    return {
+      name: lang === "ar" ? "منتجات المزارعين" : "Farmers",
+      verified: !0,
+      icon: "leaf",
+    };
+  if (key === "lozi")
+    return {
+      name: lang === "ar" ? "لوزي · التوفير" : "LOZI · Savings",
+      verified: !0,
+      icon: "bolt",
+    };
+  const st = LOZI_STORES.find((s) => s.id === key);
+  return {
+    name: st ? st.name[lang] : key,
+    verified: st && st.verified,
+    icon: st && st.cat === "wholesale" ? "warehouse" : "store",
+  };
+}
+const LOZI_STORES = [],
+  LOZI_PRODUCTS = [],
+  LOZI_SAVINGS = [],
+  LOZI_ACCOUNTS = [
+    {
+      bank: { ar: "حاسب كريمي", en: "Hasab Kuraimi" },
+      name: { ar: "مؤسسة لوزي", en: "LOZI Est." },
+      iban: "1966715",
+      color: "#7A2EC4",
+    },
+    {
+      bank: { ar: "جيب", en: "Jaib" },
+      name: { ar: "مؤسسة لوزي", en: "LOZI Est." },
+      iban: "777184208",
+      color: "#D72638",
+    },
+    {
+      bank: { ar: "جوالي", en: "Jawali" },
+      name: { ar: "مؤسسة لوزي", en: "LOZI Est." },
+      iban: "825084",
+      color: "#E8761A",
+      gradient:
+        "linear-gradient(135deg, #15366B 0%, #F2C200 55%, #ED7B18 100%)",
+    },
+    {
+      bank: { ar: "ون كاش", en: "OneCash" },
+      name: { ar: "مؤسسة لوزي", en: "LOZI Est." },
+      iban: "777184208",
+      color: "#F4951E",
+    },
+  ],
+  LOZI_SUPPORT_SEED = [
+    {
+      id: "s1",
+      label: { ar: "الدعم الرئيسي", en: "Main support" },
+      phone: "777184208",
+      primary: !0,
+    },
+  ],
+  LOZI_ADMIN_PIN = "2030",
+  LOZI_ORDERS_SEED = [],
+  LOZI_REPORTS_SEED = [
+    {
+      id: "20518",
+      typeId: "retail",
+      orderId: "0987",
+      target: { ar: "مكسرات الأصيل", en: "Al-Aseel Nuts" },
+      subject: { ar: "وزن ناقص في الطلب", en: "Underweight order" },
+      desc: {
+        ar: "طلبت كيلو لوز ولما وزنته طلع ٠٨٠ غرام فقط.",
+        en: "I ordered 1kg almonds but it weighed only 880g.",
+      },
+      status: "resolved",
+      date: { ar: "أمس", en: "Yesterday" },
+      reply: {
+        ar: "تم التحقق مع المتجر وإعادة فرق الوزن لك. شكراً لبلاغك.",
+        en: "Verified with the store and refunded the weight difference. Thanks for reporting.",
+      },
+    },
+    {
+      id: "20461",
+      typeId: "general",
+      orderId: null,
+      target: null,
+      subject: {
+        ar: "اقتراح: إضافة دفع إلكتروني",
+        en: "Suggestion: add online payment",
+      },
+      desc: {
+        ar: "حبذا لو تضيفون الدفع عبر المحفظة بجانب الدفع عند الاستلام.",
+        en: "Would love a wallet payment option besides cash on delivery.",
+      },
+      status: "review",
+      date: { ar: "قبل ٣ أيام", en: "3 days ago" },
+      reply: null,
+    },
+  ],
+  LOZI_NOTIFS_SEED = [
+    {
+      id: "n1",
+      type: "status",
+      read: !1,
+      link: "orders",
+      title: {
+        ar: "طلبك في الطريق إليك 🚚",
+        en: "Your order is on the way 🚚",
+      },
+      body: {
+        ar: "الطلب #1031 خرج للتوصيل مع المندوب محمد.",
+        en: "Order #1031 is out for delivery with courier Mohammed.",
+      },
+      time: { ar: "قبل ٥ دقائق", en: "5 min ago" },
+    },
+    {
+      id: "n2",
+      type: "order",
+      read: !1,
+      link: "orders",
+      title: { ar: "تم استلام طلبك ✓", en: "Order received ✓" },
+      body: {
+        ar: "بدأ المتجر بتجهيز الطلب #1042.",
+        en: "The store started preparing order #1042.",
+      },
+      time: { ar: "قبل ساعة", en: "1 hr ago" },
+    },
+    {
+      id: "n3",
+      type: "report",
+      read: !1,
+      link: "reports",
+      title: { ar: "رد الإدارة على بلاغك", en: "Admin replied to your report" },
+      body: {
+        ar: "تمت معالجة بلاغ «وزن ناقص في الطلب» وإعادة الفرق لك.",
+        en: "Your “underweight order” report was resolved and refunded.",
+      },
+      time: { ar: "أمس", en: "Yesterday" },
+    },
+    {
+      id: "n4",
+      type: "offer",
+      read: !0,
+      link: "savings",
+      title: { ar: "عرض توفير جديد 🌰", en: "New savings deal 🌰" },
+      body: {
+        ar: "خصومات حصرية للمشتركين على لوز الموسم الجديد.",
+        en: "Exclusive member discounts on the new-season almonds.",
+      },
+      time: { ar: "قبل يومين", en: "2 days ago" },
+    },
+  ];
+Object.assign(window, {
+  LOZI_T,
+  LOZI_T_UNIT,
+  LOZI_STORES,
+  LOZI_PRODUCTS,
+  LOZI_SAVINGS,
+  LOZI_ACCOUNTS,
+  LOZI_SUPPORT_SEED,
+  LOZI_ADMIN_PIN,
+  LOZI_ORDERS_SEED,
+  LOZI_REPORTS_SEED,
+  LOZI_NOTIFS_SEED,
+  LOZI_RATE: 140,
+  LOZI_SUB,
+  ALMOND_TYPES,
+  ALMOND_LABEL,
+  RAISIN_TYPES,
+  RAISIN_LABEL,
+  VARIETY_LABEL,
+  setCurrency,
+  getCurrency,
+  fmtMoney,
+  moneyStr,
+  vendorKey,
+  vendorInfo,
+  FARM_ROLES,
+});
 
-const{useState:useStateB}=React,FEE=1e3;function fmtPhone(p){var s=String(p==null?"":p).replace(/[^\d]/g,"");s=s.replace(/^00/,"").replace(/^967/,"").replace(/^0+/,"");return s?"+967 "+s:""}function feeFor(items,offers){if(!items||!items.length)return FEE;if(items.some(it=>it.p&&it.p.cat==="wholesale"))return null;const vid=items[0].p._vendor;if(!vid||!items.every(it=>it.p._vendor===vid))return FEE;const off=offers&&offers[vid],min=off&&off.freeDelivery&&off.freeDelivery.min;return min&&items.reduce((a,it)=>a+it.p.price*it.q,0)>=min?0:FEE}function weightKg(p){var raw=p&&p.weight&&(p.weight.ar||p.weight.en||p.weight)||"";var s=String(raw).replace(/[٠-٩]/g,function(d){return "٠١٢٣٤٥٦٧٨٩".indexOf(d)}).replace(/[۰-۹]/g,function(d){return "۰۱۲۳۴۵۶۷۸۹".indexOf(d)});var m=s.match(/[\d.]+/),n=m?parseFloat(m[0]):NaN;if(!isFinite(n)||n<=0)n=1;var isKg=/كجم|كيلو|kg/i.test(s),isG=!isKg&&/غ|جم|غرام|gram/i.test(s);return isG?n/1000:n}const perYear=lang=>lang==="ar"?" / سنة":" / yr";function Product({p,t,lang,onBack,addToCart,fav,onFav,go}){const[qty,setQty]=useStateB(1),[added,setAdded]=useStateB(!1),[byAmount,setByAmount]=useStateB(!1),[amount,setAmount]=useStateB(""),store=LOZI_STORES.find(s=>s.id===p.store),imgs=(p.images&&p.images.length?p.images:[p.img]).filter(Boolean),soldOut=p.stock!=null&&p.stock<=0,maxQty=p.stock!=null?Math.max(0,Math.floor(p.stock)):999,unit=p.stockUnit||"",isConsumer=p.cat!=="wholesale",wKg=weightKg(p),pricePerKg=wKg>0?p.price/wKg:p.price,isQuarter=["almond","raisin","savings"].indexOf(p.cat)>=0,amtMin=isQuarter?Math.max(1,Math.ceil(pricePerKg*0.25)):500,amtNum=Math.max(0,Math.round(Number(amount)||0)),estGrams=pricePerKg>0?Math.round(amtNum/pricePerKg*1000):0,amtValid=amtNum>=amtMin,doAdd=()=>{if(soldOut)return;if(byAmount){if(!amtValid)return;addToCart(p,amtNum/p.price,{byAmount:!0,grams:estGrams,amount:amtNum})}else addToCart(p,qty);setAdded(!0),setTimeout(()=>setAdded(!1),1400)};return React.createElement("div",{className:"screen product"},React.createElement("div",{className:"pd-gallery"},React.createElement("button",{className:"hero-back",onClick:onBack},React.createElement(Icon,{name:t.dir==="rtl"?"chevron":"back",size:22,color:"var(--ink)"})),React.createElement("button",{className:`pd-fav ${fav?"on":""}`,onClick:()=>onFav(p.id)},React.createElement(Icon,{name:"heart",size:20,color:fav?"#fff":"var(--ink)",fill:fav})),React.createElement(LoziCarousel,{images:imgs,ph:lang==="ar"?"صورة المنتج":"Product",t,lang,arrows:!0,dotsClickable:!0,loop:!1,zoomable:!0})),React.createElement("div",{className:"pd-body"},store&&React.createElement("button",{className:"pd-store",onClick:()=>go("store",{store})},React.createElement(Icon,{name:"store",size:14,color:"var(--green-deep)"}),store.name[lang],store.verified&&React.createElement(VerifiedSeal,{size:14})),!store&&p._vendor&&React.createElement("button",{className:"pd-store",onClick:()=>go("vstore",{vendorId:p._vendor})},React.createElement(Icon,{name:"store",size:14,color:"var(--green-deep)"}),"زيارة المتجر"),React.createElement("h1",{className:"pd-name"},p.name[lang]),p.bundle?React.createElement("div",{className:"pd-weight"},lang==="ar"?"عرض مشكّل · سعر ثابت":"Mixed bundle · fixed price"):React.createElement("div",{className:"pd-weight"},t.per," ",p.weight[lang]),soldOut?React.createElement("div",{className:"pd-soldout"},React.createElement(Icon,{name:"close",size:14,color:"var(--danger)",stroke:3}),"نفد المخزون حالياً"):p.stock!=null&&React.createElement("div",{className:"pd-variety"},React.createElement(Icon,{name:"store",size:14,color:"var(--green-deep)"}),"المتوفّر: ",React.createElement("b",null,p.stock," ",unit)),p.availKg&&!soldOut&&React.createElement("div",{className:"pd-variety"},React.createElement(Icon,{name:"leaf",size:14,color:"var(--green-deep)"}),"متوفر ≈ ",React.createElement("b",null,p.availKg," كجم")),p.variety&&React.createElement("div",{className:"pd-variety"},React.createElement(Icon,{name:"leaf",size:14,color:"var(--green-deep)"}),t.variety_label,": ",React.createElement("b",null,VARIETY_LABEL(p.variety,lang))),p.shahtiStatus==="approved"&&React.createElement("div",{className:"shahti-card"},React.createElement("span",{className:"shahti-seal"},React.createElement(ShahtiGlyph,{size:20})),React.createElement("div",{className:"shahti-card-txt"},React.createElement("strong",null,t.shahti_verified_title),React.createElement("span",null,t.shahti_verified_desc),p.inspect&&React.createElement("span",{className:"shahti-inspect"},React.createElement(Icon,{name:"location",size:12,color:"var(--gold-deep)"}),t.shahti_inspect_by,": ",p.inspect[lang]))),React.createElement("div",{className:"pd-price-row"},React.createElement(Money,{v:p.price,cls:"pd-price",small:!0}),p.old&&React.createElement("span",{className:"price-old lg"},fmtMoney(p.old).value)),React.createElement("div",{className:"pd-sec-title"},t.description),React.createElement("p",{className:"pd-desc"},p.desc[lang]),p.bundle&&Array.isArray(p.items)&&p.items.length>0&&React.createElement("div",{className:"pd-bundle"},React.createElement("div",{className:"pd-sec-title"},lang==="ar"?"محتويات العرض المشكّل":"Bundle contents"),React.createElement("div",{className:"pd-bundle-list"},p.items.map((it,i)=>React.createElement("div",{className:"pd-bundle-item",key:i},React.createElement("span",{className:"pbi-name"},it.name||""),React.createElement("span",{className:"pbi-weight"},((it.weight!=null?String(it.weight):"")+(it.unit?(it.unit==="kilo"?" كيلو":" جرام"):"")).trim())))),React.createElement("div",{className:"pd-bundle-note"},React.createElement(Icon,{name:"check",size:13,color:"var(--green-deep)",stroke:3}),lang==="ar"?"يُباع العرض كاملاً بمحتوياته وأوزانه الثابتة.":"Sold as one fixed bundle — contents and weights can't be changed."))),isConsumer&&!p.bundle&&React.createElement("div",{className:"buy-mode",style:{padding:"0 16px 8px"}},React.createElement("div",{className:"chip-wrap",style:{marginBottom:8}},React.createElement("button",{className:"chip "+(byAmount?"":"on"),onClick:()=>setByAmount(!1)},t.buy_mode_weight),React.createElement("button",{className:"chip "+(byAmount?"on":""),onClick:()=>setByAmount(!0)},t.buy_mode_amount)),byAmount&&React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},t.amount_label),React.createElement("input",{className:"inp",type:"number",inputMode:"numeric",min:amtMin,value:amount,onChange:e=>setAmount(e.target.value),placeholder:t.amount_ph}),React.createElement("div",{style:{fontSize:12.5,color:"var(--muted)",marginTop:6}},isQuarter?t.min_quarter_note:t.min_amount_note),amtNum>0&&React.createElement("div",{style:{marginTop:6,fontWeight:700,color:"var(--green-deep)"}},t.approx_qty," · ≈ ",estGrams," ",t.grams_short))),React.createElement("div",{className:"pd-footer"},!byAmount&&React.createElement("div",{className:"stepper big"},React.createElement("button",{onClick:()=>setQty(Math.max(1,qty-1))},React.createElement(Icon,{name:qty<=1?"trash":"minus",size:18,color:"var(--ink)"})),React.createElement("span",null,qty,unit?" "+unit:""),React.createElement("button",{disabled:qty>=maxQty,onClick:()=>setQty(Math.min(maxQty,qty+1))},React.createElement(Icon,{name:"plus",size:18,color:"var(--ink)"}))),React.createElement("button",{className:`btn btn-green flex1 ${added?"ok":""}`,disabled:soldOut||byAmount&&!amtValid,onClick:doAdd},React.createElement(Icon,{name:added?"check":"cart",size:20,color:"#fff",stroke:added?3:2}),React.createElement("span",null,soldOut?"نفد المخزون":added?t.added:`${t.add_to_cart} · ${moneyStr(byAmount?amtNum:p.price*qty)}`))))}function Cart({t,lang,items,setQty,removeItem,go,offers,storesMap}){if(!items.length)return React.createElement("div",{className:"screen cart empty-screen"},React.createElement("h2",{className:"screen-title"},t.cart_title),React.createElement("div",{className:"empty"},React.createElement("div",{className:"empty-ic"},React.createElement(Icon,{name:"cart",size:40,color:"var(--gold-deep)"})),React.createElement("h3",null,t.cart_empty),React.createElement("p",null,t.cart_empty_sub),React.createElement(PrimaryBtn,{icon:"store",onClick:()=>go("sections")},t.browse)));const groups={};items.forEach(it=>{const k=it.p._vendor||vendorKey(it.p);(groups[k]=groups[k]||[]).push(it)});const keys=Object.keys(groups);return React.createElement("div",{className:"screen cart"},React.createElement("h2",{className:"screen-title"},t.cart_title),React.createElement("div",{className:"cart-note"},React.createElement(Icon,{name:"store",size:15,color:"var(--green-deep)"}),t.cart_per_store_note),keys.map(k=>{const grp=groups[k],mo=storesMap&&storesMap[k],sname=mo&&mo.name||"متجر",subtotal=grp.reduce((a,it)=>a+it.p.price*it.q,0),fee=feeFor(grp,offers),minAmt=mo&&mo.minOrderEnabled&&mo.minOrderAmount>0?mo.minOrderAmount:0,belowMin=minAmt>0&&subtotal<minAmt;return React.createElement("div",{key:k,className:"cart-group"},React.createElement("div",{className:"cg-head"},React.createElement("span",{className:"cg-ic"},React.createElement(Icon,{name:"store",size:16,color:"#fff"})),React.createElement("span",{className:"cg-name"},sname),React.createElement("span",{className:"cg-tag"},t.order_from)),React.createElement("div",{className:"cart-list cg-list"},grp.map(it=>React.createElement("div",{key:it.p.id,className:"cart-row"},React.createElement(Img,{id:it.p.img,ph:"",radius:14,style:{width:64,height:64,flexShrink:0}}),React.createElement("div",{className:"cart-mid"},React.createElement("div",{className:"cart-name"},it.p.name[lang]),React.createElement("div",{className:"cart-weight"},it.byAmount?"≈ "+it.grams+" "+t.grams_short:it.p.weight[lang]),it.byAmount?React.createElement("div",{className:"cart-price"},moneyStr(it.amount)):React.createElement(Money,{v:it.p.price,cls:"cart-price",small:!0})),it.byAmount?React.createElement("button",{className:"cart-del-btn",onClick:()=>removeItem(it.p.id),style:{width:40,height:40,borderRadius:12,border:"1px solid var(--sand-2)",background:"#fff",flexShrink:0}},React.createElement(Icon,{name:"trash",size:16,color:"var(--ink)"})):React.createElement("div",{className:"stepper"},React.createElement("button",{onClick:()=>it.q<=1?removeItem(it.p.id):setQty(it.p.id,it.q-1)},React.createElement(Icon,{name:it.q<=1?"trash":"minus",size:15,color:"var(--ink)"})),React.createElement("span",null,it.q),React.createElement("button",{onClick:()=>setQty(it.p.id,it.q+1)},React.createElement(Icon,{name:"plus",size:15,color:"var(--ink)"})))))),React.createElement("div",{className:"cg-summary"},React.createElement("div",{className:"sum-row"},React.createElement("span",null,t.subtotal),React.createElement("b",null,moneyStr(subtotal))),React.createElement("div",{className:"sum-row"},React.createElement("span",null,t.delivery_fee),React.createElement("b",null,fee==null?React.createElement("span",{className:"free-deliv"},"يحدّدها المشرف"):fee===0?React.createElement("span",{className:"free-deliv"},"توصيل مجاني"):moneyStr(fee))),React.createElement("div",{className:"sum-row total"},React.createElement("span",null,t.total),React.createElement("b",null,moneyStr(subtotal+(fee||0)))),belowMin&&React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"6px",color:"var(--danger)",fontWeight:800,fontSize:"12.5px",lineHeight:1.5,margin:"2px 0 10px"}},React.createElement(Icon,{name:"shield",size:15,color:"var(--danger)"}),"الحد الأدنى للطلب من هذا المتجر "+moneyStr(minAmt)+" — أضِف منتجات للوصول إليه."),React.createElement("button",{className:"btn btn-green",disabled:belowMin,onClick:()=>{if(belowMin)return;go("checkout",{vendor:k})}},React.createElement("span",null,t.checkout_this),React.createElement(Icon,{name:lang==="ar"?"back":"fwd",size:18,color:"#fff"}))))}))}function Checkout({t,lang,items,vendor,person,onSaveAddress,onBack,onConfirm,offers,storesMap}){const subtotal=items.reduce((a,it)=>a+it.p.price*it.q,0),fee=feeFor(items,offers),mo=storesMap&&storesMap[vendor],sname=mo&&mo.name||"متجر",minAmt=mo&&mo.minOrderEnabled&&mo.minOrderAmount>0?mo.minOrderAmount:0,belowMin=minAmt>0&&subtotal<minAmt,[city,setCity]=useStateB(person&&person.city?person.city:lang==="ar"?"صنعاء":"Sanaa"),[address,setAddress]=useStateB(person&&person.address?person.address:lang==="ar"?"شارع الزبيري، حارة ٧":"Az-Zubairi St., Lane 7"),[pinned,setPinned]=useStateB(!1),[editOpen,setEditOpen]=useStateB(!1),[pay,setPay]=useStateB("prepaid"),[prepaidOpen,setPrepaidOpen]=useStateB(!1),addrLine=[city,address].filter(Boolean).join("، "),saveAddr=(c,a,p)=>{setCity(c),setAddress(a),setPinned(p),onSaveAddress&&onSaveAddress({city:c,address:a}),setEditOpen(!1)};return React.createElement("div",{className:"screen checkout"},React.createElement(TopBar,{title:t.checkout_title,onBack,t}),React.createElement("div",{className:"co-scroll"},vendor&&React.createElement("div",{className:"co-vendor"},React.createElement("span",{className:"co-vendor-ic"},React.createElement(Icon,{name:"store",size:16,color:"#fff"})),t.order_from," · ",React.createElement("b",null,sname)),React.createElement("div",{className:"co-block"},React.createElement("div",{className:"co-label"},t.delivery_to),React.createElement("div",{className:"co-addr"},React.createElement("span",{className:"co-addr-ic"},React.createElement(Icon,{name:"location",size:18,color:"var(--green-deep)"})),React.createElement("div",{className:"co-addr-txt"},React.createElement("strong",null,lang==="ar"?"المنزل":"Home"),React.createElement("span",null,addrLine),pinned&&React.createElement("span",{className:"addr-pin-chip"},React.createElement(Icon,{name:"location",size:11,color:"var(--green-deep)"}),t.map_pinned_chip)),React.createElement("button",{className:"co-edit",onClick:()=>setEditOpen(!0)},t.change_address))),React.createElement("div",{className:"co-block"},React.createElement("div",{className:"co-label"},t.order_summary),React.createElement("div",{className:"co-items"},items.map(it=>React.createElement("div",{key:it.p.id,className:"co-item"},React.createElement("span",{className:"co-q"},it.q,"×"),React.createElement("span",{className:"co-nm"},it.p.name[lang]),React.createElement("span",{className:"co-pr"},moneyStr(it.p.price*it.q)))))),React.createElement("div",{className:"co-block"},React.createElement("div",{className:"co-label"},t.payment),React.createElement("div",{className:"co-pays"},React.createElement("button",{type:"button",className:`co-pay ${pay==="prepaid"?"on":""}`,onClick:()=>setPay("prepaid")},React.createElement("span",{className:"co-pay-ic"},"🏦"),React.createElement("span",{className:"co-pay-txt"},React.createElement("strong",null,t.pay_prepaid),React.createElement("span",null,t.pay_prepaid_sub)),React.createElement("span",{className:`radio ${pay==="prepaid"?"on":""}`})))),React.createElement("div",{className:"co-totals"},React.createElement("div",{className:"sum-row"},React.createElement("span",null,t.subtotal),React.createElement("b",null,moneyStr(subtotal))),React.createElement("div",{className:"sum-row"},React.createElement("span",null,t.delivery_fee),React.createElement("b",null,fee==null?React.createElement("span",{className:"free-deliv"},"يحدّدها المشرف"):fee===0?React.createElement("span",{className:"free-deliv"},"توصيل مجاني"):moneyStr(fee))),React.createElement("div",{className:"sum-row total"},React.createElement("span",null,t.total),React.createElement("b",null,moneyStr(subtotal+(fee||0)))))),React.createElement("div",{className:"co-footer"},belowMin&&React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"6px",color:"var(--danger)",fontWeight:800,fontSize:"13px",lineHeight:1.5,marginBottom:"10px"}},React.createElement(Icon,{name:"shield",size:15,color:"var(--danger)"}),"الحد الأدنى للطلب من هذا المتجر "+moneyStr(minAmt)),React.createElement("button",{className:"btn btn-green",disabled:belowMin,onClick:()=>{if(belowMin)return;setPrepaidOpen(!0)}},React.createElement(Icon,{name:"wallet",size:20,color:"#fff",stroke:3}),React.createElement("span",null,t.pay_prepaid))),editOpen&&React.createElement(AddressSheet,{t,lang,city,address,pinned,onClose:()=>setEditOpen(!1),onSave:saveAddr}),prepaidOpen&&React.createElement(PrepaidSheet,{t,lang,amount:subtotal+(fee||0),onClose:()=>setPrepaidOpen(!1),onSent:file=>{setPrepaidOpen(!1),onConfirm("prepaid",file)}}))}function PrepaidSheet({t,lang,amount,onClose,onSent}){const[copied,setCopied]=useStateB(-1),[receipt,setReceipt]=useStateB(null),copy=(txt,i)=>{try{navigator.clipboard.writeText(txt)}catch(e){}setCopied(i),setTimeout(()=>setCopied(-1),1400)},pickReceipt=e=>{const f=e.target.files&&e.target.files[0];e.target.value="",f&&f.size<=10*1024*1024&&setReceipt({file:f,url:URL.createObjectURL(f)})};return React.createElement("div",{className:"modal-overlay",onClick:onClose},React.createElement("div",{className:"sheet",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"sheet-handle"}),React.createElement("div",{className:"sheet-scroll"},React.createElement("div",{className:"sub-head"},React.createElement("div",{className:"sub-badge"},React.createElement(Icon,{name:"wallet",size:22,color:"var(--brown)"})),React.createElement("h2",null,t.prepaid_title),React.createElement("p",null,t.prepaid_intro),React.createElement("div",{className:"wal-pay-amount"},React.createElement("span",null,t.prepaid_amount),React.createElement("strong",null,moneyStr(amount)))),React.createElement("div",{className:"sub-label"},t.prepaid_accounts),React.createElement("div",{className:"sub-accounts"},LOZI_ACCOUNTS.map((a,i)=>React.createElement("div",{key:i,className:"acct",style:{borderInlineStartColor:a.color}},React.createElement("span",{className:"acct-brand",style:{background:a.gradient||a.color}},a.bank[lang].charAt(0)),React.createElement("div",{className:"acct-info"},React.createElement("strong",{style:{color:a.color}},a.bank[lang]),React.createElement("span",{className:"acct-iban"},a.iban),React.createElement("span",{className:"acct-name"},a.name[lang])),React.createElement("button",{className:`acct-copy ${copied===i?"ok":""}`,onClick:()=>copy(a.iban,i)},React.createElement(Icon,{name:copied===i?"check":"copy",size:15,color:copied===i?"var(--green-deep)":"var(--ink)",stroke:copied===i?3:2}),copied===i?t.copied:t.copy)))),React.createElement("div",{className:"sub-label"},t.sub_upload),React.createElement("div",{className:"sub-upload"},receipt?React.createElement("div",{style:{position:"relative"}},React.createElement("img",{src:receipt.url,alt:"",style:{width:"100%",height:160,objectFit:"cover",borderRadius:16,display:"block"}}),React.createElement("button",{onClick:()=>setReceipt(null),style:{position:"absolute",insetInlineEnd:8,top:8,background:"rgba(0,0,0,.6)",color:"#fff",border:"none",borderRadius:10,padding:"6px 10px",fontWeight:800,fontSize:12}},"تغيير")):React.createElement("label",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,height:160,border:"2px dashed var(--line)",borderRadius:16,cursor:"pointer",color:"var(--muted)"}},React.createElement("input",{type:"file",accept:"image/*",onChange:pickReceipt,style:{display:"none"}}),React.createElement(Icon,{name:"upload",size:26,color:"var(--green-deep)"}),React.createElement("span",{style:{fontWeight:800,fontSize:13}},t.sub_upload_hint)))),React.createElement("div",{className:"sheet-foot"},React.createElement("button",{className:"btn btn-green",disabled:!receipt,onClick:()=>onSent(receipt&&receipt.file)},React.createElement(Icon,{name:"upload",size:18,color:"#fff"}),React.createElement("span",null,t.prepaid_send)))))}function AddressSheet({t,lang,city,address,pinned,onClose,onSave}){const[view,setView]=useStateB("form"),[c,setC]=useStateB(city),[a,setA]=useStateB(address),[isPinned,setIsPinned]=useStateB(pinned),[pin,setPin]=useStateB({x:50,y:47}),dragRef=React.useRef(!1),movePin=e=>{const r=e.currentTarget.getBoundingClientRect(),cx=e.clientX,cy=e.clientY;let x=(cx-r.left)/r.width*100,y=(cy-r.top)/r.height*100;x=Math.max(8,Math.min(92,x)),y=Math.max(12,Math.min(80,y)),setPin({x,y})};return view==="map"?React.createElement("div",{className:"modal-overlay",onClick:onClose},React.createElement("div",{className:"sheet",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"sheet-handle"}),React.createElement("div",{className:"sheet-scroll"},React.createElement("div",{className:"addr-sheet-head"},React.createElement("h2",null,t.map_title),React.createElement("p",null,t.map_hint)),React.createElement("div",{className:"map-pick",onPointerDown:e=>{dragRef.current=!0,movePin(e)},onPointerMove:e=>{dragRef.current&&movePin(e)},onPointerUp:()=>{dragRef.current=!1},onPointerLeave:()=>{dragRef.current=!1}},React.createElement("div",{className:"map-grid"}),React.createElement("div",{className:"map-road map-road-h"}),React.createElement("div",{className:"map-road map-road-v"}),React.createElement("div",{className:"map-road map-road-d"}),React.createElement("div",{className:"map-block mb1"}),React.createElement("div",{className:"map-block mb2"}),React.createElement("div",{className:"map-block mb3"}),React.createElement("div",{className:"map-pin",style:{left:pin.x+"%",top:pin.y+"%"}},React.createElement("span",{className:"map-pin-ring"}),React.createElement(Icon,{name:"location",size:34,color:"var(--danger)",fill:!0})),React.createElement("button",{className:"map-myloc",onClick:e=>{e.stopPropagation(),setPin({x:50,y:47})}},React.createElement(Icon,{name:"location",size:15,color:"var(--green-deep)"}),t.use_my_location))),React.createElement("div",{className:"sheet-foot"},React.createElement("button",{className:"btn btn-green",onClick:()=>{setIsPinned(!0),setView("form")}},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,t.map_confirm))))):React.createElement("div",{className:"modal-overlay",onClick:onClose},React.createElement("div",{className:"sheet",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"sheet-handle"}),React.createElement("div",{className:"sheet-scroll"},React.createElement("div",{className:"addr-sheet-head"},React.createElement("h2",null,t.edit_address_title),React.createElement("p",null,t.edit_address_note)),React.createElement("button",{className:"map-open-btn",onClick:()=>setView("map")},React.createElement("span",{className:"map-thumb"},React.createElement("div",{className:"map-thumb-grid"}),React.createElement(Icon,{name:"location",size:20,color:"var(--danger)",fill:!0})),React.createElement("span",{className:"map-open-txt"},React.createElement("strong",null,t.pick_on_map),React.createElement("span",null,isPinned?t.map_located:t.map_hint)),React.createElement(Icon,{name:t.dir==="rtl"?"back":"fwd",size:18,color:"var(--muted)"})),isPinned&&React.createElement("div",{className:"addr-pin-chip lg"},React.createElement(Icon,{name:"location",size:13,color:"var(--green-deep)"}),t.map_located," ✓"),React.createElement("div",{className:"form-fields"},React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.city),React.createElement("input",{className:"field-input",value:c,onChange:e=>setC(e.target.value),placeholder:t.city_ph})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.address),React.createElement("textarea",{className:"field-input area",value:a,onChange:e=>setA(e.target.value),placeholder:t.address_ph,rows:3})))),React.createElement("div",{className:"sheet-foot"},React.createElement("button",{className:"btn btn-green",disabled:!c.trim()||!a.trim(),onClick:()=>onSave(c.trim(),a.trim(),isPinned)},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,t.save)))))}function OrderSuccess({t,go,review}){return React.createElement("div",{className:"screen success"},React.createElement("div",{className:"success-ring"},React.createElement(Icon,{name:review?"upload":"check",size:48,color:"#fff",stroke:3})),React.createElement("h2",null,t.order_placed),React.createElement("p",null,review?t.success_review_sub:t.order_placed_sub),React.createElement("div",{className:"success-actions"},React.createElement(PrimaryBtn,{icon:"cart",onClick:()=>go("orders")},t.track_order),React.createElement("button",{className:"skip-link",onClick:()=>go("home")},t.nav_home)))}const ORDER_STEPS=["received","preparing","delivering","delivered"];function Orders({t,lang,orders,onBack,reorder,cancel,reportOrder,go,isSeller,role,onReview}){if(!orders.length)return React.createElement("div",{className:"screen orders empty-screen"},React.createElement(TopBar,{title:t.orders_title,onBack,t}),React.createElement("div",{className:"empty"},React.createElement("div",{className:"empty-ic"},React.createElement(Icon,{name:"cart",size:40,color:"var(--gold-deep)"})),React.createElement("h3",null,t.no_orders),React.createElement(PrimaryBtn,{icon:"store",onClick:()=>go("sections")},t.browse)));const statusKey={received:"st_received",payreview:"st_payreview",preparing:"st_preparing",delivering:"st_delivering",delivered:"st_delivered",rejected:"st_rejected",cancelled:"st_rejected"},buyHint=isSeller?role==="wholesale"?t.orders_hint_wholesale:t.orders_hint_seller:null;return React.createElement("div",{className:"screen orders"},React.createElement(TopBar,{title:t.orders_title,onBack,t}),buyHint&&React.createElement("div",{className:"orders-hint"},React.createElement(Icon,{name:"store",size:16,color:"var(--green-deep)"}),React.createElement("span",null,buyHint)),React.createElement("div",{className:"orders-list"},orders.map(o=>{const stepIdx=ORDER_STEPS.indexOf(o.status),canCancel=o.status==="received"||o.status==="payreview",isReview=o.status==="payreview";return React.createElement("div",{key:o.id,className:"order-card"},React.createElement("div",{className:"order-top"},React.createElement("div",null,React.createElement("div",{className:"order-no"},t.order_no," #",o.id),React.createElement("div",{className:"order-date"},o.date[lang]," · ",o.items.reduce((a,i)=>a+i.q,0)," ",t.items_count)),React.createElement("span",{className:`order-status st-${o.status}`},t[statusKey[o.status]])),isReview?React.createElement("div",{className:"order-review"},React.createElement(Icon,{name:"upload",size:15,color:"#B8821F"}),React.createElement("span",null,t.order_review_note)):React.createElement("div",{className:"order-track"},ORDER_STEPS.map((st,i)=>React.createElement(React.Fragment,{key:st},React.createElement("span",{className:`tdot ${i<=stepIdx?"on":""}`},i<stepIdx&&React.createElement(Icon,{name:"check",size:10,color:"#fff",stroke:3})),i<ORDER_STEPS.length-1&&React.createElement("span",{className:`tline ${i<stepIdx?"on":""}`})))),o.status==="delivering"&&o.courier&&React.createElement("div",{className:"courier-card"},React.createElement("span",{className:"courier-av"},React.createElement(Icon,{name:"truck",size:20,color:"#fff"})),React.createElement("div",{className:"courier-info"},React.createElement("strong",null,o.courier.name[lang]),React.createElement("span",{className:"courier-meta"},React.createElement(Icon,{name:"star",size:12,color:"var(--gold-deep)"}),o.courier.rating," · ",o.courier.plate[lang]),React.createElement("span",{className:"courier-eta"},React.createElement("span",{className:"eta-dot"}),o.courier.eta[lang])),React.createElement("div",{className:"courier-actions"},React.createElement("a",{className:"courier-btn call",href:`tel:${o.courier.phone}`,"aria-label":t.courier_call},React.createElement(Icon,{name:"phone",size:18,color:"var(--green-deep)"})),React.createElement("a",{className:"courier-btn wa",href:`https://wa.me/${o.courier.phone.replace(/[^0-9]/g,"")}`,target:"_blank",rel:"noopener","aria-label":t.courier_chat},React.createElement(Icon,{name:"whatsapp",size:18,color:"#fff"})))),(o.delivery_fee!=null||o.wholesale)&&React.createElement("div",{className:"order-deliv-row",style:{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13,color:"var(--muted)",padding:"6px 0"}},React.createElement("span",null,t.delivery_fee),React.createElement("b",null,o.delivery_fee==null?"يحدّدها المشرف":o.delivery_fee===0?"مجاني":moneyStr(o.delivery_fee))),React.createElement("div",{className:"order-foot"},React.createElement("span",{className:"order-total"},moneyStr(o.total)),React.createElement("div",{className:"order-btns"},canCancel&&React.createElement("button",{className:"obtn danger",onClick:()=>cancel(o.id)},t.cancel_order),!isSeller&&o.seller&&React.createElement("button",{className:"obtn",onClick:()=>window.LoziChat&&window.LoziChat.open({vendorId:o.seller,orderId:o.rid,orderNo:o.id,storeName:o.vendor}),title:"مراسلة حول الطلب"},React.createElement(Icon,{name:"chat",size:14,color:"var(--green-deep)"}),"مراسلة المتجر"),React.createElement("button",{className:"obtn warn",onClick:()=>reportOrder&&reportOrder(o)},React.createElement(Icon,{name:"flag",size:14,color:"var(--gold-deep)"}),t.rep_report_issue),!isSeller&&React.createElement("button",{className:"obtn",onClick:()=>reorder(o)},React.createElement(Icon,{name:"cart",size:14,color:"var(--green-deep)"}),t.reorder),!isSeller&&React.createElement("button",{className:"obtn",onClick:()=>onReview&&onReview(o)},React.createElement(Icon,{name:"star",size:14,color:"var(--gold-deep)"}),"قيّم المتجر"))))})))}function Savings({t,lang,products,openProduct,addToCart,favs,toggleFav,onVip}){const list=products&&products.length?products:LOZI_SAVINGS;return React.createElement("div",{className:"screen savings-screen"},React.createElement("div",{className:"sv-hero-row"},React.createElement("div",{className:"sv-hero"},React.createElement("div",{className:"sv-hero-bg"}),React.createElement("div",{className:"sv-hero-content"},React.createElement("span",{className:"sv-kicker"},React.createElement(Icon,{name:"bolt",size:14,color:"var(--gold)"}),t.savings_title),React.createElement("h1",null,t.savings_title),React.createElement("p",null,t.savings_desc),React.createElement("button",{className:"sv-chat-btn",onClick:()=>window.LoziChat&&window.LoziChat.openAdmin({storeName:t.savings_title}),style:{display:"inline-flex",alignItems:"center",gap:"7px",marginTop:"4px",padding:"11px 18px",border:"none",borderRadius:"14px",background:"var(--gold,#E6C088)",color:"#3a2a12",fontWeight:800,fontSize:"14px",fontFamily:"inherit",cursor:"pointer"}},React.createElement(Icon,{name:"chat",size:17,color:"#3a2a12"}),"تواصل مع لوزي"))),React.createElement("button",{className:"vip-entry",onClick:onVip,"aria-label":"سوق VIP"},React.createElement("span",{className:"vip-crown"},"👑"),React.createElement("span",{className:"vip-vtext"},"سوق VIP"),React.createElement("span",{className:"vip-arrow"},"←"))),React.createElement("div",{className:"sv-grid-wrap"},React.createElement(SecHead,{title:t.savings_title}),list.length?React.createElement("div",{className:"prod-grid pad"},list.map(p=>React.createElement(ProductCard,{key:p.id,p,t,lang,onOpen:openProduct,onAdd:addToCart,fav:favs.includes(p.id),onFav:toggleFav}))):React.createElement("div",{className:"empty-note",style:{textAlign:"center",color:"var(--muted)",padding:"40px 16px"}},"لا توجد منتجات توفير حالياً.")))}function Vip({t,lang,products,openProduct,addToCart,favs,toggleFav,onBack}){const list=products||[];return React.createElement("div",{className:"screen vip-screen"},React.createElement(TopBar,{title:"سوق VIP",onBack,t}),React.createElement("div",{className:"vip-hero"},React.createElement("div",{className:"vip-hero-bg"}),React.createElement("div",{className:"vip-hero-content"},React.createElement("span",{className:"vip-kicker"},"👑 سوق VIP"),React.createElement("h1",null,"سوق VIP"),React.createElement("p",null,"تشكيلة فاخرة منتقاة بعناية — منتجات نادرة وكميات محدودة، تديرها لوزي مباشرة."))),React.createElement("div",{className:"vip-grid-wrap"},React.createElement(SecHead,{title:"منتجات VIP"}),list.length?React.createElement("div",{className:"prod-grid pad"},list.map(p=>React.createElement(ProductCard,{key:p.id,p,t,lang,onOpen:openProduct,onAdd:addToCart,fav:favs.includes(p.id),onFav:toggleFav}))):React.createElement("div",{className:"vip-empty"},React.createElement("div",{className:"vip-empty-ic"},"👑"),React.createElement("p",null,"لا توجد منتجات VIP حالياً."))))}function SubModal({t,lang,onClose,onSubmitted}){const[copied,setCopied]=useStateB(-1),[hasReceipt,setHasReceipt]=useStateB(!1),copy=(txt,i)=>{try{navigator.clipboard.writeText(txt)}catch(e){}setCopied(i),setTimeout(()=>setCopied(-1),1400)};return React.useEffect(()=>{const el=document.getElementById("sub-receipt");if(!el)return;const iv=setInterval(()=>{const filled=(el.shadowRoot?[...el.shadowRoot.querySelectorAll("img")]:[]).some(i=>(i.getAttribute("src")||"").length>5&&!i.classList.contains("ghost"));setHasReceipt(filled)},600);return()=>clearInterval(iv)},[]),React.createElement("div",{className:"modal-overlay",onClick:onClose},React.createElement("div",{className:"sheet",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"sheet-handle"}),React.createElement("div",{className:"sheet-scroll"},React.createElement("div",{className:"sub-head"},React.createElement("div",{className:"sub-badge"},React.createElement(Icon,{name:"bolt",size:22,color:"var(--brown)"})),React.createElement("h2",null,t.sub_title),React.createElement("p",null,t.sub_intro),React.createElement("div",{className:"sub-price-tag"},moneyStr(LOZI_SUB.yer),perYear(lang)),React.createElement("div",{className:"sub-duration-note"},React.createElement(Icon,{name:"calendar",size:13,color:"var(--ink-soft)"}),t.sub_duration_label,": ",t.sub_duration_val)),React.createElement("div",{className:"sub-label"},t.sub_accounts),React.createElement("div",{className:"sub-accounts"},LOZI_ACCOUNTS.map((a,i)=>React.createElement("div",{key:i,className:"acct",style:{borderInlineStartColor:a.color}},React.createElement("span",{className:"acct-brand",style:{background:a.gradient||a.color}},a.bank[lang].charAt(0)),React.createElement("div",{className:"acct-info"},React.createElement("strong",{style:{color:a.color}},a.bank[lang]),React.createElement("span",{className:"acct-iban"},a.iban),React.createElement("span",{className:"acct-name"},a.name[lang])),React.createElement("button",{className:`acct-copy ${copied===i?"ok":""}`,onClick:()=>copy(a.iban,i)},React.createElement(Icon,{name:copied===i?"check":"copy",size:15,color:copied===i?"var(--green-deep)":"var(--ink)",stroke:copied===i?3:2}),copied===i?t.copied:t.copy)))),React.createElement("div",{className:"sub-label"},t.sub_upload),React.createElement("div",{className:"sub-upload"},React.createElement(Img,{id:"sub-receipt",ph:t.sub_upload_hint,radius:16,shape:"rounded",style:{width:"100%",height:160,display:"block"}}))),React.createElement("div",{className:"sheet-foot"},React.createElement("button",{className:"btn btn-green",disabled:!hasReceipt,onClick:onSubmitted},React.createElement(Icon,{name:"upload",size:18,color:"#fff"}),React.createElement("span",null,t.sub_submit)))))}const TERMS_AR={intro:["مرحباً بكم في تطبيق لوزي. تعد هذه الشروط والأحكام بمثابة اتفاقية قانونية ملزمة بين إدارة تطبيق «لوزي» (المشار إليها بـ «الإدارة» أو «التطبيق» أو «مجموعة لوزي») وبين أي شخص يقوم باستخدام التطبيق أو التسجيل فيه (المشار إليه بـ «المستخدم» سواء كان عميلاً، تاجر تجزئة، تاجر جملة، أو مزارعاً).","استخدامك للتطبيق أو تسجيلك فيه يعني موافقتك الكاملة والخالية من الجهالة على هذه الشروط، وإذا كنت لا توافق عليها، يرجى عدم استخدام التطبيق."],sections:[{n:"1",h:"شروط عامة ونطاق الخدمة",items:[{lead:"النطاق الجغرافي:",b:"يقدم تطبيق «لوزي» خدماته حالياً داخل النطاق الجغرافي لـ «العاصمة صنعاء» فقط. ولا يتحمل التطبيق مسؤولية أي طلبات أو شحنات خارج هذا النطاق."},{lead:"آلية الدفع:",b:"وسيلة الدفع المعتمدة في التطبيق لخدمات التجزئة والتوفير هي الدفع عند الاستلام نقداً (COD) فقط."},{lead:"التعديل والتحديث:",b:"تحتفظ إدارة التطبيق بالحق المطلق في تعديل أو تحديث هذه الشروط والأحكام في أي وقت، وتصبح التعديلات سارية وفورية بمجرد نشرها على التطبيق."}]},{n:"2",h:"أحكام وشروط خاصة بالعملاء (المشترين)",items:[{lead:"دقة البيانات ومسؤوليتها:",b:"يلتزم العميل بتقديم معلومات صحيحة ودقيقة عند التسجيل (رقم الهاتف للتفعيل عبر واتساب، والموقع الجغرافي الدقيق عبر GPS)، ويتحمل العميل وحده مسؤولية أي خطأ في العناوين ينتج عنه تأخر أو إلغاء الطلب."},{lead:"سياسة الطلبات المتعددة:",b:"نظراً لأن لكل متجر سلة مستقلة، فإن اختيار منتجات من متاجر متعددة سينتج عنه إنشاء طلبات منفصلة تلقائياً، ويتحمل العميل رسوم التوصيل الخاصة بكل متجر على حدة."},{lead:"إلغاء الطلب:",b:"يحق للعميل إلغاء الطلب فقط قبل البدء في مرحلة التجهيز من قبل المتجر أو الإدارة. بمجرد تحول حالة الطلب في النظام إلى «قيد التجهيز» أو «قيد التوصيل»، لا يمكن إلغاؤه بأي حال من الأحوال."},{tag:"🔄",lead:"سياسة الإرجاع (خلال 24 ساعة):",b:"يحق للعميل طلب إرجاع مشترياته خلال 24 ساعة فقط من وقت استلام الطلب، وذلك في حال كانت البضاعة تالفة، أو ناقصة الوزن الصافي، أو مختلفة تماماً عن الصور والمواصفات المعروضة في التطبيق. ولا يحق له المطالبة بالإرجاع أو استرداد الأموال نهائياً بعد مرور 24 ساعة على الاستلام."},{tag:"🚨",lead:"شرط الحظر الصارم وعقوبة التلاعب:",b:"يُحظر تماماً على العميل إغلاق هاتفه، أو تجاهل اتصالات مندوب التوصيل عمداً عند وصول الطلب لموقعه. وفي حال تكرار هذا التصرف لأكثر من مرتين، سيتم حظر حساب العميل نهائياً وبشكل تلقائي من المنصة."},{tag:"🌰",lead:"إرجاع اللوز ال«شحطي» غير المُفصح عنه:",b:"يُتاح للعميل حق إرجاع منتج اللوز في حال تبيّن أنه من نوع (شحطي) ولم يتم الإفصاح عن ذلك صراحةً وواضحاً ضمن اسم المنتج أو وصفه عند العرض. وفي حال تم الإفصاح عن ذلك بشكل واضح، يُعدّ العميل على علم مسبق بذلك ولا يحق له المطالبة بالإرجاع لهذا السبب. وفي حال ثبت أن الخطأ ناتج عن المزارع (عدم الإفصاح أو إدخال وصف غير صحيح)، فإن المزارع يتحمل تكاليف التوصيل."},{lead:"التقييمات:",b:"يلتزم العميل بكتابة تقييمات صادقة وواقعية للمتاجر والمزارعين. يحظر استخدام الألفاظ النابية أو المسيئة، وللإدارة الحق الكامل في حذف أي تقييم يخالف ذلك دون الرجوع للعميل."}]},{n:"3",h:"أحكام وشروط خاصة بمتاجر التجزئة وجملة المكسرات (التجار)",items:[{tag:"🏅",lead:"خيارات منح «شارة التوثيق»:",b:"لإضفاء الطابع الرسمي وحماية المنصة من الكيانات الوهمية، تتيح إدارة التطبيق لتاجر التجزئة وتاجر الجملة خيارين مستقلين للحصول على «شارة التوثيق» داخل التطبيق:"},{sub:!0,lead:"الخيار الأول (التوثيق المستندي):",b:"قيام التاجر برفع صورة واضحة وصالحة من ترخيص المحل الرسمي، أو سجله التجاري، أو بطاقة عضويته في الغرفة التجارية والصناعية بصنعاء عبر النظام."},{sub:!0,lead:"الخيار الثاني (التوثيق الميداني):",b:"في حال عدم توفر الأوراق الرسمية، يطلب التاجر «نزولاً ميدانياً»، وتتولى إدارة التطبيق إرسال مندوب لمعاينة المحل على الطبيعة والتحقق من جودة ومطابقة معروضاته للمقاييس المطلوبة قبل تفعيل الشارة."},{lead:"صلاحيات النشر وحظر التعدي:",b:"يُسمح للمتجر بنشر منتجات المكسرات داخل صفحته الخاصة فقط. يُمنع منعاً باتاً على المتاجر النشر في أقسام «اللوز البلدي» أو «الزبيب» المخصصة حصرياً للمزارعين، ويحق للإدارة حذف أي منشور مخالف فوراً."},{lead:"الالتزام بالأسعار والعروض:",b:"يتعهد المتجر بتقديم أسعار حقيقية ومحدثة، وفي حال إنشاء «عروض مخفضة»، يجب إرسالها للإدارة مسبقاً للموافقة عليها للتأكد من جديتها."},{tag:"🛵",lead:"حصرية اختيار الموصل وإخلاء المسؤولية المطلقة:",b:"يقر ويلتزم متجر التجزئة التزاماً قاطعاً بأن اختيار، وتعيين، والتعاقد مع مناديب التوصيل أو السائقين أو الناقلين هو مسؤولية حصرية ومباشرة على عاتق المتجر وحده، ولا تتدخل إدارة تطبيق «لوزي» في اختيار الموصلين بأي شكل من الأشكال. وبناءً على ذلك، فإن عملية توصيل بضائع التجزئة للعملاء تقع على مسؤولية المتجر المالية والمدنية الكاملة، ويضمن المتجر سلامة البضاعة من أي تلف، ضياع، أو نقص أثناء الطريق. وفي حال حدوث أي ضرر للبضاعة، أو وقوع أي نزاع أو خلاف مع المندوب المختار من قبل المتجر، أو ارتكاب المندوب لأي خطأ تشغيلي أو قانوني، يتحمل المتجر الخسارة والمسؤولية الكاملة بمفرده دون أدنى مسؤولية، أو التزام مالي، أو تضامن قانوني من قِبل تطبيق لوزي أو إدارته."},{tag:"🔒",lead:"قطعية تسعيرة التوصيل ومنع الابتزاز:",b:"يلتزم المتجر برمجياً وقانونياً بتسعيرة التوصيل الظاهرة والمعتمدة في التطبيق وقت تأكيد الطلب من قبل العميل. ويُحظر على مندوب التوصيل التابع للمتجر مطالبة العميل بأي مبالغ إضافية أو بقشيش أو تعديل في قيمة المشوار تحت أي مسمى (مثل بعد المسافة، الازدحام المروري، أو أزمات المشتقات النفطية). وفي حال خالف المندوب ذلك وطالب بزيادة مالية، يحق للعميل رفض استلام البضاعة فوراً، ويتحمل المتجر كلفة مشوار سائقه كاملاً ونفقة الرحلة، مع حق الإدارة في اتخاذ عقوبات تصل لحظر الحساب."},{tag:"⚠️",lead:"تحمل تكاليف التوصيل المرتجعة للعميل:",b:"يتحمل المتجر تكاليف ورسوم التوصيل بالكامل لسائقه/مندوبه في حال قام العميل بإلغاء طلبه (بعد خروج المندوب)، أو في حال تجاهل العميل اتصال المندوب، أو قام بإغلاق هاتفه وتسبب في إرجاع الطلب."},{tag:"💸",lead:"آلية الإرجاع الإلزامية وعقوبة البضاعة المخالفة:",b:"في حال قبول إدارة التطبيق لبلاغ العميل بالإرجاع خلال الـ 24 ساعة المسموحة (بسبب تلف، أو غش، أو نقص وزن البضاعة)، يلتزم المتجر مجبراً برد كامل المبلغ المالي للعميل، كما يتحمل المتجر منفرداً كلفة إرسال سائقه/مندوبه مجدداً إلى موقع العميل لاستلام البضاعة وإعادة الأموال كاش له، وذلك كإجراء تعويضي للعميل وعقوبة للمتجر على إرسال بضاعة مخالفة."},{tag:"🔒",lead:"الملكية الفكرية والأسماء التجارية:",b:"يتعهد ويضمن المتجر بأن الاسم التجاري، والشعار، والعلامة التي يرفعها على المنصة هي ملك خالص له أو يمتلك ترخيصاً قانونياً باستخدامها. ويتحمل المتجر منفرداً المسؤولية القانونية والقضائية الكاملة في حال وجود أي نزاع على الاسم أو انتحال للشخصية التجارية أو انتهاك للملكية الفكرية. وتحتفظ إدارة «لوزي» بالحق الكامل في إيقاف أو حظر أي متجر فوراً ودون أي تعويض في حال ثبت انتحاله لاسم تاجر آخر."},{tag:"🚫",lead:"حظر التهرب التجاري والبيع الخلفي:",b:"يُمنع منعاً باتاً وقاطعاً على المتاجر محاولة تحويل العملاء خارج المنصة، أو مشاركة أرقام التواصل المباشر (الواتساب أو الاتصال)، أو توزيع كروت المحلات الخاصة بهم داخل شحنات الطلبات بغرض حث العميل على الشراء الخارجي والتهرب من المنصة. وفي حال إثبات ذلك، يحق لإدارة «لوزي» فرض غرامة مالية قاسية، وسحب شارة التوثيق، وحظر حساب المتجر نهائياً."},{lead:"مراقبة المحادثات داخل التطبيق:",b:"يوفّر التطبيق نظام مراسلة داخلي لحظي بين أطرافه. وحمايةً للمستخدمين ومنعاً للبيع خارج التطبيق، فإن جميع المحادثات داخل التطبيق تخضع لمراجعة الإدارة. وقد ينبّه النظام تلقائياً عند رصد أرقام هواتف أو روابط تواصل خارجية (واتساب/تلغرام) أو بريد إلكتروني، مع بقاء الرسالة ظاهرة للطرفين. باستخدامك للمراسلة فإنك توافق على هذه المراجعة، ويُمنع منعاً باتاً مشاركة أرقام التواصل أو محاولة إتمام الصفقات خارج المنصة."},{tag:"⚖️",lead:"شرط الوزن الصافي (Net Weight):",b:"يتعهد المتجر تعهداً قانونياً قاطعاً بأن جميع الأوزان المعروضة للمنتجات داخل التطبيق هي أوزان صافية وخالصة للمنتج الغذائي نفسه دون احتساب وزن مواد التغليف، أو الأكياس، أو الصناديق الكرتونية. ويُعد أي نقص «غشاً تجارياً وتطفيفاً» يمنح العميل حق الإرجاع الفوري، ويتحمل البائع وحده المسؤولية أمام الجهات المختصة."},{lead:"قسم تجار الجملة:",b:"هذا القسم هو ميزة خاصة وحصرية تظهر للمتاجر فقط للتزود بالبضائع، ويحظر على المتاجر تسريب أسعار الجملة أو مشاركتها مع الجمهور العادي."}]},{n:"4",h:"أحكام وشروط خاصة بالمزارعين",items:[{lead:"حصرية الأقسام:",b:"تمنح المنصة أقسام «اللوز البلدي» و«الزبيب» كحق حصري للمزارعين الحقيقيين فقط."},{lead:"شرط التواجد الجغرافي للبضاعة:",b:"يلتزم المزارع برمجياً وتشغيلياً بأن تكون البضاعة المعروضة للبيع متواجدة داخل نطاق العاصمة صنعاء عند عرضها، لضمان سرعة نقلها وتوصيلها وتفادي تكاليف الشحن الطويل بين المحافظات."},{lead:"سياسة تسعير المنتجات وحق الحذف:",b:"المزارع هو المسؤول الأول عن تحديد سعر منتجاته، ولكن تحتفظ إدارة التطبيق بالحق الكامل في تعطيل أو حذف أي منشور منتج إذا رأت الإدارة أن السعر غير منطقي أو مبالغ فيه مقارنة بأسعار السوق السائدة، مع إرسال تنبيه للمزارع."},{tag:"🌰",lead:"الإفصاح عن اللوز «الشحطي» وحق الإرجاع:",b:"يُتاح للعميل حق إرجاع منتج اللوز في حال تبيّن أنه من نوع (شحطي) ولم يتم الإفصاح عن ذلك صراحةً وواضحاً ضمن اسم المنتج أو وصفه عند العرض. وفي حال تم الإفصاح عن ذلك بشكل واضح، يُعدّ العميل على علم مسبق بذلك ولا يحق له المطالبة بالإرجاع لهذا السبب. وفي حال ثبت أن الخطأ ناتج عن المزارع (عدم الإفصاح أو إدخال وصف غير صحيح)، فإن المزارع يتحمل تكاليف التوصيل."},{tag:"⚖️",lead:"شرط الوزن الصافي والالتزام بالتسعيرة:",b:"ينطبق على المزارعين ما ينطبق على المتاجر بخصوص الالتزام بالوزن الصافي الخالص للمنتج دون التغليف، والالتزام القاطع بتسعيرة التوصيل المعتمدة في النظام وقت الطلب دون المطالبة بأي مبالغ إضافية عند باب العميل."},{tag:"🚫",lead:"حظر التهرب التجاري:",b:"يُحظر تماماً على المزارعين توزيع أرقامهم أو كروت تواصلهم مع المناديب لسرقة عملاء المنصة والبيع من خلف التطبيق، ويُعاقب المخالف بالحظر النهائي والغرامة."},{tag:"📦",lead:"التوصيل الخاص بالمزارعين وإخلاء المسؤولية:",b:"المزارع هو المسؤول الأول والأخير عن تأمين وتدبير مندوب لتوصيل بضاعته إلى العميل في صنعاء على نفقته ومسؤوليته الكاملة. وفي حال تعذر على المزارع ذلك، وتدخلت إدارة «لوزي» لتوفير مندوب من طرفها كخدمة تسهيلية، فإن هذا المندوب يُعد وكيلاً عن المزارع في هذه الرحلة. وتخلي إدارة «لوزي» مسؤوليتها القانونية والمالية التامة عن أي تلف، نقص، ضياع للبضاعة أو الكاش أثناء الطريق، كما يتحمل المزارع وحده كلفة المشوار المرتجع وإعادة الأموال للعميل إذا تبين أن بضاعته تالفة أو مخالفة خلال الـ 24 ساعة الأولى."}]},{n:"5",h:"قسم تجار الجملة وإخلاء المسؤولية التامة",items:[{lead:"نطاق الخدمة:",b:"يقتصر دور قسم «تجار الجملة» (المخفي عن الجمهور) على عرض أسعار الجملة وربط المتاجر بتجار الجملة لإتمام الطلب فيما بينهم فقط، بمثابة لوحة معلومات وعرض، دون أي تدخل من المنصة في النقل أو الشحن أو التحصيل."},{tag:"🚚",lead:"حظر التدخل ومسؤولية الناقل الكاملة:",b:"يقر ويلتزم تاجر الجملة والمحل المشتري بأن إدارة تطبيق «لوزي» لا تتدخل بأي شكل من الأشكال في عمليات نقل، أو شحن، أو تنسيق طلبات الجملة. ويعد اختيار الموصل، أو السائق، أو جهة النقل والناقل مسؤولية حصرية وكاملة ومباشرة على عاتق تجار الجملة والمحلات (خارج نطاق المنصة التقنية). وبناءً عليه، يقع عبء وتكاليف ومخاطر الشحن والتوصيل، وضمان سلامة البضاعة من أي تلف، أو نقص، أو ضياع أثناء الطريق على عاتق أطراف عملية النقل المختارين من قِبلهم، دون أدنى مسؤولية أو تبعة تضامنية على التطبيق."},{tag:"🔒",lead:"الحماية من الاحتيال وتبرئة الذمة من المندوبين الوهميين:",b:"تخلي إدارة تطبيق «لوزي» مسؤوليتها القانونية والمالية التامة والمطلقة في حال تعرض تاجر الجملة لأي عملية تلاعب أو احتيال. وإذا تقدم إلى تاجر الجملة أي سائق، أو مندوب توصيل، أو أي شخص يدّعي أو يزعم زوراً أنه مرسل من قِبل إدارة تطبيق «لوزي» أو «مجموعة لوزي»، وقام بطلب بضائع، أو سحب أموال، أو طلب مبالغ مالية تحت أي مسمى؛ فإن إدارة التطبيق لا تتحمل أدنى مسؤولية عن تصرفاته. ويتحمل تاجر الجملة وحده كامل المسؤولية المدنية والجنائية الناتجة عن تسليم أمواله أو بضائعه لأي شخص دون التحقق الرسمي والاتصال المباشر بإدارة المنصة لاعتماد الهوية، ويُعد تسليمه للبضائع أو الكاش تقصيراً منه يسقط معه حقه في أي مطالبة مستقبلية."},{tag:"❌",lead:"إخلاء المسؤولية المالية للجملة والديون:",b:"لا يحق لتاجر الجملة نهائياً مطالبة «مجموعة لوزي» بقيمة أي بضاعة تم توصيلها لأحد المتاجر ولم يقم المتجر بدفع ثمنها، سواء كان ذلك بسبب إهمال مندوب التوصيل التابع لتاجر الجملة في تحصيل المبلغ، أو بسبب امتناع المتجر عن السداد أو أي سبب آخر. العلاقة المالية والتحصيل والديون هي مسؤولية مباشرة وحصرية بين تاجر الجملة والمتجر المشتري خارج نطاق المنصة."}]},{n:"6",h:"قسم التوفير والاشتراكات (الملكية الفكرية والحماية التجارية)",items:[{lead:"ملكية القسم:",b:"«قسم التوفير» هو قسم تجاري وحصري مملوك بالكامل لإدارة تطبيق «لوزي» (مجموعة لوزي)، ولا يحق لأي متجر أو مزارع خارجي عرض منتجاته فيه."},{lead:"رسوم الاشتراك والتفعيل:",b:"قيمة الاشتراك السنوي في قسم التوفير هي 500 ريال يمني سنوياً (أو ما يعادلها بحسب ما تحدده الإدارة). يتم تفعيل الاشتراك يدوياً بعد قيام العميل برفع صورة واضحة لسند دفع الرسوم المعتمد."},{tag:"🚫",lead:"حظر الاستغلال التجاري وقيد الكميات:",b:"منتجات قسم التوفير مخصصة للاستهلاك الشخصي والمنزلي للعملاء الحقيقيين فقط. ويُمنع منعاً باتاً استخدام القسم لأغراض تجارية، أو إعادة البيع، أو تصريف البضائع للمحلات. وتحتفظ إدارة «لوزي» بالحق المطلق في تحديد حد أقصى للكميات المتاحة للشراء لكل عميل برمجياً، كما يحق للإدارة إلغاء أي طلبية وإيقاف وحظر حساب المشتري نهائياً ودون رد رسوم الاشتراك إذا تبين أنه «تاجر» أو يقوم بشراء الكميات بغرض إعادة البيع والمنافسة غير المشروعة."},{lead:"انتهاء الاشتراك:",b:"عند انتهاء مدة الاشتراك السنوي، يحق للتطبيق حجب ميزة الشراء والوصول لقسم التوفير فوراً، وتظل الأسعار المخفضة ظاهرة فقط كعرض تشجيعي للمستخدم حتى يقوم بالتجديد."}]},{n:"7",h:"نظام البلاغات والقرارات الإدارية القاطعة",items:[{lead:"آلية بلاغات الإرجاع وشكاوى الجودة:",b:"لتقديم طلب إرجاع خلال الـ 24 ساعة المسموحة، يجب على العميل رفع بلاغ رسمي موجه للإدارة عبر التطبيق، يلتزم فيه بـ: رفع صور واضحة وقاطعة تثبت تلف البضاعة أو نقص وزنها أو اختلافها، وكتابة وصف تفصيلي للمشكلة، وتحديد اسم المتجر أو المزارع المشترى منه."},{lead:"السرية والاطلاع:",b:"يُرسل البلاغ للإدارة وللمتجر معاً بشكل سري ولا يظهر للعامة. يرى المتجر البلاغ بالكامل وتفاصيله لمراجعة جودة عمله، لكن لا يمكنه الرد عليه أو حذفه داخل التطبيق."},{lead:"القرار النهائي الصارم:",b:"لإدارة التطبيق الصلاحية المطلقة والكاملة في اتخاذ القرار النهائي بشأن قبول طلب الإرجاع أو رفضه، أو التعامل مع أي مخالفة للشروط (بما يشمل إيقاف وحظر حسابات المتاجر، المزارعين، أو العملاء). جميع قرارات الإدارة نهائية وقاطعة ولا تقبل الاستئناف، أو المراجعة، أو الطعن بأي شكل من الأشكال قضائياً أو إدارياً."}]},{n:"8",h:"مرجعية الغرفة التجارية والتحكيم",items:[{tag:"⚖️",lead:"الغرفة التجارية كجهة تحكيم حصرية:",b:"في حال حدوث أي نزاع تجاري أو قانوني بين المتجر (تجزئة أو جملة) أو المزارع وبين إدارة التطبيق، ويتعذر حله ودياً، يتعهد الطرفان التزاماً قاطعاً وقبل اللجوء إلى القضاء والجهات الحكومية بإحالة النزاع رسمياً إلى «مركز التحكيم في الغرفة التجارية والصناعية بصنعاء» للفصل فيه وفقاً لأعراف سوق المكسرات واللوز والزبيب المعتمدة في أمانة العاصمة. وتظل كافة قرارات إدارة «لوزي» الإدارية (من حظر حسابات، أو إلغاء توثيق، أو حذف منتجات) سارية ونافذة وفورية طوال فترة التحكيم وحتى صدور قرار رسمي من الغرفة."}]},{n:"9",h:"مطابقة الصور للواقع وحظر التضليل البصري (ضمان الجودة)",items:[{tag:"📸",lead:"شرط حقيقية ومطابقة الصور:",b:"يتعهد ويقر المتجر والمزارع التزاماً قاطعاً بأن جميع الصور والوسائط المرئية المرفوعة للمنتجات داخل التطبيق هي صور حقيقية ومطابقة بنسبة 100% للمنتج الفعلي الذي سيتم شحنه وتوصيله للعميل من حيث: (النوع، المنشأ كاللوز البلدي أو الخارجي، الحجم، اللون، ودرجة الجودة ونظافة المنتج). ويُحظر تماماً استخدام صور عامة من الإنترنت أو صور مضللة تفوق جودة المنتج الحقيقي المعروض."},{tag:"🚨",lead:"عقوبة الغش والتضليل البصري:",b:"في حال تبين لإدارة التطبيق (بناءً على بلاغ مصور من العميل ومقارنته بالصورة المعروضة في المنصة) أن المنتج المرسل أقل جودة، أو مختلف النوع والمنشأ، أو مجرد تضليل بصري؛ يُصنف هذا التصرف قانونياً وتشغيلياً كـ «تزوير وغش تجاري معتمد»."},{lead:"التبعات القانونية والإدارية:",b:"يمنح هذا المخالفُ العميلَ الحقَ المطلق في رفض الاستلام أو إرجاع البضاعة واسترداد ماله كاملاً كاش، ويتحمل البائع وحده كلفة مشوار المندوب ذهاباً وإياباً. وتحتفظ إدارة «لوزي» بالحق الكامل والفوري في شطب المنتج المخالف، وفرض غرامة مالية على الحساب، وفي حال التكرار يتم حظر حساب المتجر أو المزارع نهائياً من المنصة مع إخلاء مسؤولية التطبيق أمام جهات الرقابة وحماية المستهلك."}]},{n:"10",h:"سلامة التخزين وجودة المذاق",items:[{tag:"🛡️",lead:"تعهد جودة المنتج وطزاجته:",b:"يتعهد المتجر والمزارع بأن جميع المنتجات المعروضة هي بضائع طازجة، سليمة، وخالية تماماً من الرطوبة، أو السوس، أو طعم «الزرنخة» الناتج عن سوء أو طول فترة التخزين."},{lead:"حق الإرجاع عند ظهور العيب:",b:"إذا تبين للعميل بعد فتح المنتج وتذوقه خلال الـ 24 ساعة الأولى وجود هذا العيب، يُعتبر المنتج تالفاً، ويحق للعميل إرجاعه فوراً واستعادة ماله، ويتحمل البائع المسؤولية الكاملة عن تعويض العميل وتكاليف المندوب، مع حق الإدارة في إنذار البائع أو حظره."}]},{n:"11",h:"حظر التنازل عن الحساب أو التصرف به",items:[{tag:"🪪",lead:"حصرية ملكية الحساب الموثق:",b:"تعتبر حسابات المتاجر والمزارعين في تطبيق «لوزي»، وبخاصة الحسابات الموثقة، حسابات شخصية وحصرية لأصحابها القانونيين الذين تم التحقق منهم مستندياً أو ميدانياً."},{lead:"حظر البيع أو النقل دون موافقة:",b:"يُمنع منعاً باتاً وقاطعاً بيع الحساب، أو تأجيره، أو التنازل عنه، أو نقل ملكيته للغير دون أخذ موافقة خطية مسبقة من إدارة التطبيق. وفي حال اكتشاف أي عملية نقل ملكية أو تصرف بالحساب من وراء الإدارة، يحق لإدارة «لوزي» سحب شارة التوثيق فوراً، وحظر الحساب نهائياً، مع تحميل صاحب الحساب الأصلي كافة التبعات القانونية والتجارية لأي عمليات غش أو احتيال تتم عبر حسابه."}]},{n:"12",h:"الحصانة القانونية وإخلاء المسؤولية المطلقة لـ «لوزي»",items:[{tag:"⚠️",lead:"المسؤولية الجنائية والطبية عن سلامة المنتجات:",b:"إن المواد المعروضة هي مواد غذائية تخضع لرقابة بائعيها. يضمن المتجر والمزارع بشكل مطلق وصارم سلامة بضائعهما صحياً وخلوها من التلف، التعفن، أو المواد المغشوشة وفقاً للقوانين النافذة والمقاييس الرسمية. ويتحملان منفردين وبشكل كامل ومباشر أي مسؤولية جنائية، مدنية، أو تعويضات طبية وعلاجية أمام القضاء والنيابة والجهات الحكومية في حال حدوث تسمم أو ضرر صحي لأي مستخدم، دون أدنى مسؤولية أو تضامن أو تبعية قانونية على تطبيق «لوزي» أو إدارته."},{b:"تطبيق «لوزي» هو منصة تقنية وسيطة تربط بين المتاجر والمزارعين والعملاء لتسهيل البيع والتجزئة. وبالتالي، لا يتحمل التطبيق المسؤولية القانونية المباشرة عن جودة البضائع التي توفرها المتاجر الخارجية، وينحصر دور التطبيق في الإجراءات التأديبية الإدارية (مثل إلزام المتجر بالإرجاع، أو حظر الحساب، أو إلغاء التوثيق) في حال ثبوت المخالفة خلال الـ 24 ساعة الأولى."},{tag:"🔒",lead:"أمن البيانات والخصوصية الرقمية:",b:"تلتزم إدارة تطبيق «لوزي» ببذل أقصى الجهود الممكنة لتأمين وحماية بيانات المستخدمين (أرقام الهواتف، سجلات البيع، المواقع الجغرافية GPS) والوقوف على أحدث معايير الحماية البرمجية. ومع ذلك، فإن المستخدم يقر بأن شبكة الإنترنت والأنظمة الرقمية ليست آمنة بنسبة 100%، ويوافق على رفع بياناته وموقعه على مسؤوليته الخاصة. وتخلي إدارة التطبيق مسؤوليتها القانونية أو المدنية عن أي اختراق سيبراني، أو تسريب بيانات ناتج عن قوى قاهرة، أو هجمات إلكترونية مستهدفة خارجة عن السيطرة البرمجية المعتادة."},{b:"لا يتحمل التطبيق مسؤولية أي تأخير في التوصيل أو تراجع الأداء ناتج عن ظروف قاهرة، أو أزمات مشتقات نفطية، أو قطوعات شوارع، أو اضطرابات أمنية خارجة عن إرادة مناديب المتاجر والمزارعين."}]},{n:"13",h:"نظام عمولة المنصة (محفظة البائع) وآلية التعديل المستقبلي",items:[{tag:"📊",lead:"النسبة الثابتة لعمولة التجزئة والجملة:",b:"يقر ويلتزم كل متجر (تجزئة أو جملة) ومزارع مسجل في التطبيق بدفع عمولة اقتطاعية ثابتة لصالح إدارة تطبيق «لوزي» عن كل صفقة بيع يتم إتمامها بنجاح وتحويل حالتها إلى «مكتمل»، وتُحتسب النسب كالتالي:"},{sub:!0,lead:"مبيعات التجزئة:",b:"نسبة ثابتة وقدرها 0.005% من إجمالي قيمة الطلب المكتمل."},{sub:!0,lead:"مبيعات الجملة:",b:"نسبة ثابتة وقدرها 0.001% من إجمالي قيمة صفقة الجملة المكتملة."},{tag:"🔒",lead:"التسجيل الآلي والدين المستحق:",b:"تُقيد هذه العمولات تلقائياً في ذمة البائع عبر «نظام محفظة البائع» داخل لوحة التحكم بمجرد تسليم الطلب للعميل، وتعتبر ديناً مستحق الأداء لصالح المنصة يجب تصفيتها وتوريدها بانتظام لتجنب تعليق الحساب."},{tag:"✅",lead:"استثناء الطلبات المدفوعة مسبقاً:",b:"الطلبات التي يتم سدادها من العميل عبر خيار «الدفع المسبق» (التحويل البنكي) ويتم اعتماد تحويلها لا تُحتسب على البائع كعمولة آجلة في محفظته، إذ تُسوّى عمولتها مباشرةً من قِبل إدارة المنصة عند تحصيل قيمة الطلب، فلا يترتب على البائع أي دين مؤجل عنها."}]}]};function TermsSheet({t,lang,onClose}){return React.createElement("div",{className:"modal-overlay",onClick:onClose},React.createElement("div",{className:"sheet",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"sheet-handle"}),React.createElement("div",{className:"terms-top"},React.createElement("h2",null,t.terms_title),React.createElement("span",{className:"terms-sub-tag"},React.createElement(Icon,{name:"location",size:12,color:"var(--green-deep)"}),lang==="ar"?"العاصمة صنعاء":"Sanaa")),React.createElement("div",{className:"sheet-scroll terms-scroll"},TERMS_AR.intro.map((p,i)=>React.createElement("p",{key:"in"+i,className:"terms-intro"},p)),TERMS_AR.sections.map(s=>React.createElement("div",{key:s.n,className:"terms-block"},React.createElement("div",{className:"terms-head"},React.createElement("span",{className:"terms-num"},s.n),React.createElement("h4",null,s.h)),React.createElement("div",{className:"terms-items"},s.items.map((it,j)=>React.createElement("div",{key:j,className:`terms-item ${it.sub?"sub":""}`},it.tag?React.createElement("span",{className:"terms-emoji"},it.tag):React.createElement("span",{className:"terms-bullet"}),React.createElement("p",null,it.lead&&React.createElement("b",null,it.lead," "),it.b))))))),React.createElement("div",{className:"sheet-foot"},React.createElement("button",{className:"btn btn-green",onClick:onClose},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,t.terms_agree)))))}function AddProductSheet({t,lang,section,role,onClose,onPublish,initial}){const editing=!!initial,isAlmond=section==="almond",isRaisin=section==="raisin",isFarmer=section==="almond"||section==="raisin",initWeightRaw=initial&&(initial.weight[lang]||initial.weight.ar)||"",initIsQadah=isRaisin&&initWeightRaw.indexOf(t.qadah_label)===0,[name,setName]=useStateB(initial&&(initial.name[lang]||initial.name.ar)||""),[variety,setVariety]=useStateB(initial&&initial.variety?initial.variety:isAlmond?"jabri":isRaisin?"razqi":""),[weight,setWeight]=useStateB(initial?initIsQadah?"":initWeightRaw:""),[useQadah,setUseQadah]=useStateB(initIsQadah),[qadahKg,setQadahKg]=useStateB(initIsQadah?initWeightRaw.split("·").pop().trim():"٣٤ك"),[price,setPrice]=useStateB(initial?String(initial.unit==="ratl"&&initial.ratlPrice?initial.ratlPrice:initial.price):""),[wantShahti,setWantShahti]=useStateB(initial?!!initial.shahti:!1),[copied,setCopied]=useStateB(!1),RATL_PER_KILO=1.75,[priceUnit,setPriceUnit]=useStateB(isAlmond&&initial&&initial.unit==="ratl"?"ratl":"kilo"),[ratls,setRatls]=useStateB(initial&&initial.availRatls?String(initial.availRatls):""),[confirmKilo,setConfirmKilo]=useStateB(!1),[roundNote,setRoundNote]=useStateB(""),cleanDec=v=>{v=String(v).replace(/[^0-9.]/g,"");const i=v.indexOf(".");return i<0?v:v.slice(0,i+1)+v.slice(i+1).replace(/\./g,"")},onQtyBlur=(v,setV)=>{const n=parseFloat(String(v).replace(/[^0-9.]/g,""));if(!isFinite(n))return;const r=Math.floor(n*20+1e-9)/20,rs=String(r);setV(rs);if(n-r>1e-9){setRoundNote("تم التقريب إلى "+rs);setTimeout(()=>setRoundNote(""),2600)}},[inSanaa,setInSanaa]=useStateB(!!initial),WH_UNITS=["كيس","كرتون","قطمة","قدح"],[whUnit,setWhUnit]=useStateB(initial&&WH_UNITS.indexOf(initial.stockUnit)>=0?initial.stockUnit:"كيس"),[stockQty,setStockQty]=useStateB(initial&&initial.stockInput!=null?String(initial.stockInput):""),isRatl=isAlmond&&priceUnit==="ratl",ratlPrice=Number(price)||0,pricePerKilo=Math.round(ratlPrice*RATL_PER_KILO),ratlCount=Number(ratls)||0,availKg=ratlCount?ratlCount/RATL_PER_KILO:0,isWholesale=section==="wholesale",canChoose=isWholesale||isFarmer,initTarget=initial?initial.sale==="wholesale"?"wholesale":initial.cat||section:isWholesale?"wholesale":section,[target,setTarget]=useStateB(initTarget),effSection=canChoose?target:section,qadahWeights=["٣٢ك","٣٣ك","٣٤ك","٣٥ك"],isQadah=isRaisin&&useQadah,isWhSeller=section==="wholesale",needsQadahStock=isRaisin&&target==="wholesale",needsWhUnit=isWhSeller&&target==="wholesale",usesRatlStock=isAlmond&&isRatl,stockUnitLabel=isAlmond?"كجم":needsQadahStock?"قدح":needsWhUnit?whUnit:"كجم",qtyNum=Number(stockQty)||0,stockVal=isAlmond&&isRatl?Math.round(availKg*10)/10:qtyNum,finalWeight=isRatl?"١ كجم":isQadah?`${t.qadah_label} · ${qadahKg}`:weight.trim(),secLabel={almond:t.sec_almond,raisin:t.sec_raisin,retail:t.sec_retail,wholesale:t.sec_wholesale}[effSection],secIcon={almond:"leaf",raisin:"leaf",retail:"store",wholesale:"warehouse"}[effSection],copyPhone=()=>{try{navigator.clipboard.writeText(t.shahti_phone)}catch(e){}setCopied(!0),setTimeout(()=>setCopied(!1),1400)},[photos,setPhotos]=useStateB(()=>(initial&&initial.images||[]).map((u,i)=>({url:u,thumb:(initial.thumbs||[])[i]}))),onPickPhotos=e=>{const add=[];Array.from(e.target.files||[]).forEach(f=>{f.type&&f.type.indexOf("image/")!==0||f.size>10*1024*1024||add.push({file:f,url:URL.createObjectURL(f)})}),setPhotos(ps=>[...ps,...add].slice(0,6)),e.target.value=""},removePhoto=i=>setPhotos(ps=>ps.filter((_,x)=>x!==i)),ready=name.trim()&&price&&Number(price)>0&&(isRatl?ratlCount>0:finalWeight)&&(!isFarmer||inSanaa)&&(usesRatlStock?!0:qtyNum>0),publish=()=>{if(!ready)return;const id=editing?initial.id:"mine-"+Date.now(),outCat=isFarmer?section:effSection,outSale=canChoose&&target==="wholesale"?"wholesale":void 0;onPublish({id,img:editing?initial.img:id,store:editing?initial.store:"mine-"+effSection,cat:outCat,sale:outSale,sanaa:isFarmer?!0:void 0,stock:stockVal,stockUnit:stockUnitLabel,stockInput:usesRatlStock?ratlCount:qtyNum,qadahWeight:needsQadahStock?qadahKg:void 0,photoItems:photos.map(p=>p.file?{file:p.file}:{url:p.url,thumb:p.thumb}),variety:isAlmond||isRaisin?variety:void 0,baladi:isAlmond?!0:void 0,shahti:isAlmond&&wantShahti?!0:void 0,shahtiStatus:isAlmond&&wantShahti?initial&&initial.shahtiStatus==="approved"?"approved":"pending":null,inspect:isAlmond&&wantShahti?{ar:t.shahti_loc_name+" · "+t.shahti_loc_addr,en:t.shahti_loc_name+" · "+t.shahti_loc_addr}:void 0,price:isRatl?pricePerKilo:Number(price),weight:{ar:finalWeight,en:finalWeight},unit:isRatl?"ratl":void 0,ratlPrice:isRatl?ratlPrice:void 0,availRatls:isRatl?ratlCount:void 0,availKg:isRatl?Math.round(availKg*10)/10:void 0,name:{ar:name,en:name},desc:editing&&initial.desc?initial.desc:{ar:"منتج طازج منشور عبر لوزي.",en:"Fresh product published via LOZI."}},editing)},needKiloConfirm=isAlmond&&priceUnit==="kilo",onPublishClick=()=>{if(ready){if(needKiloConfirm){setConfirmKilo(!0);return}publish()}};return React.createElement("div",{className:"modal-overlay",onClick:onClose},React.createElement("div",{className:"sheet",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"sheet-handle"}),React.createElement("div",{className:"sheet-scroll"},React.createElement("div",{className:"sub-head"},React.createElement("div",{className:"sub-badge",style:{background:"var(--green)"}},React.createElement(Icon,{name:editing?"idcard":secIcon,size:22,color:"#fff"})),React.createElement("h2",null,editing?t.edit_product:isFarmer?t.add_crop:t.add_product)),!editing&&canChoose&&React.createElement("div",{className:"field",style:{marginBottom:4}},React.createElement("span",{className:"field-label"},"وجهة النشر"),React.createElement("div",{className:"seg seg-2"},isFarmer?React.createElement(React.Fragment,null,React.createElement("button",{className:target===section?"on":"",onClick:()=>setTarget(section)},section==="almond"?t.sec_almond:t.sec_raisin),React.createElement("button",{className:target==="wholesale"?"on":"",onClick:()=>setTarget("wholesale")},"سوق الجملة")):React.createElement(React.Fragment,null,React.createElement("button",{className:target==="wholesale"?"on":"",onClick:()=>setTarget("wholesale")},"سوق الجملة"),React.createElement("button",{className:target==="retail"?"on":"",onClick:()=>setTarget("retail")},"التجزئة"))),target==="wholesale"&&React.createElement("span",{className:"pl-note"},React.createElement(Icon,{name:"shield",size:13,color:"var(--green-deep)"}),"في سوق الجملة: التسعير بالكيس، ووزن الكيس ثابت."),isFarmer&&target===section&&React.createElement("span",{className:"pl-note"},React.createElement(Icon,{name:"shield",size:13,color:"var(--green-deep)"}),"يُنشر في قسم ",section==="almond"?t.sec_almond:t.sec_raisin," ويظهر للعملاء مباشرةً · التسعير بالكيلو."),!isFarmer&&target==="retail"&&React.createElement("span",{className:"pl-note"},React.createElement(Icon,{name:"shield",size:13,color:"var(--green-deep)"}),"في التجزئة: التسعير بالكيلو، والطلب بالجرام أو بالمبلغ.")),!editing&&!canChoose&&React.createElement("div",{className:"publish-lock"},React.createElement("span",{className:"pl-sec"},React.createElement(Icon,{name:secIcon,size:15,color:"#fff"}),t.publish_to,": ",React.createElement("b",null,secLabel)),React.createElement("span",{className:"pl-note"},React.createElement(Icon,{name:"shield",size:13,color:"var(--green-deep)"}),t.publish_locked_note)),React.createElement("div",{className:"form-fields"},React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},"صور المنتج"),React.createElement("div",{className:"photo-grid"},photos.map((p,i)=>React.createElement("div",{className:"photo-thumb",key:i},React.createElement("img",{src:p.url,alt:""}),React.createElement("button",{className:"photo-del",onClick:()=>removePhoto(i)},React.createElement(Icon,{name:"close",size:13,color:"#fff",stroke:3})))),photos.length<6&&React.createElement("label",{className:"photo-add"},React.createElement("input",{type:"file",accept:"image/*",multiple:!0,onChange:onPickPhotos,style:{display:"none"}}),React.createElement(Icon,{name:"upload",size:20,color:"var(--green-deep)"}),React.createElement("span",null,"إضافة صورة"))),React.createElement("span",{className:"pl-note"},React.createElement(Icon,{name:"shield",size:13,color:"var(--green-deep)"}),"يمكنك إضافة حتى ٦ صور. تظهر للمشترين في صفحة المنتج.")),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.crop_name),React.createElement("input",{className:"field-input",value:name,onChange:e=>setName(e.target.value),placeholder:t.crop_name_ph})),isAlmond&&React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},t.almond_type),React.createElement("div",{className:"seg"},ALMOND_TYPES.map(a=>React.createElement("button",{key:a.id,className:variety===a.id?"on":"",onClick:()=>setVariety(a.id)},a.label[lang])))),isRaisin&&React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},t.raisin_type),React.createElement("div",{className:"seg"},RAISIN_TYPES.map(a=>React.createElement("button",{key:a.id,className:variety===a.id?"on":"",onClick:()=>setVariety(a.id)},a.label[lang])))),isAlmond&&React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},"وحدة التسعير"),React.createElement("div",{className:"seg seg-2"},React.createElement("button",{className:priceUnit==="kilo"?"on":"",onClick:()=>setPriceUnit("kilo")},"بالكيلو"),React.createElement("button",{className:priceUnit==="ratl"?"on":"",onClick:()=>setPriceUnit("ratl")},"بالرطل")),isRatl&&React.createElement("span",{className:"pl-note ratl-warn"},React.createElement(Icon,{name:"shield",size:13,color:"var(--gold-deep)"}),"تُدخِل السعر ",React.createElement("b",null,"بالرطل"),"، والمشتري يشتري ",React.createElement("b",null,"بالكيلو"),". سعر الكيلو = سعر الرطل × ١٫٧٥.")),!isRatl&&React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},effSection==="wholesale"?"وزن الكيس":t.crop_weight),isRaisin&&React.createElement("div",{className:"seg seg-weight"},React.createElement("button",{className:useQadah?"":"on",onClick:()=>setUseQadah(!1)},t.weight_custom),React.createElement("button",{className:useQadah?"on":"",onClick:()=>setUseQadah(!0)},t.qadah_label)),!isQadah&&React.createElement("input",{className:"field-input",value:weight,onChange:e=>setWeight(e.target.value),placeholder:effSection==="wholesale"?"مثال: كيس ٥٠ كجم":t.crop_weight_ph}),isQadah&&React.createElement("div",{className:"qadah-field"},React.createElement("div",{className:"qadah-head"},React.createElement("span",{className:"qadah-label"},t.qadah_weight_label),React.createElement("span",{className:"qadah-hint"},t.qadah_hint)),React.createElement("div",{className:"chip-wrap"},qadahWeights.map(q=>React.createElement("button",{key:q,className:`chip ${qadahKg===q?"on":""}`,onClick:()=>setQadahKg(q)},q))))),isRatl&&React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"عدد الأرطال المتوفرة"),React.createElement("input",{className:"field-input",value:ratls,onChange:e=>setRatls(cleanDec(e.target.value)),onBlur:()=>onQtyBlur(ratls,setRatls),placeholder:"مثال: ١٠ أرطال",inputMode:"decimal"}),roundNote&&React.createElement("span",{className:"pl-note",style:{color:"var(--gold-deep)"}},React.createElement(Icon,{name:"check",size:13,color:"var(--gold-deep)"}),roundNote),ratlCount>0&&React.createElement("span",{className:"pl-note"},React.createElement(Icon,{name:"shield",size:13,color:"var(--green-deep)"}),"≈ ",availKg.toFixed(1)," كجم متاحة للبيع.")),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},isRatl?"سعر الرطل الواحد (ريال يمني)":effSection==="wholesale"?"سعر الكيس (ريال يمني)":effSection==="retail"?"سعر الكيلو (ريال يمني)":t.crop_price),React.createElement("input",{className:"field-input",value:price,onChange:e=>setPrice(e.target.value.replace(/[^0-9]/g,"")),placeholder:isRatl?"سعر الرطل الواحد":t.crop_price_ph,inputMode:"numeric"})),isRatl&&ratlPrice>0&&React.createElement("div",{className:"ratl-convert"},React.createElement("div",{className:"rc-row"},React.createElement("span",null,"سعر الرطل"),React.createElement("b",null,moneyStr(ratlPrice))),React.createElement("div",{className:"rc-eq"},"× ١٫٧٥ ="),React.createElement("div",{className:"rc-row big"},React.createElement("span",null,"سعر الكيلو للمشتري"),React.createElement("b",null,moneyStr(pricePerKilo)))),!usesRatlStock&&React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},"الكمية المتوفرة",needsWhUnit||needsQadahStock?"":" ("+stockUnitLabel+")"),needsWhUnit&&React.createElement("div",{className:"chip-wrap",style:{marginBottom:8}},WH_UNITS.map(u=>React.createElement("button",{key:u,className:`chip ${whUnit===u?"on":""}`,onClick:()=>setWhUnit(u)},u))),needsQadahStock&&React.createElement("div",{className:"chip-wrap",style:{marginBottom:8}},qadahWeights.map(q=>React.createElement("button",{key:q,className:`chip ${qadahKg===q?"on":""}`,onClick:()=>setQadahKg(q)},q))),React.createElement("input",{className:"field-input",value:stockQty,onChange:e=>setStockQty(isAlmond?cleanDec(e.target.value):e.target.value.replace(/[^0-9]/g,"")),onBlur:isAlmond?()=>onQtyBlur(stockQty,setStockQty):void 0,placeholder:needsQadahStock?"عدد الأقداح":needsWhUnit?"عدد الـ"+whUnit:"الكمية بالكيلو",inputMode:isAlmond?"decimal":"numeric"}),isAlmond&&roundNote&&React.createElement("span",{className:"pl-note",style:{color:"var(--gold-deep)"}},React.createElement(Icon,{name:"check",size:13,color:"var(--gold-deep)"}),roundNote),needsQadahStock&&React.createElement("span",{className:"pl-note"},React.createElement(Icon,{name:"shield",size:13,color:"var(--green-deep)"}),"وزن القدح ",qadahKg," · المشتري يشتري بالقدح."),needsWhUnit&&React.createElement("span",{className:"pl-note"},React.createElement(Icon,{name:"shield",size:13,color:"var(--green-deep)"}),"المشتري يشتري بوحدة «",whUnit,"».")),isAlmond&&React.createElement("div",{className:"shahti-request"},React.createElement("button",{className:"shahti-toggle",onClick:()=>setWantShahti(v=>!v)},React.createElement("span",{className:"shahti-seal sm"},React.createElement(ShahtiGlyph,{size:18})),React.createElement("span",{className:"shahti-toggle-txt"},React.createElement("strong",null,t.shahti_request),React.createElement("span",null,t.shahti_for_baladi," · تظهر الشارة بعد موافقة الإدارة")),React.createElement("span",{className:`switch ${wantShahti?"on":""}`},React.createElement("i",null))),wantShahti&&React.createElement("div",{className:"shahti-conds"},React.createElement("div",{className:"shahti-cond"},React.createElement("span",{className:"sc-n"},"1"),t.shahti_cond_sample),React.createElement("div",{className:"shahti-cond"},React.createElement("span",{className:"sc-n"},"2"),t.shahti_cond_inspect),React.createElement("div",{className:"shahti-loc"},React.createElement("div",{className:"shahti-loc-head"},React.createElement(Icon,{name:"location",size:15,color:"var(--green-deep)"}),t.shahti_loc_label),React.createElement("div",{className:"shahti-loc-name"},t.shahti_loc_name),React.createElement("div",{className:"shahti-loc-addr"},t.shahti_loc_addr),React.createElement("div",{className:"shahti-loc-actions"},React.createElement("button",{className:`shahti-phone ${copied?"ok":""}`,onClick:copyPhone},React.createElement(Icon,{name:copied?"check":"copy",size:14,color:copied?"var(--green-deep)":"var(--ink)",stroke:copied?3:2}),React.createElement("span",{className:"sp-num"},t.shahti_phone),React.createElement("span",{className:"sp-act"},copied?t.copied:t.copy)),React.createElement("a",{className:"shahti-wa",href:`https://wa.me/967${t.shahti_phone}`,target:"_blank",rel:"noreferrer"},React.createElement(Icon,{name:"whatsapp",size:16,color:"#fff"}),t.call_wa))),React.createElement("div",{className:"shahti-only-note"},React.createElement(Icon,{name:"shield",size:13,color:"var(--gold-deep)"}),t.shahti_only_baladi_note))),isFarmer&&React.createElement("label",{className:"terms-check sanaa-check"},React.createElement("input",{type:"checkbox",checked:inSanaa,onChange:e=>setInSanaa(e.target.checked)}),React.createElement("span",null,"أؤكّد أن الكمية متوفّرة داخل مدينة صنعاء، لتسريع عملية التوصيل للعميل")))),React.createElement("div",{className:"sheet-foot"},React.createElement("button",{className:"btn btn-green",disabled:!ready,onClick:onPublishClick},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,needKiloConfirm?"مراجعة وتأكيد":editing?t.save_edits:t.publish_crop))),confirmKilo&&React.createElement("div",{className:"ratl-confirm-overlay",onClick:()=>setConfirmKilo(!1)},React.createElement("div",{className:"ratl-confirm",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"rcf-icon"},React.createElement(Icon,{name:"shield",size:26,color:"var(--gold-deep)"})),React.createElement("h3",null,"تأكيد السعر بالكيلو"),React.createElement("p",{className:"rcf-lead"},"تأكّد أن هذا السعر ",React.createElement("b",null,"للكيلو")," وليس للرطل — الخلط بينهما قد يكلّفك خسارة كبيرة."),React.createElement("div",{className:"rcf-box"},React.createElement("div",{className:"rcf-row big"},React.createElement("span",null,"أدخلتَ سعر ",React.createElement("b",null,"الكيلو")),React.createElement("b",null,moneyStr(Number(price)||0)))),React.createElement("p",{className:"rcf-note"},"إن كنت تقصد سعر ",React.createElement("b",null,"الرطل"),"، ارجع وبدّل وحدة التسعير إلى «بالرطل»."),React.createElement("div",{className:"rcf-actions"},React.createElement("button",{className:"btn btn-ghost flex1",onClick:()=>setConfirmKilo(!1)},"رجوع للتعديل"),React.createElement("button",{className:"btn btn-green flex1",onClick:()=>{setConfirmKilo(!1),publish()}},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,"تأكيد ونشر")))))))}function greetFor(fullName){const first=(fullName||"").trim().split(/\s+/)[0],who=first?" يا "+first:"",h=new Date().getHours();return h>=6&&h<11?"صباح الخير"+who:h>=17&&h<23?"مساء الخير"+who:"أهلاً"+who}const ROLE_KEY={customer:"role_customer",farmer_almond:"role_farmer",farmer_raisin:"role_farmer",retail:"role_retail",wholesale:"role_wholesale"};function Profile({t,lang,go,favCount,subscribed,subPending,role,person,isSeller,dashCount=0}){const roleLabel=t[ROLE_KEY[role]||"role_customer"]+(role==="farmer_almond"?" · "+t.farmer_almond:role==="farmer_raisin"?" · "+t.farmer_raisin:""),rows=[{id:"personal",icon:"idcard",label:t.p_personal,go:()=>go("personal")},isSeller?{id:"dashboard",icon:"truck",label:t.nav_dashboard,badge:dashCount||null,go:()=>go("dashboard")}:null,{id:"orders",icon:"cart",label:t.p_orders,go:()=>go("orders")},{id:"fav",icon:"heart",label:t.p_fav,badge:favCount,go:()=>go("favorites")},{id:"reports",icon:"flag",label:t.p_reports,go:()=>go("reports")},{id:"settings",icon:"settings",label:t.p_settings,go:()=>go("settings")}].filter(Boolean);return React.createElement("div",{className:"screen profile"},React.createElement("h2",{className:"screen-title prof-greet"},greetFor(person&&person.name)),React.createElement("div",{className:"prof-card"},React.createElement("div",{className:"prof-av"},React.createElement(Icon,{name:"user",size:30,color:"var(--green-deep)"})),React.createElement("div",{className:"prof-meta"},React.createElement("strong",null,person&&person.name?person.name:t.guest),React.createElement("span",null,person&&person.phone?fmtPhone(person.phone):"+967 7• ••• ••••"),React.createElement("span",{className:"prof-role"},React.createElement(Icon,{name:"shield",size:11,color:"var(--green-deep)"}),t.acct_type,": ",roleLabel))),React.createElement("div",{className:"prof-list"},rows.map(r=>React.createElement("button",{key:r.id,className:"prof-row",onClick:r.go},React.createElement("span",{className:"prow-ic"},React.createElement(Icon,{name:r.icon,size:20,color:"var(--green-deep)",fill:r.id==="sub"})),React.createElement("span",{className:"prow-label"},r.label),r.badge?React.createElement("span",{className:"prow-badge"},r.badge):null,r.tag?React.createElement("span",{className:"prow-tag"},r.tag):null,React.createElement(Icon,{name:t.dir==="rtl"?"back":"fwd",size:16,color:"var(--muted)"})))))}function PersonalInfo({t,lang,role,onBack,person,onSave}){const isVendor=!!role&&role!=="customer";const[name,setName]=useStateB(person.name||""),[phone,setPhone]=useStateB(person.phone||""),[city,setCity]=useStateB(person.city||""),[address,setAddress]=useStateB(person.address||"");const phoneLocal=String(phone||"").replace(/^\+?967/,"").replace(/^0+/,"");return React.createElement("div",{className:"screen personal"},React.createElement(TopBar,{title:t.pinfo_title,onBack,t}),React.createElement("div",{className:"set-scroll"},React.createElement("div",{className:"pinfo-hint-card"},React.createElement(Icon,{name:"idcard",size:18,color:"var(--green-deep)"}),isVendor?t.pinfo_edit_hint_vendor:t.pinfo_edit_hint),React.createElement("div",{className:"form-fields"},React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.full_name),isVendor?React.createElement("div",{className:"field-input static locked"},React.createElement("span",{style:{flex:1}},name||"—"),React.createElement(Icon,{name:"lock",size:15,color:"var(--muted)"})):React.createElement("input",{className:"field-input",value:name,onChange:e=>setName(e.target.value),placeholder:t.full_name_ph})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.phone),React.createElement("div",{className:"phone-input"},React.createElement("span",{className:"phone-cc"},"+967"),isVendor?React.createElement("div",{className:"field-input static locked"},React.createElement("span",{style:{flex:1,direction:"ltr",textAlign:"start"}},phoneLocal||"—"),React.createElement(Icon,{name:"lock",size:15,color:"var(--muted)"})):React.createElement("input",{className:"field-input",value:phoneLocal,onChange:e=>setPhone(e.target.value),placeholder:t.phone_ph,inputMode:"tel"})))),React.createElement("div",{className:"pinfo-sec-head"},React.createElement(Icon,{name:"location",size:16,color:"var(--green-deep)"}),React.createElement("span",null,t.my_location)),React.createElement("div",{className:"form-fields"},React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.country),React.createElement("div",{className:"field-input static"},React.createElement("span",{className:"cf-flag sm"},"🇾🇪"),t.yemen)),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.city),React.createElement("input",{className:"field-input",value:city,onChange:e=>setCity(e.target.value),placeholder:t.city_ph})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.address),React.createElement("textarea",{className:"field-input area",value:address,onChange:e=>setAddress(e.target.value),placeholder:t.address_ph,rows:3}))),React.createElement("button",{className:"btn btn-green",disabled:!isVendor&&(!name.trim()||phoneLocal.length<7),onClick:()=>onSave({name,phone:phoneLocal?"+967"+phoneLocal:"",city,address}),style:{marginTop:6}},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,t.save))))}function SubscriptionDetails({t,lang,onBack,subscribed,subPending,sub,onSubscribe,fmtDate}){return React.createElement("div",{className:"screen subdetails"},React.createElement(TopBar,{title:t.sub_details,onBack,t}),React.createElement("div",{className:"set-scroll"},React.createElement("div",{className:`subd-status ${subscribed?"active":subPending?"pending":"none"}`},React.createElement("span",{className:"subd-ic"},React.createElement(Icon,{name:subscribed?"check":"bolt",size:22,color:"#fff",stroke:subscribed?3:2})),React.createElement("div",null,React.createElement("strong",null,subscribed?t.sub_active:subPending?t.sub_pending:t.sub_not_member),React.createElement("span",null,subscribed?t.savings_hero:subPending?t.sub_pending_sub:t.savings_desc))),React.createElement("div",{className:"subd-card"},React.createElement("div",{className:"subd-row"},React.createElement("span",null,t.sub_price_label),React.createElement("b",null,moneyStr(LOZI_SUB.yer),perYear(lang))),React.createElement("div",{className:"subd-row"},React.createElement("span",null,t.sub_duration_label),React.createElement("b",null,t.sub_duration_val)),subscribed&&React.createElement("div",{className:"subd-row"},React.createElement("span",null,t.sub_start),React.createElement("b",null,fmtDate(sub.start,lang))),subscribed&&React.createElement("div",{className:"subd-row highlight"},React.createElement("span",null,React.createElement(Icon,{name:"calendar",size:15,color:"var(--gold-deep)"}),t.sub_expiry),React.createElement("b",null,fmtDate(sub.expiry,lang)))),!subscribed&&!subPending&&React.createElement("button",{className:"btn btn-gold",onClick:onSubscribe},React.createElement(Icon,{name:"bolt",size:18,color:"var(--brown)"}),React.createElement("span",null,t.subscribe_now)),subscribed&&React.createElement("button",{className:"btn btn-ghost",onClick:onSubscribe},React.createElement(Icon,{name:"bolt",size:18,color:"var(--ink)"}),React.createElement("span",null,t.sub_renew))))}function Favorites({t,lang,favs,catalog,onBack,openProduct,addToCart,toggleFav,go}){const list=(catalog||[]).filter(p=>favs.includes(p.id));return React.createElement("div",{className:"screen favorites"},React.createElement(TopBar,{title:t.fav_title,onBack,t}),list.length?React.createElement("div",{className:"prod-grid pad"},list.map(p=>React.createElement(ProductCard,{key:p.id,p,t,lang,onOpen:openProduct,onAdd:addToCart,fav:!0,onFav:toggleFav}))):React.createElement("div",{className:"empty"},React.createElement("div",{className:"empty-ic"},React.createElement(Icon,{name:"heart",size:38,color:"var(--gold-deep)"})),React.createElement("h3",null,t.no_fav),React.createElement(PrimaryBtn,{icon:"store",onClick:()=>go("sections")},t.browse)))}const REPORT_TYPES=[{id:"retail",icon:"store",cls:"rt-retail",titleKey:"rep_retail",descKey:"rep_retail_desc",targetKey:"rep_target_store"},{id:"farmer",icon:"leaf",cls:"rt-farmer",titleKey:"rep_farmer",descKey:"rep_farmer_desc",targetKey:"rep_target_farmer"},{id:"general",icon:"flag",cls:"rt-general",titleKey:"rep_general",descKey:"rep_general_desc",targetKey:null}],REPORT_STATUS={review:{key:"rep_st_review",cls:"rep-st-review",icon:"flag"},resolved:{key:"rep_st_resolved",cls:"rep-st-resolved",icon:"check"},rejected:{key:"rep_st_rejected",cls:"rep-st-rejected",icon:"minus"}};function repTypeOf(id){return REPORT_TYPES.find(x=>x.id===id)||REPORT_TYPES[2]}function locVal(v,lang){return v==null?"":typeof v=="string"?v:v[lang]||v.ar||""}function Reports({t,lang,onBack,reports=[],onSubmit,prefill,showToast}){const[view,setView]=useStateB(prefill?"form":"list"),[type,setType]=useStateB(prefill?repTypeOf(prefill.typeId):null),[target,setTarget]=useStateB(prefill&&prefill.target||""),[orderId]=useStateB(prefill&&prefill.orderId||null),[subject,setSubject]=useStateB(""),[desc,setDesc]=useStateB(""),[open,setOpen]=useStateB(null),resetForm=()=>{setView("list"),setType(null),setTarget(""),setSubject(""),setDesc("")},valid=subject.trim()&&desc.trim()&&(!type||!type.targetKey||target.trim()),submit=()=>{onSubmit&&onSubmit({typeId:type.id,target:type.targetKey?target.trim():null,subject:subject.trim(),desc:desc.trim(),orderId}),resetForm()};return view==="list"?React.createElement("div",{className:"screen reports"},React.createElement(TopBar,{title:t.reports_title,onBack,t,right:React.createElement("button",{className:"tb-action",onClick:()=>setView("choose"),"aria-label":t.new_report},React.createElement(Icon,{name:"plus",size:18,color:"var(--green-deep)"}))}),React.createElement("div",{className:"set-scroll"},reports.length===0?React.createElement("div",{className:"empty"},React.createElement("div",{className:"empty-ic"},React.createElement(Icon,{name:"flag",size:36,color:"var(--gold-deep)"})),React.createElement("h3",null,t.rep_empty),React.createElement("p",null,t.rep_empty_sub),React.createElement(PrimaryBtn,{icon:"plus",onClick:()=>setView("choose")},t.new_report)):React.createElement(React.Fragment,null,React.createElement("button",{className:"btn btn-green",onClick:()=>setView("choose"),style:{marginBottom:14}},React.createElement(Icon,{name:"plus",size:18,color:"#fff",stroke:2.5}),React.createElement("span",null,t.new_report)),React.createElement("div",{className:"rep-cards"},reports.map(r=>{const rt=repTypeOf(r.typeId),st=REPORT_STATUS[r.status]||REPORT_STATUS.review,isOpen=open===r.id;return React.createElement("div",{key:r.id,className:`rep-card ${isOpen?"open":""}`},React.createElement("button",{className:"rep-card-head",onClick:()=>setOpen(isOpen?null:r.id)},React.createElement("span",{className:`rt-ic ${rt.cls}`},React.createElement(Icon,{name:rt.icon,size:18,color:"#fff",fill:rt.icon==="leaf"})),React.createElement("span",{className:"rep-card-mid"},React.createElement("strong",null,locVal(r.subject,lang)),React.createElement("span",{className:"rep-card-meta"},"#",r.id," · ",locVal(r.date,lang),r.target?" · "+locVal(r.target,lang):"")),React.createElement("span",{className:`rep-status ${st.cls}`},t[st.key])),isOpen&&React.createElement("div",{className:"rep-card-body"},React.createElement("div",{className:"rep-type-line"},React.createElement(Icon,{name:rt.icon,size:13,color:"var(--ink-soft)",fill:rt.icon==="leaf"}),t[rt.titleKey],r.orderId?" · "+t.rep_about_order+" #"+r.orderId:""),React.createElement("p",{className:"rep-desc-txt"},locVal(r.desc,lang)),r.reply&&React.createElement("div",{className:"rep-reply"},React.createElement("div",{className:"rep-reply-head"},React.createElement(Icon,{name:"shield",size:13,color:"var(--green-deep)"}),t.rep_admin_reply),React.createElement("p",null,locVal(r.reply,lang)))))})),React.createElement("div",{className:"rep-confid"},React.createElement(Icon,{name:"shield",size:15,color:"var(--green-deep)"}),t.rep_confidential)))):view==="choose"?React.createElement("div",{className:"screen reports"},React.createElement(TopBar,{title:t.new_report,onBack:()=>setView("list"),t}),React.createElement("div",{className:"set-scroll"},React.createElement("div",{className:"rep-intro"},React.createElement("h3",null,t.report_pick_type),React.createElement("p",null,t.report_pick_sub)),React.createElement("div",{className:"rep-types"},REPORT_TYPES.map(rt=>React.createElement("button",{key:rt.id,className:`rep-type ${rt.cls}`,onClick:()=>{setType(rt),setView("form")}},React.createElement("span",{className:"rt-ic"},React.createElement(Icon,{name:rt.icon,size:22,color:"#fff",fill:rt.icon==="leaf"})),React.createElement("span",{className:"rt-txt"},React.createElement("strong",null,t[rt.titleKey]),React.createElement("span",null,t[rt.descKey])),React.createElement(Icon,{name:t.dir==="rtl"?"back":"fwd",size:18,color:"var(--muted)"})))),React.createElement("div",{className:"rep-confid"},React.createElement(Icon,{name:"shield",size:15,color:"var(--green-deep)"}),t.rep_confidential))):React.createElement("div",{className:"screen reports"},React.createElement(TopBar,{title:t[type.titleKey],onBack:()=>prefill?onBack():setView("choose"),t}),React.createElement("div",{className:"set-scroll"},React.createElement("div",{className:`rep-form-head ${type.cls}`},React.createElement("span",{className:"rt-ic"},React.createElement(Icon,{name:type.icon,size:20,color:"#fff",fill:type.icon==="leaf"})),React.createElement("span",null,t[type.descKey])),orderId&&React.createElement("div",{className:"rep-order-ref"},React.createElement(Icon,{name:"cart",size:15,color:"var(--green-deep)"}),t.rep_about_order," ",React.createElement("b",null,"#",orderId)),React.createElement("div",{className:"form-fields"},type.targetKey&&React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t[type.targetKey]),React.createElement("input",{className:"field-input",value:target,onChange:e=>setTarget(e.target.value),placeholder:t.rep_target_ph})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.rep_subject),React.createElement("input",{className:"field-input",value:subject,onChange:e=>setSubject(e.target.value),placeholder:t.rep_subject_ph})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.rep_desc),React.createElement("textarea",{className:"field-input area lg",value:desc,onChange:e=>setDesc(e.target.value),placeholder:t.rep_desc_ph,rows:5})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},t.rep_attach),React.createElement(Img,{id:"report-photo",ph:t.rep_attach,radius:14,style:{width:"100%",height:96}}))),React.createElement("div",{className:"rep-confid"},React.createElement(Icon,{name:"shield",size:15,color:"var(--green-deep)"}),t.rep_confidential),React.createElement("button",{className:"btn btn-green",disabled:!valid,onClick:submit,style:{marginTop:6}},React.createElement(Icon,{name:"flag",size:18,color:"#fff"}),React.createElement("span",null,t.rep_submit))))}function Settings({t,lang,onBack,toggleLang,currency,setCurrencyState,themeMode,setThemeMode,openTerms,go,person,onLogout,openSupport,onRequestDelete}){const[del,setDel]=useStateB(""),[delErr,setDelErr]=useStateB(""),submitDelete=async()=>{setDel("sending"),setDelErr("");const r=await onRequestDelete();if(r&&r.ok)return setDel("sent");setDelErr(r&&r.error||"تعذّر الإرسال"),setDel("confirm")},addr=person&&(person.city||person.address)?[person.city,person.address].filter(Boolean).join("، "):t.no_location,themes=[{id:"light",icon:"sun",label:t.theme_light},{id:"dark",icon:"moon",label:t.theme_dark},{id:"auto",icon:"auto",label:t.theme_auto}];return React.createElement("div",{className:"screen settings"},React.createElement(TopBar,{title:t.settings_title,onBack,t}),React.createElement("div",{className:"set-group"},React.createElement("div",{className:"set-row col"},React.createElement("div",{className:"set-row-main"},React.createElement("span",{className:"set-ic"},React.createElement(Icon,{name:"tag",size:19,color:"var(--green-deep)"})),React.createElement("span",{className:"set-label"},t.currency_label),React.createElement("div",{className:"lang-switch"},React.createElement("button",{className:currency==="YER"?"on":"",onClick:()=>setCurrencyState("YER")},t.currency_yer),React.createElement("button",{className:currency==="SAR"?"on":"",onClick:()=>setCurrencyState("SAR")},t.currency_sar))),React.createElement("div",{className:"set-note"},t.currency_note)),React.createElement("div",{className:"set-row col"},React.createElement("div",{className:"set-row-main"},React.createElement("span",{className:"set-ic"},React.createElement(Icon,{name:"moon",size:18,color:"var(--green-deep)"})),React.createElement("span",{className:"set-label"},t.theme_label)),React.createElement("div",{className:"theme-seg"},themes.map(m=>React.createElement("button",{key:m.id,className:`theme-opt ${themeMode===m.id?"on":""}`,onClick:()=>setThemeMode(m.id)},React.createElement(Icon,{name:m.icon,size:18,color:themeMode===m.id?"#fff":"var(--ink-soft)"}),React.createElement("span",null,m.label)))),React.createElement("div",{className:"set-note"},themeMode==="auto"?t.theme_auto_note:""))),React.createElement("div",{className:"set-group"},React.createElement("button",{className:"set-row tap",onClick:()=>go&&go("personal")},React.createElement("span",{className:"set-ic"},React.createElement(Icon,{name:"location",size:19,color:"var(--green-deep)"})),React.createElement("span",{className:"set-label"},t.my_location),React.createElement("span",{className:"set-val ellip"},addr),React.createElement(Icon,{name:t.dir==="rtl"?"back":"fwd",size:16,color:"var(--muted)"})),React.createElement("button",{className:"set-row tap",onClick:openTerms},React.createElement("span",{className:"set-ic"},React.createElement(Icon,{name:"flag",size:19,color:"var(--green-deep)"})),React.createElement("span",{className:"set-label"},t.terms_title),React.createElement(Icon,{name:t.dir==="rtl"?"back":"fwd",size:16,color:"var(--muted)"})),React.createElement("button",{className:"set-row tap",onClick:openSupport},React.createElement("span",{className:"set-ic"},React.createElement(Icon,{name:"whatsapp",size:19,color:"var(--green-deep)"})),React.createElement("span",{className:"set-label"},t.wa_support),React.createElement(Icon,{name:t.dir==="rtl"?"back":"fwd",size:16,color:"var(--muted)"}))),React.createElement("button",{className:"logout-btn",onClick:onLogout},React.createElement(Icon,{name:"logout",size:19,color:"var(--muted)"}),t.logout),React.createElement("div",{className:"danger-zone"},del==="sent"?React.createElement("div",{className:"del-sent"},React.createElement(Icon,{name:"check",size:16,color:"var(--green-deep)",stroke:3}),"تم إرسال طلب حذف حسابك إلى الإدارة. ستتم مراجعته قريباً."):del==="confirm"||del==="sending"?React.createElement("div",{className:"del-confirm"},React.createElement("p",null,"سيُرسَل طلب حذف حسابك إلى الإدارة لمراجعته ثم حذفه نهائياً. هل أنت متأكد؟"),delErr&&React.createElement("span",{className:"verif-err"},delErr),React.createElement("div",{className:"del-actions"},React.createElement("button",{className:"btn btn-ghost flex1",disabled:del==="sending",onClick:()=>setDel("")},"إلغاء"),React.createElement("button",{className:"btn btn-danger flex1",disabled:del==="sending",onClick:submitDelete},del==="sending"?"جارٍ الإرسال…":"تأكيد الطلب"))):React.createElement("button",{className:"del-account-link",onClick:()=>setDel("confirm"),style:{background:"none",border:"none",color:"var(--muted)",fontSize:"12px",textDecoration:"underline",cursor:"pointer",padding:"6px 0",fontFamily:"inherit",opacity:.7}},"حذف الحساب")),React.createElement("div",{className:"set-version"},"LOZI · v1.2"))}function waLink(phone){let d=String(phone).replace(/[^0-9]/g,"");return d.indexOf("967")!==0&&(d.charAt(0)==="0"&&(d=d.slice(1)),d="967"+d),"https://wa.me/"+d}function supLabel(n,lang){return typeof n.label=="string"?n.label:n.label[lang]||n.label.ar||""}function SupportSheet({t,lang,numbers,onClose}){const ordered=[...numbers].sort((a,b)=>(b.primary?1:0)-(a.primary?1:0));return React.createElement("div",{className:"modal-overlay",onClick:onClose},React.createElement("div",{className:"sheet",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"sheet-handle"}),React.createElement("div",{className:"sheet-scroll"},React.createElement("div",{className:"sup-head"},React.createElement("div",{className:"sup-badge"},React.createElement(Icon,{name:"whatsapp",size:28,color:"#fff"})),React.createElement("h2",null,t.sup_title),React.createElement("p",null,t.sup_intro)),React.createElement("div",{className:"sup-list"},ordered.map(n=>React.createElement("a",{key:n.id,className:"sup-card",href:waLink(n.phone),target:"_blank",rel:"noopener"},React.createElement("span",{className:"sup-ic"},React.createElement(Icon,{name:"whatsapp",size:23,color:"#fff"})),React.createElement("span",{className:"sup-info"},React.createElement("strong",null,supLabel(n,lang),n.primary&&React.createElement("i",{className:"sup-tag"},t.sup_primary)),React.createElement("span",{className:"sup-num",dir:"ltr"},"+967 ",n.phone)),React.createElement("span",{className:"sup-go"},React.createElement(Icon,{name:"whatsapp",size:15,color:"#fff"}),React.createElement("span",null,t.contact_wa))))))))}const NOTIF_ICON={order:"cart",status:"truck",report:"flag",offer:"tag",info:"bell"};function Notifications({t,lang,notifs=[],onBack,go}){return React.createElement("div",{className:"screen notifs"},React.createElement(TopBar,{title:t.notif_title,onBack,t}),React.createElement("div",{className:"set-scroll"},notifs.length===0?React.createElement("div",{className:"empty"},React.createElement("div",{className:"empty-ic"},React.createElement(Icon,{name:"bell",size:36,color:"var(--gold-deep)"})),React.createElement("h3",null,t.notif_empty),React.createElement("p",null,t.notif_empty_sub)):React.createElement("div",{className:"notif-list"},notifs.map(n=>React.createElement("button",{key:n.id,className:`notif-row nt-${n.type} ${n.read?"":"unread"}`,onClick:()=>n.link&&go(n.link)},React.createElement("span",{className:"notif-ic"},React.createElement(Icon,{name:NOTIF_ICON[n.type]||"bell",size:18,color:"#fff"})),React.createElement("span",{className:"notif-mid"},React.createElement("strong",null,n.title[lang]),React.createElement("span",{className:"notif-body"},n.body[lang]),React.createElement("span",{className:"notif-time"},n.time[lang])),!n.read&&React.createElement("i",{className:"notif-unread-dot"}))))))}Object.assign(window,{Product,Cart,Checkout,OrderSuccess,Orders,Savings,SubModal,TermsSheet,AddProductSheet,Profile,PersonalInfo,SubscriptionDetails,Favorites,Reports,Settings,SupportSheet,Notifications});
+const { useState, useRef, useEffect } = React,
+  Ic = {
+    chat: "M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z",
+    search:
+      "M11 4a7 7 0 1 0 4.9 12l4 4 1.4-1.4-4-4A7 7 0 0 0 11 4Zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10Z",
+    filter: "M3 5h18l-7 8v6l-4 2v-8L3 5Z",
+    close: "M6 6l12 12M18 6 6 18",
+    home: "M12 3 3 10v10h6v-6h6v6h6V10l-9-7Z",
+    store:
+      "M4 4h16l1 5a2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1-5 0L4 4Zm1 8v8h6v-5h2v5h6v-8",
+    savings:
+      "M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4Zm0 5 1.6 3.3 3.6.5-2.6 2.5.6 3.6L12 15.7 8.8 17.4l.6-3.6L6.8 11l3.6-.5L12 7Z",
+    cart: "M3 4h2l2.4 12.3A2 2 0 0 0 9.4 18h8.2a2 2 0 0 0 2-1.6L21 8H6.2M9 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm9 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",
+    user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0",
+    star: "M12 2.5 14.9 8.4 21.5 9.4 16.7 14 17.9 20.6 12 17.5 6.1 20.6 7.3 14 2.5 9.4 9.1 8.4 12 2.5Z",
+    check: "M5 12.5 10 17.5 19.5 7",
+    back: "M15 5 8 12l7 7",
+    fwd: "M9 5l7 7-7 7",
+    heart:
+      "M12 21s-7.5-4.6-10-9.2C.6 8.8 2 5.5 5.2 5.2 7.3 5 8.9 6.2 12 9c3.1-2.8 4.7-4 6.8-3.8C22 5.5 23.4 8.8 22 11.8 19.5 16.4 12 21 12 21Z",
+    plus: "M12 5v14M5 12h14",
+    minus: "M5 12h14",
+    trash: "M5 7h14M9 7V5h6v2m-1 0v11a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V7",
+    whatsapp:
+      "M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2Zm5.3 13.9c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-3.3-.9s-3.7-3.4-3.8-3.5c-.1-.2-.9-1.2-.9-2.3s.6-1.6.8-1.9c.2-.2.4-.3.6-.3h.5c.2 0 .4 0 .6.5l.7 1.7c.1.2.1.4 0 .5l-.3.5c-.1.2-.3.3-.1.6.1.2.6 1 1.3 1.6.9.8 1.6 1 1.8 1.1.2.1.4.1.5-.1l.6-.7c.2-.2.3-.2.6-.1l1.6.8c.3.1.4.2.5.3.1.2.1.6-.1 1.2Z",
+    location:
+      "M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z",
+    globe:
+      "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 0c2.5 2 4 5.5 4 10s-1.5 8-4 10m0-20c-2.5 2-4 5.5-4 10s1.5 8 4 10M2.5 9h19M2.5 15h19",
+    logout:
+      "M15 12H4m0 0 4-4m-4 4 4 4M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5",
+    bell: "M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Zm4 10a2 2 0 0 0 4 0",
+    copy: "M9 9V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-4M4 9h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z",
+    upload: "M12 16V4m0 0L8 8m4-4 4 4M5 18v1a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1",
+    chevron: "M9 5l7 7-7 7",
+    bolt: "M13 2 4 14h6l-1 8 9-12h-6l1-8Z",
+    shield: "M12 2 4 5v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V5l-8-3Z",
+    flag: "M5 21V4m0 0h11l-2 4 2 4H5",
+    settings:
+      "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.5 4-1.8.9.3 2-1.9.7-1.2-1.6-2 .4-.6 1.9h-2l-.6-1.9-2-.4L7.5 18l-1.9-.7.3-2L4 12l1.8-.9-.3-2 1.9-.7 1.2 1.6 2-.4.6-1.9h2l.6 1.9 2 .4L18.6 6l1.9.7-.3 2L22 12Z",
+    warehouse: "M3 21V9l9-5 9 5v12M3 21h18M7 21v-6h4v6m4 0v-6h2v6M7 12h4",
+    percent:
+      "M19 5 5 19M8.5 8.5a2 2 0 1 1-3 0 2 2 0 0 1 3 0Zm10 10a2 2 0 1 1-3 0 2 2 0 0 1 3 0Z",
+    tag: "M3 11V4a1 1 0 0 1 1-1h7l9 9a1 1 0 0 1 0 1.4l-6.6 6.6a1 1 0 0 1-1.4 0L3 11Zm4-3.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",
+    truck:
+      "M3 7h11v9H3V7Zm11 3h4l3 3v3h-7v-6ZM7.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm10 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z",
+    leaf: "M4 20c0-8 5-14 16-14 0 11-6 16-14 16-1 0-2-.2-2-.2S4 21 4 20Zm4-1c3-5 6-7 9-8",
+    idcard:
+      "M3 5h18v14H3V5Zm3 4a2 2 0 1 1 4 0 2 2 0 0 1-4 0Zm-1 7c0-2 1.5-3 3-3s3 1 3 3M14 9h5M14 13h5M14 16h3",
+    lock: "M7 11V8a5 5 0 0 1 10 0v3M6 11h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Z",
+    calendar: "M4 6h16v15H4V6Zm0 5h16M8 3v4m8-4v4",
+    phone:
+      "M6.6 3h3l1.5 5-2 1.3a12 12 0 0 0 5.6 5.6l1.3-2 5 1.5v3a2 2 0 0 1-2.2 2A17 17 0 0 1 4.6 5.2 2 2 0 0 1 6.6 3Z",
+    mail: "M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm0 2 8 6 8-6",
+    wallet:
+      "M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2H3Zm0 1h17a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2H4a1 1 0 0 1-1-1V8Zm14 4.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z",
+    sun: "M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-13v2m0 12v2M4 12H2m20 0h-2M5.6 5.6 4.2 4.2m14.2 14.2-1.4-1.4M5.6 18.4l-1.4 1.4M18.4 5.6l1.4-1.4",
+    moon: "M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z",
+    auto: "M12 3a9 9 0 0 0 0 18V3Zm0 0a9 9 0 0 1 0 18",
+  };
+function Icon({
+  name,
+  size = 22,
+  color = "currentColor",
+  stroke = 2,
+  fill = !1,
+}) {
+  const filledOnes = [
+    "star",
+    "heart",
+    "savings",
+    "whatsapp",
+    "bolt",
+    "shield",
+    "moon",
+  ];
+  if (!Ic[name]) return null;
+  const isFill = fill || filledOnes.includes(name);
+  return React.createElement(
+    "svg",
+    {
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24",
+      fill: isFill ? color : "none",
+      stroke: isFill ? "none" : color,
+      strokeWidth: stroke,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+    },
+    React.createElement("path", { d: Ic[name] }),
+  );
+}
+function Img({ id, ph, style, radius = 14, shape = "rounded", className }) {
+  return typeof id == "string" && /^(https?:|data:|blob:)/.test(id)
+    ? React.createElement("img", {
+        src: id,
+        alt: ph || "",
+        class: className,
+        style: Object.assign(
+          {
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+            borderRadius: shape === "circle" ? "50%" : radius + "px",
+          },
+          style || {},
+        ),
+      })
+    : React.createElement("image-slot", {
+        id,
+        placeholder: ph || "",
+        shape,
+        radius: String(radius),
+        style,
+        class: className,
+      });
+}
+function Stars({ value, size = 13 }) {
+  return React.createElement(
+    "span",
+    { style: { display: "inline-flex", gap: 1, color: "var(--gold-deep)" } },
+    React.createElement(Icon, { name: "star", size }),
+    React.createElement(
+      "b",
+      { style: { color: "var(--ink)", fontSize: size, fontWeight: 800 } },
+      value.toFixed(1),
+    ),
+  );
+}
+function Badge({ kind, t }) {
+  return kind === "verified"
+    ? React.createElement(
+        "span",
+        { className: "badge badge-verified" },
+        React.createElement(Icon, { name: "shield", size: 12, color: "#fff" }),
+        t.verified,
+      )
+    : null;
+}
+function VerifiedSeal({ size = 16 }) {
+  return React.createElement(
+    "span",
+    {
+      className: "ver-seal",
+      title: "موثّق",
+      style: { width: size, height: size },
+    },
+    React.createElement(Icon, {
+      name: "check",
+      size: Math.round(size * 0.62),
+      color: "#fff",
+      stroke: 3,
+    }),
+  );
+}
+function Money({ v, cls, small }) {
+  const m = fmtMoney(v);
+  return React.createElement(
+    "span",
+    { className: cls },
+    m.value,
+    " ",
+    React.createElement(
+      "i",
+      { style: small ? { fontSize: ".62em" } : null },
+      m.unit,
+    ),
+  );
+}
+function offerText(o, t, lang) {
+  return o.type === "discount"
+    ? `${t.off_discount} ${o.value}%`
+    : o.type === "free_min"
+      ? `${t.off_free_min} ${moneyStr(o.min)}`
+      : o.type === "bundle"
+        ? `${o.items[lang]} (${o.weight[lang]}) · ${moneyStr(o.value)}`
+        : "";
+}
+function offerIcon(o) {
+  return o.type === "discount"
+    ? "percent"
+    : o.type === "free_min"
+      ? "truck"
+      : "tag";
+}
+function OfferChip({ o, t, lang }) {
+  return React.createElement(
+    "span",
+    { className: `offer-chip oc-${o.type}` },
+    React.createElement(Icon, {
+      name: offerIcon(o),
+      size: 12,
+      color: "currentColor",
+    }),
+    offerText(o, t, lang),
+  );
+}
+function PrimaryBtn({
+  children,
+  onClick,
+  icon,
+  variant = "green",
+  style,
+  disabled,
+}) {
+  const iconColor =
+    variant === "ghost"
+      ? "var(--ink)"
+      : variant === "wa-line"
+        ? "#1FA855"
+        : "#fff";
+  return React.createElement(
+    "button",
+    { className: `btn btn-${variant}`, onClick, disabled, style },
+    icon &&
+      React.createElement(Icon, { name: icon, size: 20, color: iconColor }),
+    React.createElement("span", null, children),
+  );
+}
+function Stepper({ value, onMinus, onPlus, t }) {
+  return React.createElement(
+    "div",
+    { className: "stepper" },
+    React.createElement(
+      "button",
+      { onClick: onMinus },
+      React.createElement(Icon, {
+        name: value <= 1 ? "trash" : "minus",
+        size: 16,
+        color: "var(--ink)",
+      }),
+    ),
+    React.createElement("span", null, value),
+    React.createElement(
+      "button",
+      { onClick: onPlus },
+      React.createElement(Icon, {
+        name: "plus",
+        size: 16,
+        color: "var(--ink)",
+      }),
+    ),
+  );
+}
+function SecHead({ title, action, onAction }) {
+  return React.createElement(
+    "div",
+    { className: "sec-head" },
+    React.createElement("h3", null, title),
+    action &&
+      React.createElement(
+        "button",
+        { className: "sec-action", onClick: onAction },
+        action,
+      ),
+  );
+}
+function TopBar({ title, onBack, right, t }) {
+  return React.createElement(
+    "div",
+    { className: "topbar" },
+    onBack
+      ? React.createElement(
+          "button",
+          { className: "icon-btn", onClick: onBack, "aria-label": t.back },
+          React.createElement(Icon, {
+            name: t.dir === "rtl" ? "chevron" : "back",
+            size: 22,
+            color: "var(--ink)",
+          }),
+        )
+      : React.createElement("span", { style: { width: 38 } }),
+    React.createElement("h2", null, title),
+    React.createElement(
+      "div",
+      { style: { minWidth: 38, display: "flex", justifyContent: "flex-end" } },
+      right,
+    ),
+  );
+}
+function BottomNav({ active, go, cartCount, t, isSeller }) {
+  const items = [
+    { id: "home", icon: "home", label: t.nav_home },
+    { id: "sections", icon: "store", label: t.nav_stores },
+    isSeller
+      ? { id: "dashboard", icon: "truck", label: t.nav_dashboard }
+      : { id: "savings", icon: "savings", label: t.nav_savings },
+    { id: "cart", icon: "cart", label: t.nav_cart, badge: cartCount },
+    { id: "profile", icon: "user", label: t.nav_profile },
+  ].filter(Boolean);
+  return React.createElement(
+    "nav",
+    { className: "bottom-nav" },
+    items.map((it) => {
+      const on = active === it.id;
+      return React.createElement(
+        "button",
+        {
+          key: it.id,
+          className: `nav-item ${on ? "on" : ""}`,
+          onClick: () => go(it.id),
+        },
+        React.createElement(
+          "span",
+          { className: "nav-ic" },
+          React.createElement(Icon, {
+            name: it.icon,
+            size: 23,
+            color: on ? "var(--green-deep)" : "var(--muted)",
+            fill: on && it.id === "savings",
+          }),
+          it.badge
+            ? React.createElement("span", { className: "nav-badge" }, it.badge)
+            : null,
+        ),
+        React.createElement("span", null, it.label),
+      );
+    }),
+  );
+}
+function Toast({ msg }) {
+  return msg ? React.createElement("div", { className: "toast" }, msg) : null;
+}
+function lozUploadXHR(bucket, path, file, token, onProgress) {
+  return new Promise((resolve) => {
+    try {
+      const xhr = new XMLHttpRequest();
+      (xhr.open(
+        "POST",
+        window.LOZI_SUPABASE_URL + "/storage/v1/object/" + bucket + "/" + path,
+        !0,
+      ),
+        xhr.setRequestHeader("authorization", "Bearer " + token),
+        xhr.setRequestHeader("apikey", window.LOZI_SUPABASE_ANON),
+        file.type && xhr.setRequestHeader("content-type", file.type),
+        xhr.setRequestHeader("x-upsert", "true"),
+        (xhr.upload.onprogress = (e) => {
+          e.lengthComputable && onProgress && onProgress(e.loaded / e.total);
+        }),
+        (xhr.onload = () =>
+          resolve(
+            xhr.status >= 200 && xhr.status < 300
+              ? { ok: !0 }
+              : { ok: !1, error: "HTTP " + xhr.status },
+          )),
+        (xhr.onerror = () => resolve({ ok: !1, error: "network" })),
+        xhr.send(file));
+    } catch (e) {
+      resolve({ ok: !1, error: e.message });
+    }
+  });
+}
+function lozPublicUrl(bucket, path) {
+  return (
+    window.LOZI_SUPABASE_URL +
+    "/storage/v1/object/public/" +
+    bucket +
+    "/" +
+    path
+  );
+}
+function UploadRing({ pct }) {
+  const C = 2 * Math.PI * 34,
+    p = Math.max(0, Math.min(1, pct || 0));
+  return React.createElement(
+    "div",
+    { className: "upload-ring-overlay" },
+    React.createElement(
+      "div",
+      { className: "upload-ring-card" },
+      React.createElement(
+        "div",
+        { className: "upload-ring" },
+        React.createElement(
+          "svg",
+          { viewBox: "0 0 80 80", width: "84", height: "84" },
+          React.createElement("circle", {
+            className: "ur-bg",
+            cx: "40",
+            cy: "40",
+            r: 34,
+          }),
+          React.createElement("circle", {
+            className: "ur-fg",
+            cx: "40",
+            cy: "40",
+            r: 34,
+            style: { strokeDasharray: C, strokeDashoffset: C * (1 - p) },
+          }),
+        ),
+        React.createElement(
+          "span",
+          { className: "ur-pct" },
+          Math.round(p * 100),
+          "%",
+        ),
+      ),
+      React.createElement("span", { className: "ur-label" }, "جارٍ رفع الصور…"),
+    ),
+  );
+}
+Object.assign(window, {
+  Icon,
+  Img,
+  Stars,
+  Badge,
+  VerifiedSeal,
+  Money,
+  OfferChip,
+  offerText,
+  offerIcon,
+  PrimaryBtn,
+  Stepper,
+  SecHead,
+  TopBar,
+  BottomNav,
+  Toast,
+  UploadRing,
+  lozUploadXHR,
+  lozPublicUrl,
+});
 
-const{useState:useStateS}=React,SELLER_STEPS=["new","preparing","delivering","delivered"],SELLER_NEXT={new:"preparing",preparing:"delivering",delivering:"delivered"},SELLER_ACTION={new:"act_start_prep",preparing:"act_out_delivery",delivering:"act_mark_delivered"},SELLER_STATUS_KEY={new:"st_new",preparing:"st_preparing",delivering:"st_delivering",delivered:"st_delivered",rejected:"st_rejected"},LOZI_SELLER_ORDERS_SEED=[],SELLER_TITLE={retail:"dash_retail",wholesale:"dash_wholesale",farmer_almond:"dash_farm",farmer_raisin:"dash_farm"},SELLER_GLYPH={retail:"store",wholesale:"warehouse",farmer_almond:"leaf",farmer_raisin:"leaf"},LOZI_MY_PRODUCTS_SEED={};function mapsHref(addr){return"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(addr)}function SellerOrderCard({o,t,lang,onAdvance,onAssign,onReject,allowLozi=!0}){const[rejecting,setRejecting]=useStateS(!1),txt=v=>v==null?"":typeof v=="string"?v:v[lang]||v.ar||"",stepIdx=SELLER_STEPS.indexOf(o.status),c=o.customer||{},itemCount=o.items.reduce((a,it)=>a+it.q,0),rejected=o.status==="rejected",showDelivery=o.status==="new"||o.status==="preparing",canReject=o.status==="new"||o.status==="preparing",nextAction=SELLER_NEXT[o.status],canAdvance=!!nextAction;return React.createElement("div",{className:`sodr-card st-${o.status}`},React.createElement("div",{className:"sodr-top"},React.createElement("div",{className:"sodr-head"},React.createElement("span",{className:"sodr-no"},t.order_no," #",o.id),React.createElement("span",{className:"sodr-when"},o.placed[lang]," · ",itemCount," ",t.items_count)),React.createElement("span",{className:`sodr-badge st-${o.status}`},t[SELLER_STATUS_KEY[o.status]])),!rejected&&React.createElement("div",{className:"sodr-track"},SELLER_STEPS.map((st,i)=>React.createElement(React.Fragment,{key:st},React.createElement("span",{className:`sdot ${i<=stepIdx?"on":""}`},i<stepIdx&&React.createElement(Icon,{name:"check",size:9,color:"#fff",stroke:3})),i<SELLER_STEPS.length-1&&React.createElement("span",{className:`sline ${i<stepIdx?"on":""}`})))),rejected&&React.createElement("div",{className:"sodr-rejected"},React.createElement(Icon,{name:"close",size:14,color:"var(--danger)",stroke:2.5}),t.rej_reason_label,": ",o.rejectReason||t.rej_out_of_stock),React.createElement("div",{className:"sodr-cust"},React.createElement("div",{className:"sodr-cust-row"},React.createElement("span",{className:"sodr-cust-ic"},React.createElement(Icon,{name:"user",size:16,color:"var(--green-deep)"})),React.createElement("span",{className:"sodr-cust-name"},c.name),React.createElement("span",{className:"sodr-cust-area"},c.area," · ",c.city)),React.createElement("div",{className:"sodr-addr"},React.createElement(Icon,{name:"location",size:15,color:"var(--gold-deep)"}),React.createElement("span",null,c.address)),c.note&&React.createElement("div",{className:"sodr-note"},React.createElement(Icon,{name:"bell",size:13,color:"var(--muted)"}),React.createElement("span",null,c.note))),React.createElement("div",{className:"sodr-items"},o.items.map((it,i)=>React.createElement("div",{key:i,className:"sodr-item"},React.createElement("span",{className:"sodr-item-q"},it.q,"×"),React.createElement("span",{className:"sodr-item-name"},txt(it.name)),React.createElement("span",{className:"sodr-item-wt"},txt(it.weight)),React.createElement("span",{className:"sodr-item-pr"},moneyStr((it.price||0)*it.q))))),showDelivery&&React.createElement("div",{className:"sodr-deliver"},React.createElement("span",{className:"sodr-deliver-lbl"},React.createElement(Icon,{name:"truck",size:14,color:"var(--green-deep)"}),"التوصيل عبر منصة لوزي")),rejecting&&React.createElement("div",{className:"sodr-reject"},React.createElement("span",{className:"sodr-reject-q"},t.rej_confirm_q),React.createElement("div",{className:"sodr-reject-acts"},React.createElement("button",{className:"sodr-reject-yes",onClick:()=>{onReject(o.id,t.rej_out_of_stock),setRejecting(!1)}},t.rej_out_of_stock),React.createElement("button",{className:"sodr-reject-no",onClick:()=>setRejecting(!1)},t.rej_cancel))),React.createElement("div",{className:"sodr-foot"},React.createElement("div",{className:"sodr-total"},React.createElement("span",null,t.order_total),React.createElement("strong",null,moneyStr(o.total))),React.createElement("div",{className:"sodr-foot-acts"},!rejected&&canReject&&!rejecting&&React.createElement("button",{className:"sodr-rejectbtn",onClick:()=>setRejecting(!0)},React.createElement(Icon,{name:"close",size:14,color:"var(--danger)",stroke:2.5}),t.rej_reject),nextAction&&!rejected&&React.createElement("button",{className:`sodr-action ${canAdvance?"":"disabled"}`,disabled:!canAdvance,onClick:()=>canAdvance&&onAdvance(o.id)},o.status==="delivering"?React.createElement(Icon,{name:"check",size:16,color:"#fff",stroke:3}):React.createElement(Icon,{name:"truck",size:16,color:"#fff"}),t[SELLER_ACTION[o.status]]),o.status==="delivered"&&React.createElement("span",{className:"sodr-done"},React.createElement(Icon,{name:"check",size:14,color:"var(--green-deep)",stroke:3}),t.st_delivered),rejected&&React.createElement("span",{className:"sodr-done rej"},React.createElement(Icon,{name:"close",size:14,color:"var(--danger)",stroke:2.5}),t.st_rejected))))}function SellerDashboard({t,lang,role,person,storeName,rating,orders,onAdvance,onAssign,onReject,productCount=0,go,onAddProduct,onMyProducts,onStore,onOffers,onReviews,onBundles,showBundles,verifStatus="approved",onVerify}){const[filter,setFilter]=useStateS("all"),title="لوحة التحكم",allowLozi=role!=="wholesale",newCount=orders.filter(o=>o.status==="new").length,prepCount=orders.filter(o=>o.status==="preparing").length,delivCount=orders.filter(o=>o.status==="delivering").length,doneCount=orders.filter(o=>o.status==="delivered").length,rejCount=orders.filter(o=>o.status==="rejected").length,activeCount=prepCount+delivCount,totalSales=orders.filter(o=>o.status==="preparing"||o.status==="delivering"||o.status==="delivered").reduce((a,o)=>a+o.total,0),FILTERS=[{id:"all",label:t.flt_all,n:orders.length},{id:"new",label:t.flt_new,n:newCount,alert:!0},{id:"preparing",label:t.flt_preparing,n:prepCount},{id:"delivering",label:t.flt_delivering,n:delivCount},{id:"delivered",label:t.flt_done,n:doneCount},{id:"rejected",label:t.flt_rejected,n:rejCount}],list=filter==="all"?orders:orders.filter(o=>o.status===filter);return React.createElement("div",{className:"screen seller-dash"},React.createElement("div",{className:"sdash-hero"},React.createElement("div",{className:"sdash-hero-top"},React.createElement("span",{className:"sdash-glyph"},React.createElement(Icon,{name:SELLER_GLYPH[role]||"store",size:22,color:"#fff"})),React.createElement("div",{className:"sdash-hero-txt"},React.createElement("h1",null,title),React.createElement("span",null,person&&person.name||storeName||t.guest))),React.createElement("div",{className:"sdash-stats"},React.createElement("div",{className:"sdash-stat"},React.createElement("strong",null,newCount),React.createElement("span",null,t.dash_new_orders)),React.createElement("div",{className:"sdash-stat"},React.createElement("strong",null,activeCount),React.createElement("span",null,t.dash_active)),React.createElement("div",{className:"sdash-stat"},React.createElement("strong",null,fmtMoney(totalSales).value,React.createElement("i",{className:"sdash-unit"},fmtMoney(totalSales).unit)),React.createElement("span",null,t.dash_total_sales)))),verifStatus!=="approved"&&React.createElement("button",{className:`verif-banner ${verifStatus}`,onClick:onVerify},React.createElement(Icon,{name:"shield",size:18,color:verifStatus==="pending"?"var(--gold-deep)":"#fff"}),React.createElement("span",null,verifStatus==="pending"?"حسابك قيد المراجعة من الإدارة":verifStatus==="rejected"?"تم رفض التوثيق — أعد الإرسال":"وثّق حسابك لتتمكن من نشر المنتجات"),verifStatus!=="pending"&&React.createElement("i",{className:"vb-cta"},"توثيق")),React.createElement("div",{className:"sdash-actions"},React.createElement("button",{className:"sdash-act products",onClick:onMyProducts},React.createElement(Icon,{name:"store",size:18,color:"var(--brown)"}),React.createElement("span",null,t.dash_my_products),React.createElement("span",{className:"sdash-act-count"},productCount)),React.createElement("button",{className:"sdash-act add",onClick:onAddProduct},React.createElement(Icon,{name:"plus",size:18,color:"#fff",stroke:2.4}),React.createElement("span",null,t.dash_add_short))),React.createElement("button",{className:"sdash-store-link",onClick:onStore},React.createElement("span",{className:"ssl-ic"},React.createElement(Icon,{name:"store",size:18,color:"var(--green-deep)"})),React.createElement("span",{className:"ssl-txt"},"الملف التجاري",React.createElement("i",null,"صورة المتجر · الاسم · الوصف · ساعات العمل")),React.createElement(Icon,{name:t.dir==="rtl"?"back":"fwd",size:16,color:"var(--muted)"})),React.createElement("button",{className:"sdash-store-link",onClick:onOffers},React.createElement("span",{className:"ssl-ic"},React.createElement(Icon,{name:"tag",size:18,color:"var(--green-deep)"})),React.createElement("span",{className:"ssl-txt"},"العروض والتقييمات",React.createElement("i",null,rating&&rating.count?"الخصومات والتوصيل · ⭐ "+rating.avg.toFixed(1)+" ("+rating.count+" تقييم)":"الخصومات والتوصيل · الردّ على التقييمات")),React.createElement(Icon,{name:t.dir==="rtl"?"back":"fwd",size:16,color:"var(--muted)"})),React.createElement("div",{className:"sdash-filters"},FILTERS.map(f=>React.createElement("button",{key:f.id,className:`sdash-flt ${filter===f.id?"on":""}`,onClick:()=>setFilter(f.id)},f.label,React.createElement("span",{className:`sdash-flt-n ${f.alert&&f.n?"alert":"muted"}`},f.n)))),React.createElement("div",{className:"sdash-list"},list.length?list.map(o=>React.createElement(SellerOrderCard,{key:o.id,o,t,lang,onAdvance,onAssign,onReject,allowLozi})):React.createElement("div",{className:"sdash-empty"},React.createElement("div",{className:"sdash-empty-ic"},React.createElement(Icon,{name:"cart",size:34,color:"var(--gold-deep)"})),React.createElement("p",null,t.dash_no_orders))))}function MyProductCard({p,t,lang,onToggle,onDelete,onEdit,onPin}){const active=p.active!==!1;return React.createElement("div",{className:`myp-card ${active?"":"off"}`},React.createElement("div",{className:"myp-img"},React.createElement(Img,{id:p.img,ph:lang==="ar"?"صورة المنتج":"Product",radius:13,style:{width:64,height:64}})),React.createElement("div",{className:"myp-body"},React.createElement("div",{className:"myp-name"},p.pinned&&React.createElement("span",{className:"myp-pinned",title:"مثبّت"},"📌"),p.name[lang],p.stock!=null&&p.stock<=0&&React.createElement("span",{className:"myp-stock out"},"نفد"),p.stock!=null&&p.stock>0&&p.stock<=3&&React.createElement("span",{className:"myp-stock low"},"مخزون منخفض")),React.createElement("div",{className:"myp-meta"},React.createElement("span",{className:"myp-wt"},p.weight[lang]),React.createElement("span",{className:"myp-price"},moneyStr(p.price)),p.stock!=null&&React.createElement("span",{className:"myp-wt"},"المتوفّر: ",p.stock," ",p.stockUnit||"")),React.createElement("div",{className:"myp-row2"},React.createElement("span",{className:`myp-status ${active?"on":"off"}`},React.createElement("i",null),active?t.myp_visible:t.myp_hidden),React.createElement("button",{className:"myp-edit",onClick:()=>onEdit(p.id)},React.createElement(Icon,{name:"idcard",size:13,color:"var(--green-deep)"}),t.myp_edit),onPin&&React.createElement("button",{className:"myp-pin "+(p.pinned?"on":""),onClick:()=>onPin(p.id,!p.pinned)},"📌",p.pinned?"إلغاء التثبيت":"تثبيت"))),React.createElement("div",{className:"myp-actions"},React.createElement("button",{className:`myp-toggle ${active?"on":""}`,onClick:()=>onToggle(p.id),"aria-label":t.myp_toggle},React.createElement("i",null)),React.createElement("button",{className:"myp-del",onClick:()=>onDelete(p.id),"aria-label":t.myp_delete},React.createElement(Icon,{name:"trash",size:16,color:"var(--danger)"}))))}function MyProducts({t,lang,role,products,onBack,onAdd,onToggle,onDelete,onEdit,onPin}){const[query,setQuery]=useStateS(""),[sort,setSort]=useStateS("newest"),visible=products.filter(p=>p.active!==!1).length,SORTS=[{id:"newest",label:t.sort_newest},{id:"price_hi",label:t.sort_price_hi},{id:"price_lo",label:t.sort_price_lo},{id:"name",label:t.sort_name},{id:"visible",label:t.sort_visible}],q=query.trim().toLowerCase();let list=q?products.filter(p=>(p.name.ar+" "+p.name.en).toLowerCase().indexOf(q)!==-1):products.slice();return sort==="price_hi"?list.sort((a,b)=>b.price-a.price):sort==="price_lo"?list.sort((a,b)=>a.price-b.price):sort==="name"?list.sort((a,b)=>a.name[lang].localeCompare(b.name[lang],"ar")):sort==="visible"&&list.sort((a,b)=>(b.active!==!1)-(a.active!==!1)),React.createElement("div",{className:"screen myproducts"},React.createElement(TopBar,{title:t.myp_title,onBack,t}),React.createElement("div",{className:"myp-sum"},React.createElement("div",{className:"myp-sum-stat"},React.createElement("strong",null,products.length),React.createElement("span",null,t.myp_total)),React.createElement("div",{className:"myp-sum-stat"},React.createElement("strong",null,visible),React.createElement("span",null,t.myp_visible_count)),React.createElement("button",{className:"myp-add",onClick:onAdd},React.createElement(Icon,{name:"plus",size:16,color:"#fff",stroke:2.4}),t.dash_add_short)),products.length>0&&React.createElement("div",{className:"myp-tools"},React.createElement("div",{className:"myp-search"},React.createElement(Icon,{name:"search",size:17,color:"var(--muted)"}),React.createElement("input",{value:query,onChange:e=>setQuery(e.target.value),placeholder:t.myp_search_ph}),query&&React.createElement("button",{className:"myp-clear",onClick:()=>setQuery("")},React.createElement(Icon,{name:"close",size:15,color:"var(--muted)"}))),React.createElement("div",{className:"myp-sorts"},SORTS.map(s=>React.createElement("button",{key:s.id,className:`myp-sort ${sort===s.id?"on":""}`,onClick:()=>setSort(s.id)},s.label)))),React.createElement("div",{className:"myp-list"},products.length?list.length?list.map(p=>React.createElement(MyProductCard,{key:p.id,p,t,lang,onToggle,onDelete,onEdit,onPin})):React.createElement("div",{className:"sdash-empty"},React.createElement("div",{className:"sdash-empty-ic"},React.createElement(Icon,{name:"search",size:32,color:"var(--gold-deep)"})),React.createElement("p",null,t.myp_no_match)):React.createElement("div",{className:"sdash-empty"},React.createElement("div",{className:"sdash-empty-ic"},React.createElement(Icon,{name:"store",size:34,color:"var(--gold-deep)"})),React.createElement("p",null,t.myp_empty),React.createElement("button",{className:"myp-add solo",onClick:onAdd},React.createElement(Icon,{name:"plus",size:16,color:"#fff",stroke:2.4}),t.dash_add_short))))}const LOZI_COMMISSION_ORDERS=[],LOZI_WALLET_DUE=12500;function walStatusMeta(status,t){return status==="active"?{color:"var(--green)",soft:"var(--green-soft)",icon:"check",label:t.wal_st_active,sub:t.wal_st_active_sub}:status==="suspended"?{color:"var(--danger)",soft:"#F7E7E3",icon:"close",label:t.wal_st_suspended,sub:t.wal_st_suspended_sub}:{color:"#C58A1F",soft:"#FBEFD8",icon:"bell",label:t.wal_st_due,sub:t.wal_st_due_sub}}function walPayBadge(s,t){return s==="approved"?{cls:"ok",label:t.wal_pay_approved,icon:"check"}:s==="rejected"?{cls:"rej",label:t.wal_pay_rejected,icon:"close"}:{cls:"rev",label:t.wal_pay_review,icon:"bell"}}function SellerWallet({t,lang,person,due,deadline,lastPay,orders,onPay}){const[status,setStatus]=useStateS("due"),m=walStatusMeta(status,t),pb=walPayBadge(lastPay.status,t),STATES=[{id:"active",dot:"var(--green)",label:t.wal_c_green},{id:"due",dot:"#C58A1F",label:t.wal_c_orange},{id:"suspended",dot:"var(--danger)",label:t.wal_c_red}];return React.createElement("div",{className:"screen seller-wallet"},React.createElement("div",{className:"wal-hero",style:{"--wal-accent":m.color}},React.createElement("div",{className:"wal-hero-bg"}),React.createElement("div",{className:"wal-hero-body"},React.createElement("div",{className:"wal-hero-top"},React.createElement("span",{className:"wal-due-label"},React.createElement(Icon,{name:"wallet",size:15,color:"var(--gold)"}),t.wal_due_label),React.createElement("span",{className:"wal-status-pill",style:{background:m.color}},React.createElement("i",{style:{background:"#fff"}}),m.label)),React.createElement("div",{className:"wal-amount"},moneyStr(due)),React.createElement("div",{className:"wal-due-sub"},t.wal_due_sub),React.createElement("div",{className:"wal-deadline"},React.createElement(Icon,{name:"calendar",size:15,color:"#fff"}),React.createElement("span",null,t.wal_deadline,": ",React.createElement("b",null,deadline))),React.createElement("button",{className:"wal-pay-btn",onClick:onPay},React.createElement(Icon,{name:"upload",size:18,color:"var(--brown)"}),t.wal_pay))),React.createElement("div",{className:"wal-status",style:{background:m.soft,borderColor:m.color}},React.createElement("span",{className:"wal-status-ic",style:{background:m.color}},React.createElement(Icon,{name:m.icon,size:17,color:"#fff",stroke:m.icon==="check"?3:2.4})),React.createElement("div",{className:"wal-status-txt"},React.createElement("strong",{style:{color:m.color}},t.wal_status_title,": ",m.label),React.createElement("span",null,m.sub))),React.createElement("div",{className:"wal-preview"},React.createElement("span",{className:"wal-preview-lbl"},t.wal_preview),React.createElement("div",{className:"wal-preview-seg"},STATES.map(s=>React.createElement("button",{key:s.id,className:`wal-seg ${status===s.id?"on":""}`,style:status===s.id?{background:s.dot,borderColor:s.dot,color:"#fff"}:null,onClick:()=>setStatus(s.id)},React.createElement("i",{style:{background:status===s.id?"#fff":s.dot}}),s.label)))),React.createElement("div",{className:"wal-card wal-last"},React.createElement("div",{className:"wal-last-l"},React.createElement("span",{className:"wal-last-ic"},React.createElement(Icon,{name:"upload",size:16,color:"var(--green-deep)"})),React.createElement("div",{className:"wal-last-txt"},React.createElement("strong",null,t.wal_last_pay),React.createElement("span",null,moneyStr(lastPay.amount)," · ",t.wal_last_pay_on," ",lastPay.date[lang]))),React.createElement("span",{className:`wal-pay-badge ${pb.cls}`},React.createElement(Icon,{name:pb.icon,size:12,color:"currentColor",stroke:pb.icon==="check"?3:2.4}),pb.label)),React.createElement("div",{className:"wal-card wal-calc"},React.createElement("div",{className:"wal-calc-head"},React.createElement("div",{className:"wal-calc-title"},React.createElement("strong",null,t.wal_calc_title),React.createElement("span",null,orders.length," ",t.wal_total_orders)),React.createElement("span",{className:"wal-rate"},React.createElement(Icon,{name:"percent",size:12,color:"var(--green-deep)"}),t.wal_rate_note)),React.createElement("div",{className:"wal-table"},React.createElement("div",{className:"wal-trow wal-thead"},React.createElement("span",{className:"wal-c-order"},t.wal_col_order),React.createElement("span",{className:"wal-c-val"},t.wal_col_value),React.createElement("span",{className:"wal-c-comm"},t.wal_col_comm),React.createElement("span",{className:"wal-c-date"},t.wal_col_date)),orders.map(o=>React.createElement("div",{key:o.id,className:"wal-trow"},React.createElement("span",{className:"wal-c-order"},"#",o.id),React.createElement("span",{className:"wal-c-val"},moneyStr(o.value)),React.createElement("span",{className:"wal-c-comm"},moneyStr(o.comm)),React.createElement("span",{className:"wal-c-date"},o.date[lang]))),React.createElement("div",{className:"wal-trow wal-tfoot"},React.createElement("span",{className:"wal-c-order"},t.order_total),React.createElement("span",{className:"wal-c-val"}),React.createElement("span",{className:"wal-c-comm"},moneyStr(orders.reduce((a,o)=>a+o.comm,0))),React.createElement("span",{className:"wal-c-date"}))),React.createElement("div",{className:"wal-prepaid-note"},React.createElement(Icon,{name:"check",size:14,color:"var(--green-deep)",stroke:3}),React.createElement("span",null,t.wal_prepaid_exempt))))}function CommissionPaySheet({t,lang,amount,onClose,onSubmitted}){const[copied,setCopied]=useStateS(-1),[hasReceipt,setHasReceipt]=useStateS(!1),copy=(txt,i)=>{try{navigator.clipboard.writeText(txt)}catch(e){}setCopied(i),setTimeout(()=>setCopied(-1),1400)};return React.useEffect(()=>{const el=document.getElementById("wal-receipt");if(!el)return;const iv=setInterval(()=>{const imgs=el.shadowRoot?[...el.shadowRoot.querySelectorAll("img")]:[];setHasReceipt(imgs.some(i=>(i.getAttribute("src")||"").length>5&&!i.classList.contains("ghost")))},600);return()=>clearInterval(iv)},[]),React.createElement("div",{className:"modal-overlay",onClick:onClose},React.createElement("div",{className:"sheet",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"sheet-handle"}),React.createElement("div",{className:"sheet-scroll"},React.createElement("div",{className:"sub-head"},React.createElement("div",{className:"sub-badge"},React.createElement(Icon,{name:"wallet",size:22,color:"var(--brown)"})),React.createElement("h2",null,t.wal_pay_title),React.createElement("p",null,t.wal_pay_intro),React.createElement("div",{className:"wal-pay-amount"},React.createElement("span",null,t.wal_pay_amount),React.createElement("strong",null,moneyStr(amount)))),React.createElement("div",{className:"sub-label"},t.wal_accounts),React.createElement("div",{className:"sub-accounts"},LOZI_ACCOUNTS.map((a,i)=>React.createElement("div",{key:i,className:"acct",style:{borderInlineStartColor:a.color}},React.createElement("span",{className:"acct-brand",style:{background:a.gradient||a.color}},a.bank[lang].charAt(0)),React.createElement("div",{className:"acct-info"},React.createElement("strong",{style:{color:a.color}},a.bank[lang]),React.createElement("span",{className:"acct-iban"},a.iban),React.createElement("span",{className:"acct-name"},a.name[lang])),React.createElement("button",{className:`acct-copy ${copied===i?"ok":""}`,onClick:()=>copy(a.iban,i)},React.createElement(Icon,{name:copied===i?"check":"copy",size:15,color:copied===i?"var(--green-deep)":"var(--ink)",stroke:copied===i?3:2}),copied===i?t.copied:t.copy)))),React.createElement("div",{className:"sub-label"},t.sub_upload),React.createElement("div",{className:"sub-upload"},React.createElement(Img,{id:"wal-receipt",ph:t.sub_upload_hint,radius:16,shape:"rounded",style:{width:"100%",height:160,display:"block"}}))),React.createElement("div",{className:"sheet-foot"},React.createElement("button",{className:"btn btn-green",disabled:!hasReceipt,onClick:onSubmitted},React.createElement(Icon,{name:"upload",size:18,color:"#fff"}),React.createElement("span",null,t.sub_submit)))))}function VerifySheet({t,role,status,note,onClose,onSubmit}){const[address,setAddress]=useStateS(""),[idFront,setIdFront]=useStateS(null),[idBack,setIdBack]=useStateS(null),[commercialFile,setCommercialFile]=useStateS(null),[shopFile,setShopFile]=useStateS(null),[busy,setBusy]=useStateS(!1),[err,setErr]=useStateS(""),pending=status==="pending",approved=status==="approved",rejected=status==="rejected",isWholesale=role==="wholesale",hasShop=role==="retail"||role==="wholesale",pick=setter=>e=>{const f=(e.target.files||[])[0];if(f){if(f.size>10*1024*1024){setErr("الحجم الأقصى ١٠ ميجابايت");return}setErr(""),setter(f)}},ready=address.trim()&&idFront&&idBack&&(!isWholesale||commercialFile),submit=async()=>{if(!ready||busy)return;setBusy(!0),setErr("");const r=await onSubmit({address:address.trim(),idFront,idBack,commercialFile,shopFile});if(setBusy(!1),!r||!r.ok){setErr(r&&r.error||"تعذّر الإرسال");return}};return React.createElement("div",{className:"modal-overlay",onClick:onClose},React.createElement("div",{className:"sheet",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"sheet-handle"}),React.createElement("div",{className:"sheet-scroll"},React.createElement("div",{className:"sub-head"},React.createElement("div",{className:"sub-badge",style:{background:"var(--green)"}},React.createElement(Icon,{name:"idcard",size:22,color:"#fff"})),React.createElement("h2",null,"توثيق الحساب")),pending&&React.createElement("div",{className:"verif-state"},React.createElement("span",{className:"verif-ic pending"},React.createElement(Icon,{name:"shield",size:28,color:"var(--gold-deep)"})),React.createElement("h3",null,"مستنداتك قيد المراجعة"),React.createElement("p",null,"يراجع فريق لوزي مستنداتك ويُفعّل حسابك قريباً. ستتمكن من نشر المنتجات بعد الموافقة.")),approved&&React.createElement("div",{className:"verif-state"},React.createElement("span",{className:"verif-ic ok"},React.createElement(Icon,{name:"check",size:26,color:"#fff",stroke:3})),React.createElement("h3",null,"حسابك موثّق"),React.createElement("p",null,"يمكنك الآن نشر منتجاتك بحرية.")),!pending&&!approved&&React.createElement("div",{className:"verif-form"},React.createElement("p",{className:"verif-intro"},"لنشر منتجاتك، أرفق المستندات التالية ويراجعها فريق لوزي ثم يُفعّل حسابك."),rejected&&React.createElement("div",{className:"verif-rejected"},React.createElement(Icon,{name:"flag",size:14,color:"var(--danger)"}),"تم رفض المستندات السابقة",note?" · "+note:"",". أعد الإرسال بمستندات واضحة."),React.createElement("div",{className:"verif-field"},React.createElement("span",{className:"verif-label"},"العنوان ",React.createElement("em",null,"مطلوب")),React.createElement("input",{className:"field-input",value:address,onChange:e=>setAddress(e.target.value),placeholder:"المدينة · الحي · أقرب معلم"})),React.createElement("div",{className:"verif-field"},React.createElement("span",{className:"verif-label"},"البطاقة الشخصية ",React.createElement("em",null,"مطلوب")),React.createElement("p",{className:"verif-hint"},"ارفق صورة البطاقة من الأمام والخلف."),React.createElement("div",{className:"verif-duo"},React.createElement("label",{className:`verif-pick sm ${idFront?"done":""}`},React.createElement("input",{type:"file",accept:"image/*",onChange:pick(setIdFront),style:{display:"none"}}),React.createElement(Icon,{name:idFront?"check":"upload",size:18,color:"var(--green-deep)",stroke:idFront?3:2}),React.createElement("span",null,idFront?"الأمام · تم":"الوجه الأمامي")),React.createElement("label",{className:`verif-pick sm ${idBack?"done":""}`},React.createElement("input",{type:"file",accept:"image/*",onChange:pick(setIdBack),style:{display:"none"}}),React.createElement(Icon,{name:idBack?"check":"upload",size:18,color:"var(--green-deep)",stroke:idBack?3:2}),React.createElement("span",null,idBack?"الخلف · تم":"الوجه الخلفي")))),isWholesale&&React.createElement("div",{className:"verif-field"},React.createElement("span",{className:"verif-label"},"السجل التجاري ",React.createElement("em",null,"مطلوب")),React.createElement("label",{className:"verif-pick"},React.createElement("input",{type:"file",accept:"image/*,application/pdf",onChange:pick(setCommercialFile),style:{display:"none"}}),React.createElement(Icon,{name:commercialFile?"check":"upload",size:18,color:"var(--green-deep)",stroke:commercialFile?3:2}),React.createElement("span",null,commercialFile?commercialFile.name:"اختر ملف (صورة أو PDF)"))),hasShop&&React.createElement("div",{className:"verif-field"},React.createElement("span",{className:"verif-label"},"صورة للمحل ",React.createElement("i",null,"اختياري")),React.createElement("label",{className:"verif-pick"},React.createElement("input",{type:"file",accept:"image/*",onChange:pick(setShopFile),style:{display:"none"}}),React.createElement(Icon,{name:shopFile?"check":"upload",size:18,color:"var(--green-deep)",stroke:shopFile?3:2}),React.createElement("span",null,shopFile?shopFile.name:"اختر صورة"))),err&&React.createElement("span",{className:"verif-err"},err))),!pending&&!approved&&React.createElement("div",{className:"sheet-foot"},React.createElement("button",{className:"btn btn-green",disabled:!ready||busy,onClick:submit},React.createElement(Icon,{name:busy?"upload":"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,busy?"جارٍ الإرسال…":"إرسال للمراجعة")))))}function SellerStore({t,lang,store,verifStatus,onBack,onSave,onVerify}){const s=store||{},[name,setName]=useStateS(s.name||""),[desc,setDesc]=useStateS(s.description||""),[hours,setHours]=useStateS(s.hours||""),[enabled,setEnabled]=useStateS(s.enabled!==!1),[minOrderEnabled,setMinOrderEnabled]=useStateS(s.minOrderEnabled===!0),[minOrderAmount,setMinOrderAmount]=useStateS(s.minOrderAmount!=null?String(s.minOrderAmount):""),[imgFile,setImgFile]=useStateS(null),[imgPreview,setImgPreview]=useStateS(s.image||""),[busy,setBusy]=useStateS(!1),approved=verifStatus==="approved",pickImg=e=>{const f=(e.target.files||[])[0];f&&(f.size>10*1024*1024||(setImgFile(f),setImgPreview(URL.createObjectURL(f)),e.target.value=""))},ready=name.trim(),save=async()=>{!ready||busy||(setBusy(!0),await onSave({name:name.trim(),description:desc.trim(),hours:hours.trim(),enabled,imageFile:imgFile,minOrderEnabled,minOrderAmount}),setBusy(!1))};return React.createElement("div",{className:"screen seller-store"},React.createElement("div",{className:"sp-hero"},React.createElement("label",{className:"store-cover"},React.createElement("input",{type:"file",accept:"image/*",onChange:pickImg,style:{display:"none"}}),imgPreview?React.createElement(Img,{id:imgPreview,ph:"",radius:0,shape:"rect",style:{width:"100%",height:"100%"}}):React.createElement("div",{className:"store-cover-empty"},React.createElement(Icon,{name:"upload",size:26,color:"#fff"}),React.createElement("span",null,"أضف صورة المتجر")),React.createElement("span",{className:"store-cover-edit"},React.createElement(Icon,{name:"upload",size:14,color:"#fff"}),"تغيير الصورة")),React.createElement("button",{className:"hero-back",onClick:onBack},React.createElement(Icon,{name:t.dir==="rtl"?"chevron":"back",size:22,color:"var(--ink)"}))),React.createElement("div",{className:"store-body"},React.createElement("div",{className:"store-badges"},approved?React.createElement("span",{className:"sb-badge ok"},React.createElement(Icon,{name:"check",size:13,color:"#fff",stroke:3}),"متجر موثّق"):React.createElement("button",{className:"sb-badge warn",onClick:onVerify},React.createElement(Icon,{name:"shield",size:13,color:"#fff"}),"أكمل توثيقك"),s.offers&&s.offers.discount&&s.offers.discount.percent?React.createElement("span",{className:"sb-badge gold"},React.createElement(Icon,{name:"tag",size:13,color:"var(--brown)"}),"خصم ",s.offers.discount.percent,"%",s.offers.discount.scope==="product"?" · صنف":""):null,s.offers&&s.offers.freeDelivery&&s.offers.freeDelivery.min?React.createElement("span",{className:"sb-badge gold"},React.createElement(Icon,{name:"truck",size:13,color:"var(--brown)"}),"توصيل مجاني فوق ",s.offers.freeDelivery.min):null),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"اسم المتجر"),React.createElement("input",{className:"field-input",value:name,onChange:e=>setName(e.target.value),placeholder:"اسم متجرك"})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"نبذة عن المتجر"),React.createElement("textarea",{className:"field-input store-desc",rows:3,value:desc,onChange:e=>setDesc(e.target.value),placeholder:"من أنت وماذا تبيع؟"})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"ساعات العمل"),React.createElement("input",{className:"field-input",value:hours,onChange:e=>setHours(e.target.value),placeholder:"مثال: السبت–الخميس · ٨ص – ٨م"})),React.createElement("div",{className:"store-toggle"},React.createElement("span",null,"المتجر مُفعّل ومرئي للعملاء"),React.createElement("span",{className:`switch ${enabled?"on":""}`,onClick:()=>setEnabled(v=>!v)},React.createElement("i",null))),React.createElement("div",{className:"store-toggle"},React.createElement("span",null,"اشتراط حد أدنى للطلب"),React.createElement("span",{className:`switch ${minOrderEnabled?"on":""}`,onClick:()=>setMinOrderEnabled(v=>!v)},React.createElement("i",null))),minOrderEnabled&&React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"الحد الأدنى للطلب (ريال يمني)"),React.createElement("input",{className:"field-input",value:minOrderAmount,onChange:e=>setMinOrderAmount(e.target.value.replace(/[^0-9]/g,"")),placeholder:"مثال: ٥٠٠٠",inputMode:"numeric"}),React.createElement("p",{className:"offer-note"},"لن يتمكّن العميل من إتمام الطلب من متجرك إذا كان إجمالي سلّته أقل من هذا المبلغ."))),React.createElement("div",{className:"store-foot"},React.createElement("button",{className:"btn btn-green",disabled:!ready||busy,onClick:save},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,busy?"جارٍ الحفظ…":"حفظ الملف التجاري"))))}function SellerOffers({t,lang,store,products,onBack,onSave,role,onBundles,embedded}){const o=store&&store.offers||{},d=o.discount||{},fd=o.freeDelivery||{},[discOn,setDiscOn]=useStateS(!!d.percent),[discScope,setDiscScope]=useStateS(d.scope||"all"),[discProduct,setDiscProduct]=useStateS(d.productId||products[0]&&products[0].id||""),[discPercent,setDiscPercent]=useStateS(d.percent?String(d.percent):""),[fdOn,setFdOn]=useStateS(!!fd.min),[fdMin,setFdMin]=useStateS(fd.min?String(fd.min):""),[busy,setBusy]=useStateS(!1),pct=Math.min(90,Math.max(0,Number(discPercent)||0)),ready=(!discOn||pct>0&&(discScope==="all"||discProduct))&&(!fdOn||Number(fdMin)>0),save=async()=>{!ready||busy||(setBusy(!0),await onSave({discount:discOn&&pct>0?{percent:pct,scope:discScope,productId:discScope==="product"?discProduct:null}:null,freeDelivery:fdOn&&Number(fdMin)>0?{min:Number(fdMin)}:null}),setBusy(!1))};return React.createElement(embedded?React.Fragment:"div",embedded?null:{className:"screen seller-offers"},embedded?null:React.createElement(TopBar,{title:"العروض",onBack,t}),React.createElement("div",{className:"set-scroll offers-scroll"},role==="retail"&&onBundles&&React.createElement("button",{className:"sdash-store-link or-bundle",onClick:onBundles},React.createElement("span",{className:"ssl-ic gold"},React.createElement(Icon,{name:"tag",size:18,color:"var(--gold-deep)"})),React.createElement("span",{className:"ssl-txt"},"عرض مشكّل",React.createElement("i",null,"عرض مكوّن من عدة أصناف بسعر واحد")),React.createElement(Icon,{name:t.dir==="rtl"?"back":"fwd",size:16,color:"var(--muted)"})),React.createElement("div",{className:"offer-sec"},React.createElement("div",{className:"offer-sec-head"},React.createElement("div",{className:"osh-txt"},React.createElement("strong",null,"خصم"),React.createElement("span",null,"نسبة خصم على كل المتجر أو على صنف معيّن")),React.createElement("span",{className:`switch ${discOn?"on":""}`,onClick:()=>setDiscOn(v=>!v)},React.createElement("i",null))),discOn&&React.createElement("div",{className:"offer-sec-body"},React.createElement("div",{className:"seg seg-2"},React.createElement("button",{className:discScope==="all"?"on":"",onClick:()=>setDiscScope("all")},"كل المتجر"),React.createElement("button",{className:discScope==="product"?"on":"",onClick:()=>setDiscScope("product")},"صنف معيّن")),discScope==="product"&&(products.length?React.createElement("select",{className:"field-input",value:discProduct,onChange:e=>setDiscProduct(e.target.value)},products.map(p=>React.createElement("option",{key:p.id,value:p.id},p.name[lang]))):React.createElement("p",{className:"offer-note"},"أضف منتجاً أولاً لاختياره.")),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"نسبة الخصم %"),React.createElement("input",{className:"field-input",value:discPercent,onChange:e=>setDiscPercent(e.target.value.replace(/[^0-9]/g,"")),placeholder:"مثال: ١٥",inputMode:"numeric"})))),React.createElement("div",{className:"offer-sec"},React.createElement("div",{className:"offer-sec-head"},React.createElement("div",{className:"osh-txt"},React.createElement("strong",null,"توصيل مجاني"),React.createElement("span",null,"عند بلوغ حدّ أدنى للشراء تحدّده أنت")),React.createElement("span",{className:`switch ${fdOn?"on":""}`,onClick:()=>setFdOn(v=>!v)},React.createElement("i",null))),fdOn&&React.createElement("div",{className:"offer-sec-body"},React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"أقل مبلغ للشراء (ريال يمني)"),React.createElement("input",{className:"field-input",value:fdMin,onChange:e=>setFdMin(e.target.value.replace(/[^0-9]/g,"")),placeholder:"مثال: ١٠٠٠٠",inputMode:"numeric"})),React.createElement("p",{className:"offer-note"},"يحصل العميل على توصيل مجاني عند بلوغ سلّته هذا المبلغ.")))),React.createElement("div",{className:"store-foot"},React.createElement("button",{className:"btn btn-green",disabled:!ready||busy,onClick:save},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,busy?"جارٍ الحفظ…":"حفظ العروض"))))}function SellerReviews({t,lang,vendorId,onBack,embedded}){const[rows,setRows]=useStateS(null),[replyId,setReplyId]=useStateS(null),[replyText,setReplyText]=useStateS(""),load=()=>{!window.LOZI_SB||!vendorId||window.LOZI_SB.from("reviews").select("*").eq("store_vendor_id",vendorId).order("created_at",{ascending:!1}).then(({data})=>setRows(data||[]))};React.useEffect(load,[vendorId]);const avg=rows&&rows.length?rows.reduce((a,r)=>a+r.rating,0)/rows.length:0,saveReply=async r=>{const{error}=await window.LOZI_SB.from("reviews").update({reply:replyText.trim()||null}).eq("id",r.id);error||(setReplyId(null),setReplyText(""),load())};return React.createElement(embedded?React.Fragment:"div",embedded?null:{className:"screen seller-reviews"},embedded?null:React.createElement(TopBar,{title:"التقييمات",onBack,t}),React.createElement("div",{className:"set-scroll",style:{padding:"16px 18px 40px"}},React.createElement("div",{className:"srev-summary"},React.createElement(Stars,{value:avg,size:18}),React.createElement("strong",null,avg?avg.toFixed(1):"—"),React.createElement("span",null,"· ",rows?rows.length:0," تقييم")),rows===null?React.createElement("div",{className:"vs-empty"},"جارٍ التحميل…"):rows.length?rows.map(r=>React.createElement("div",{className:"rev-card",key:r.id},React.createElement("div",{className:"rev-top"},React.createElement("strong",null,r.reviewer_name||"عميل"),React.createElement(Stars,{value:r.rating,size:13})),r.comment&&React.createElement("p",{className:"rev-comment"},r.comment),replyId===r.id?React.createElement("div",{className:"srev-replybox"},React.createElement("textarea",{className:"field-input store-desc",rows:2,value:replyText,onChange:e=>setReplyText(e.target.value),placeholder:"اكتب ردّك…"}),React.createElement("div",{className:"del-actions"},React.createElement("button",{className:"btn btn-ghost flex1 sm",onClick:()=>setReplyId(null)},"إلغاء"),React.createElement("button",{className:"btn btn-green flex1 sm",onClick:()=>saveReply(r)},"حفظ الرد"))):r.reply?React.createElement("div",{className:"rev-reply"},React.createElement("b",null,"ردّك:")," ",r.reply," ",React.createElement("button",{className:"srev-editreply",onClick:()=>{setReplyId(r.id),setReplyText(r.reply)}},"تعديل")):React.createElement("button",{className:"srev-replybtn",onClick:()=>{setReplyId(r.id),setReplyText("")}},React.createElement(Icon,{name:"whatsapp",size:14,color:"var(--green-deep)"}),"ردّ على التقييم"))):React.createElement("div",{className:"sdash-empty"},React.createElement("div",{className:"sdash-empty-ic"},React.createElement(Icon,{name:"star",size:30,color:"var(--gold-deep)"})),React.createElement("p",null,"لا توجد تقييمات بعد — ستظهر هنا بعد أول عملية بيع."))))}function SellerOffersReviews({t,lang,store,products,vendorId,role,onBack,onSave,onBundles}){const[tab,setTab]=useStateS("offers");return React.createElement("div",{className:"screen seller-offers-reviews"},React.createElement(TopBar,{title:"العروض والتقييمات",onBack,t}),React.createElement("div",{className:"seg seg-2 or-tabs"},React.createElement("button",{className:tab==="offers"?"on":"",onClick:()=>setTab("offers")},"العروض"),React.createElement("button",{className:tab==="reviews"?"on":"",onClick:()=>setTab("reviews")},"التقييمات")),tab==="offers"?React.createElement(SellerOffers,{t,lang,store,products,role,onBack,onSave,onBundles,embedded:!0}):React.createElement(SellerReviews,{t,lang,vendorId,embedded:!0}))}Object.assign(window,{SellerDashboard,SellerOffersReviews,MyProducts,SellerWallet,CommissionPaySheet,VerifySheet,SellerStore,SellerOffers,SellerReviews,LOZI_SELLER_ORDERS_SEED,LOZI_MY_PRODUCTS_SEED,LOZI_COMMISSION_ORDERS,LOZI_WALLET_DUE});
+const { useState: useStateA } = React;
+function LoziCarousel({
+  images,
+  ph,
+  t,
+  lang,
+  arrows,
+  dotsClickable,
+  loop,
+  zoomable,
+}) {
+  const imgs = (images || []).filter(Boolean),
+    n = imgs.length,
+    rtl = !t || t.dir !== "ltr";
+  const [slide, setSlide] = React.useState(0),
+    [drag, setDrag] = React.useState(0),
+    [dragging, setDragging] = React.useState(!1),
+    [seen, setSeen] = React.useState({ 0: !0, 1: !0 }),
+    [zoomSrc, setZoomSrc] = React.useState(null);
+  const openZoom = (u) => {
+      zoomable &&
+        typeof u == "string" &&
+        /^(https?:|data:|blob:)/.test(u) &&
+        setZoomSrc(u);
+    },
+    lightbox = zoomSrc
+      ? React.createElement(ImageLightbox, {
+          src: zoomSrc,
+          ph,
+          onClose: () => setZoomSrc(null),
+        })
+      : null;
+  const wrapRef = React.useRef(null),
+    startRef = React.useRef(null),
+    movedRef = React.useRef(!1),
+    suppressRef = React.useRef(!1);
+  React.useEffect(() => {
+    setSeen((s) => {
+      const c = Object.assign({}, s);
+      [slide - 1, slide, slide + 1].forEach((i) => {
+        i >= 0 && i < n && (c[i] = !0);
+      });
+      return c;
+    });
+  }, [slide, n]);
+  React.useEffect(() => {
+    slide > n - 1 && setSlide(Math.max(0, n - 1));
+  }, [n]);
+  const go = (d) =>
+    setSlide((s) => {
+      let v = s + d;
+      return v < 0 ? (loop ? n - 1 : 0) : v > n - 1 ? (loop ? 0 : n - 1) : v;
+    });
+  if (n <= 1)
+    return React.createElement(
+      React.Fragment,
+      null,
+      React.createElement(
+        "div",
+        {
+          className: "loz-car loz-car-single",
+          onClick: zoomable ? () => openZoom(imgs[0]) : null,
+          style: zoomable ? { cursor: "zoom-in" } : null,
+        },
+        React.createElement(Img, {
+          id: imgs[0] || "",
+          ph: ph || "",
+          radius: 0,
+          shape: "rect",
+          style: { width: "100%", height: "100%" },
+        }),
+      ),
+      lightbox,
+    );
+  const W = () => (wrapRef.current && wrapRef.current.offsetWidth) || 1;
+  const onDown = (e) => {
+    if (e.button && e.button !== 0) return;
+    if (
+      e.target &&
+      e.target.closest &&
+      e.target.closest("button,.loz-car-dots")
+    )
+      return;
+    startRef.current = { x: e.clientX, id: e.pointerId };
+    movedRef.current = !1;
+  };
+  const onMove = (e) => {
+    if (!startRef.current) return;
+    let dx = e.clientX - startRef.current.x;
+    if (!movedRef.current) {
+      if (Math.abs(dx) <= 5) return;
+      movedRef.current = !0;
+      setDragging(!0);
+      try {
+        e.currentTarget.setPointerCapture(startRef.current.id);
+      } catch (_) {}
+    }
+    if (!loop && ((slide === 0 && dx > 0) || (slide === n - 1 && dx < 0)))
+      dx *= 0.35;
+    setDrag(dx);
+  };
+  const onUp = () => {
+    if (!startRef.current) return;
+    const moved = movedRef.current,
+      dx = drag,
+      th = Math.max(40, W() * 0.18);
+    startRef.current = null;
+    if (moved) {
+      setDragging(!1);
+      setDrag(0);
+      dx > th ? go(-1) : dx < -th && go(1);
+      suppressRef.current = !0;
+      setTimeout(() => {
+        suppressRef.current = !1;
+      }, 0);
+    } else openZoom(imgs[slide]);
+  };
+  const stop = (e) => {
+    suppressRef.current && (e.stopPropagation(), e.preventDefault());
+  };
+  const atStart = slide === 0,
+    atEnd = slide === n - 1;
+  const slides = imgs.map((u, i) => {
+    const url = typeof u == "string" ? u : "",
+      isUrl = /^(https?:|data:|blob:)/.test(url),
+      load = seen[i] || !isUrl;
+    return React.createElement(
+      "div",
+      { className: "loz-car-slide", key: i },
+      React.createElement(Img, {
+        id: load ? u : "",
+        ph: ph || "",
+        radius: 0,
+        shape: "rect",
+        style: { width: "100%", height: "100%" },
+      }),
+    );
+  });
+  const track = React.createElement(
+    "div",
+    {
+      className: "loz-car-track",
+      style: {
+        transform: "translateX(calc(" + -slide * 100 + "% + " + drag + "px))",
+        transition: dragging
+          ? "none"
+          : "transform .32s cubic-bezier(.22,.61,.36,1)",
+      },
+    },
+    slides,
+  );
+  const mkBtn = (d, side, icon, dis, label) =>
+    React.createElement(
+      "button",
+      {
+        key: label,
+        className: "loz-car-btn",
+        style: side === "right" ? { right: 10 } : { left: 10 },
+        disabled: dis,
+        "aria-label": label,
+        onClick: (e) => {
+          e.stopPropagation();
+          go(d);
+        },
+      },
+      React.createElement(Icon, {
+        name: icon,
+        size: 22,
+        color: "var(--green-deep)",
+      }),
+    );
+  const dots = React.createElement(
+    "div",
+    {
+      className: "loz-car-dots " + (dotsClickable ? "" : "static"),
+      style: { direction: rtl ? "rtl" : "ltr" },
+    },
+    imgs.map((_, i) =>
+      React.createElement("i", {
+        key: i,
+        className: i === slide ? "on" : "",
+        onClick: dotsClickable
+          ? (e) => {
+              e.stopPropagation();
+              setSlide(i);
+            }
+          : null,
+      }),
+    ),
+  );
+  return React.createElement(
+    React.Fragment,
+    null,
+    React.createElement(
+      "div",
+      {
+        className: "loz-car " + (arrows ? "" : "loz-car-bare"),
+        ref: wrapRef,
+        onPointerDown: onDown,
+        onPointerMove: onMove,
+        onPointerUp: onUp,
+        onPointerCancel: onUp,
+        onClickCapture: stop,
+      },
+      track,
+      arrows &&
+        mkBtn(
+          -1,
+          rtl ? "right" : "left",
+          rtl ? "chevron" : "back",
+          !loop && atStart,
+          "السابق",
+        ),
+      arrows &&
+        mkBtn(
+          1,
+          rtl ? "left" : "right",
+          rtl ? "back" : "chevron",
+          !loop && atEnd,
+          "التالي",
+        ),
+      dots,
+    ),
+    lightbox,
+  );
+}
+function ImageLightbox({ src, ph, onClose }) {
+  const [scale, setScale] = React.useState(1),
+    [pos, setPos] = React.useState({ x: 0, y: 0 }),
+    [dy, setDy] = React.useState(0),
+    [active, setActive] = React.useState(!1);
+  const ptrs = React.useRef(new Map()),
+    pinch = React.useRef(null),
+    panRef = React.useRef(null),
+    closeRef = React.useRef(null),
+    movedRef = React.useRef(!1),
+    lastTap = React.useRef(0);
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => {
+      e.key === "Escape" && onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v)),
+    down = (e) => {
+      e.stopPropagation();
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch (_) {}
+      ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      setActive(!0);
+      movedRef.current = !1;
+      if (ptrs.current.size === 2) {
+        const v = [...ptrs.current.values()];
+        pinch.current = {
+          d: Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y) || 1,
+          s: scale,
+        };
+        panRef.current = null;
+        closeRef.current = null;
+      } else if (scale > 1)
+        panRef.current = { x: e.clientX, y: e.clientY, px: pos.x, py: pos.y };
+      else closeRef.current = { y: e.clientY, dy: 0 };
+    },
+    move = (e) => {
+      if (!ptrs.current.has(e.pointerId)) return;
+      ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptrs.current.size >= 2 && pinch.current) {
+        const v = [...ptrs.current.values()],
+          d = Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y);
+        setScale(clamp(pinch.current.s * (d / pinch.current.d), 1, 4));
+        movedRef.current = !0;
+      } else if (scale > 1 && panRef.current) {
+        setPos({
+          x: panRef.current.px + (e.clientX - panRef.current.x),
+          y: panRef.current.py + (e.clientY - panRef.current.y),
+        });
+        movedRef.current = !0;
+      } else if (closeRef.current) {
+        const d = e.clientY - closeRef.current.y;
+        closeRef.current.dy = d;
+        Math.abs(d) > 6 && (movedRef.current = !0);
+        setDy(d > 0 ? d : 0);
+      }
+    },
+    up = (e) => {
+      e.stopPropagation();
+      ptrs.current.delete(e.pointerId);
+      ptrs.current.size < 2 && (pinch.current = null);
+      if (closeRef.current && scale <= 1 && closeRef.current.dy > 110) {
+        onClose();
+        return;
+      }
+      if (ptrs.current.size === 0) {
+        if (!movedRef.current) {
+          const now = Date.now();
+          now - lastTap.current < 300
+            ? (setScale((s) => (s > 1 ? 1 : 2.5)),
+              setPos({ x: 0, y: 0 }),
+              (lastTap.current = 0))
+            : (lastTap.current = now);
+        }
+        panRef.current = null;
+        closeRef.current = null;
+        setActive(!1);
+        setDy(0);
+        scale <= 1 && setPos({ x: 0, y: 0 });
+      }
+    },
+    op = clamp(1 - dy / 380, 0, 1);
+  return React.createElement(
+    "div",
+    {
+      style: {
+        position: "absolute",
+        inset: 0,
+        zIndex: 300,
+        background: "rgba(8,6,4," + 0.94 * op + ")",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        touchAction: "none",
+        userSelect: "none",
+        animation: "fade .2s ease",
+      },
+      onClick: () => onClose(),
+    },
+    React.createElement(
+      "button",
+      {
+        "aria-label": "إغلاق",
+        onClick: (e) => {
+          e.stopPropagation();
+          onClose();
+        },
+        style: {
+          position: "absolute",
+          top: 12,
+          right: 12,
+          width: 38,
+          height: 38,
+          borderRadius: 19,
+          background: "rgba(0,0,0,.42)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 2,
+          border: "none",
+        },
+      },
+      React.createElement(Icon, { name: "close", size: 22, color: "#fff" }),
+    ),
+    React.createElement("img", {
+      src: src,
+      alt: ph || "",
+      draggable: !1,
+      onPointerDown: down,
+      onPointerMove: move,
+      onPointerUp: up,
+      onPointerCancel: up,
+      onClick: (e) => e.stopPropagation(),
+      style: {
+        maxWidth: "100%",
+        maxHeight: "100%",
+        width: "auto",
+        height: "auto",
+        objectFit: "contain",
+        transform:
+          "translate(" +
+          pos.x +
+          "px," +
+          (pos.y + dy) +
+          "px) scale(" +
+          scale +
+          ")",
+        transformOrigin: "center center",
+        transition: active ? "none" : "transform .22s ease",
+        touchAction: "none",
+        cursor: scale > 1 ? "grab" : "zoom-in",
+        willChange: "transform",
+      },
+    }),
+  );
+}
+function ProductCard({ p, t, lang, onOpen, onAdd, fav, onFav }) {
+  const old = p.old,
+    soldOut = p.stock != null && p.stock <= 0;
+  return React.createElement(
+    "div",
+    {
+      className: `prod-card ${p.bundle ? "bundle" : ""} ${soldOut ? "soldout" : ""}`,
+      onClick: () => onOpen(p),
+    },
+    React.createElement(
+      "div",
+      { className: "prod-img" },
+      React.createElement(LoziCarousel, {
+        images: (p.thumbs && p.thumbs.length
+          ? p.thumbs
+          : p.images && p.images.length
+            ? p.images
+            : [p.img]
+        ).filter(Boolean),
+        ph: lang === "ar" ? "صورة المنتج" : "Product",
+        t,
+        lang,
+        arrows: !1,
+        dotsClickable: !1,
+        loop: !1,
+      }),
+      soldOut &&
+        React.createElement("span", { className: "soldout-tag" }, "نفد"),
+      !soldOut &&
+        old &&
+        React.createElement("span", { className: "save-tag" }, t.special_price),
+      p.bundle &&
+        React.createElement(
+          "span",
+          { className: "bundle-tag" },
+          lang === "ar" ? "عرض مشكّل" : "Bundle",
+        ),
+      p.pinned &&
+        React.createElement(
+          "span",
+          { className: "pin-tag", title: "مثبّت" },
+          "📌",
+        ),
+      p.variety &&
+        React.createElement(
+          "span",
+          { className: "variety-tag" },
+          VARIETY_LABEL(p.variety, lang),
+        ),
+      p.shahtiStatus === "approved" &&
+        React.createElement(
+          "span",
+          { className: "shahti-tag" },
+          React.createElement(ShahtiGlyph, { size: 11 }),
+          t.shahti_badge,
+        ),
+      React.createElement(
+        "button",
+        {
+          className: `fav-btn ${fav ? "on" : ""}`,
+          onClick: (e) => {
+            (e.stopPropagation(), onFav(p.id));
+          },
+        },
+        React.createElement(Icon, {
+          name: "heart",
+          size: 16,
+          color: fav ? "#fff" : "var(--ink)",
+          fill: fav,
+        }),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "prod-body" },
+      React.createElement(
+        "div",
+        { className: p.bundle ? "prod-name bundle-name" : "prod-name" },
+        p.name[lang],
+      ),
+      React.createElement("div", { className: "prod-weight" }, p.weight[lang]),
+      React.createElement(
+        "div",
+        { className: "prod-foot" },
+        React.createElement(
+          "div",
+          { className: "price-wrap" },
+          React.createElement(Money, { v: p.price, cls: "price", small: !0 }),
+          old &&
+            React.createElement(
+              "span",
+              { className: "price-old" },
+              fmtMoney(old).value,
+            ),
+        ),
+        React.createElement(
+          "button",
+          {
+            className: "add-mini",
+            disabled: soldOut,
+            onClick: (e) => {
+              (e.stopPropagation(), soldOut || onAdd(p));
+            },
+          },
+          React.createElement(Icon, { name: "plus", size: 18, color: "#fff" }),
+        ),
+      ),
+    ),
+  );
+}
+function ShahtiGlyph({ size = 14, color = "#fff" }) {
+  return React.createElement(
+    "svg",
+    { width: size, height: size, viewBox: "0 0 24 24", fill: "none" },
+    React.createElement("path", {
+      d: "M12 3C8 6 6 10 6 14c0 4 3 7 6 7s6-3 6-7c0-4-2-8-6-11Z",
+      fill: color,
+      opacity: "0.92",
+    }),
+    React.createElement("path", {
+      d: "M9.2 13.4 11 15.2l4-4.4",
+      stroke: "var(--green-deep)",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+    }),
+  );
+}
+function StoreCard({ s, t, lang, onOpen }) {
+  return React.createElement(
+    "div",
+    { className: "store-card", onClick: () => onOpen(s) },
+    React.createElement(
+      "div",
+      { className: "store-img" },
+      React.createElement(Img, {
+        id: s.img,
+        ph: lang === "ar" ? "صورة المتجر" : "Store",
+        radius: 16,
+      }),
+      s.cat === "wholesale" &&
+        React.createElement(
+          "span",
+          { className: "wh-corner" },
+          t.wholesale_badge,
+        ),
+    ),
+    React.createElement(
+      "div",
+      { className: "store-body" },
+      React.createElement(
+        "div",
+        { className: "store-top" },
+        React.createElement(
+          "div",
+          { className: "store-name" },
+          s.name[lang],
+          s.verified && React.createElement(VerifiedSeal, { size: 16 }),
+        ),
+        React.createElement(Stars, { value: s.rating }),
+      ),
+      React.createElement(
+        "div",
+        { className: "store-addr" },
+        React.createElement(Icon, {
+          name: "location",
+          size: 12,
+          color: "var(--muted)",
+        }),
+        s.addr[lang],
+        " · ",
+        s.reviews,
+        " ",
+        t.reviews,
+      ),
+      s.offers &&
+        s.offers.length > 0 &&
+        React.createElement(
+          "div",
+          { className: "offer-row" },
+          s.offers.map((o, i) =>
+            React.createElement(OfferChip, { key: i, o, t, lang }),
+          ),
+        ),
+    ),
+  );
+}
+function Splash({ onDone }) {
+  return (
+    React.useEffect(() => {
+      const x = setTimeout(onDone, 1900);
+      return () => clearTimeout(x);
+    }, []),
+    React.createElement(
+      "div",
+      { className: "screen splash" },
+      React.createElement(
+        "div",
+        { className: "splash-logo" },
+        React.createElement(
+          "div",
+          { className: "splash-badge" },
+          React.createElement(LoziBadge, { size: 96 }),
+        ),
+        React.createElement("div", { className: "logo-word" }, "لوزي"),
+        React.createElement("div", { className: "logo-en" }, "LOZI"),
+      ),
+      React.createElement(
+        "div",
+        { className: "splash-tag" },
+        "مع لوزي، تدعم اقتصاد وطنك",
+      ),
+      React.createElement(
+        "div",
+        { className: "splash-dots" },
+        React.createElement("i", null),
+        React.createElement("i", null),
+        React.createElement("i", null),
+      ),
+    )
+  );
+}
+function LoziMark({ size = 48, color = "#fff" }) {
+  return React.createElement(
+    "svg",
+    { width: size, height: size, viewBox: "0 0 64 64", fill: "none" },
+    React.createElement("path", {
+      d: "M32 6C20 14 14 26 14 38c0 12 8 20 18 20s18-8 18-20C50 26 44 14 32 6Z",
+      fill: color,
+    }),
+    React.createElement("path", {
+      d: "M32 14c-6 6-9 14-9 22 0 7 4 13 9 14",
+      stroke: "var(--green)",
+      strokeWidth: "3",
+      strokeLinecap: "round",
+      opacity: "0.55",
+    }),
+  );
+}
+function LoziAlmond({ x, y, rot }) {
+  return React.createElement(
+    "g",
+    { transform: `translate(${x},${y}) rotate(${rot}) scale(.72)` },
+    React.createElement("ellipse", {
+      cx: "0",
+      cy: "22",
+      rx: "13",
+      ry: "4.2",
+      fill: "url(#lzbAlm)",
+    }),
+    React.createElement("path", {
+      d: "M0 -17 C8 -9 11 -1 11 6 C11 13 6 18 0 19 C-6 18 -11 13 -11 6 C-11 -1 -8 -9 0 -17 Z",
+      fill: "#ECD89B",
+      stroke: "#5E3E16",
+      strokeWidth: "1.7",
+      strokeLinejoin: "round",
+    }),
+    React.createElement(
+      "g",
+      {
+        fill: "none",
+        stroke: "#B68E45",
+        strokeWidth: "1",
+        strokeLinecap: "round",
+      },
+      React.createElement("path", {
+        d: "M0 -10 C-1.1 -2 -1.1 9 0 15.5",
+        opacity: ".75",
+      }),
+      React.createElement("path", {
+        d: "M-4.6 -6.5 C-5.6 0.5 -5.6 9 -4.6 14",
+        opacity: ".62",
+      }),
+      React.createElement("path", {
+        d: "M4.6 -6.5 C5.6 0.5 5.6 9 4.6 14",
+        opacity: ".62",
+      }),
+    ),
+    React.createElement("path", {
+      d: "M-3 -12 C-6 -8 -7.5 -3 -7.5 1",
+      fill: "none",
+      stroke: "#FBF1CE",
+      strokeWidth: "1.5",
+      strokeLinecap: "round",
+      opacity: ".55",
+    }),
+  );
+}
+function LoziBadge({ size = 88 }) {
+  return React.createElement(
+    "svg",
+    {
+      width: size,
+      height: size,
+      viewBox: "0 0 100 100",
+      fill: "none",
+      style: {
+        display: "block",
+        borderRadius: size * 0.225,
+        boxShadow: "0 12px 30px rgba(33,55,42,.32)",
+      },
+    },
+    React.createElement(
+      "defs",
+      null,
+      React.createElement(
+        "linearGradient",
+        {
+          id: "lzbBg",
+          gradientUnits: "userSpaceOnUse",
+          x1: "0",
+          y1: "0",
+          x2: "100",
+          y2: "100",
+          gradientTransform: "rotate(15 50 50)",
+        },
+        React.createElement("stop", { offset: "0", stopColor: "#3E5F47" }),
+        React.createElement("stop", { offset: ".55", stopColor: "#2C4836" }),
+        React.createElement("stop", { offset: "1", stopColor: "#1E3325" }),
+      ),
+      React.createElement(
+        "radialGradient",
+        { id: "lzbAlm", cx: "50%", cy: "50%", r: "50%" },
+        React.createElement("stop", {
+          offset: "0%",
+          stopColor: "#10220F",
+          stopOpacity: ".5",
+        }),
+        React.createElement("stop", {
+          offset: "62%",
+          stopColor: "#10220F",
+          stopOpacity: ".2",
+        }),
+        React.createElement("stop", {
+          offset: "100%",
+          stopColor: "#10220F",
+          stopOpacity: "0",
+        }),
+      ),
+    ),
+    React.createElement("rect", {
+      width: "100",
+      height: "100",
+      rx: "22.5",
+      fill: "url(#lzbBg)",
+    }),
+    React.createElement("rect", {
+      x: "13",
+      y: "13",
+      width: "74",
+      height: "74",
+      rx: "16",
+      fill: "none",
+      stroke: "rgba(245,237,210,.26)",
+      strokeWidth: "1.5",
+    }),
+    React.createElement(
+      "g",
+      { transform: "translate(50 50) scale(0.84) translate(-50 -50)" },
+      React.createElement(
+        "g",
+        { transform: "translate(50,18) scale(.72)" },
+        React.createElement("path", {
+          d: "M0 -3 L0 -13",
+          fill: "none",
+          stroke: "#C9A23E",
+          strokeWidth: "2.6",
+          strokeLinecap: "round",
+        }),
+        React.createElement("path", {
+          d: "M0 -11 C11 -17 21 -15 22 -6 C21 0 10 0 1 -5 C0 -7 0 -9 0 -11 Z",
+          fill: "#8FB154",
+          stroke: "#2C3D1A",
+          strokeWidth: "1.6",
+          strokeLinejoin: "round",
+        }),
+        React.createElement("path", {
+          d: "M3 -8 C9 -10 15 -10 19 -7",
+          fill: "none",
+          stroke: "#2C3D1A",
+          strokeWidth: "1",
+          strokeLinecap: "round",
+          opacity: ".6",
+        }),
+        React.createElement(
+          "g",
+          { fill: "#F2D24E", stroke: "#8A6A1E", strokeWidth: "1.5" },
+          React.createElement("circle", { cx: "0", cy: "3", r: "7.5" }),
+          React.createElement("circle", { cx: "-11", cy: "14", r: "7.5" }),
+          React.createElement("circle", { cx: "0", cy: "14", r: "7.5" }),
+          React.createElement("circle", { cx: "11", cy: "14", r: "7.5" }),
+          React.createElement("circle", { cx: "-16.5", cy: "25", r: "7.5" }),
+          React.createElement("circle", { cx: "-5.5", cy: "25", r: "7.5" }),
+          React.createElement("circle", { cx: "5.5", cy: "25", r: "7.5" }),
+          React.createElement("circle", { cx: "16.5", cy: "25", r: "7.5" }),
+          React.createElement("circle", { cx: "-11", cy: "36", r: "7.5" }),
+          React.createElement("circle", { cx: "0", cy: "36", r: "7.5" }),
+          React.createElement("circle", { cx: "11", cy: "36", r: "7.5" }),
+          React.createElement("circle", { cx: "0", cy: "47", r: "7.5" }),
+        ),
+        React.createElement(
+          "g",
+          { fill: "#FBEFA6", opacity: ".7" },
+          React.createElement("circle", { cx: "-2.3", cy: "0.7", r: "1.8" }),
+          React.createElement("circle", { cx: "-13.3", cy: "11.7", r: "1.8" }),
+          React.createElement("circle", { cx: "-18.8", cy: "22.7", r: "1.8" }),
+          React.createElement("circle", { cx: "-13.3", cy: "33.7", r: "1.8" }),
+        ),
+      ),
+      React.createElement(LoziAlmond, { x: 34, y: 71, rot: -15 }),
+      React.createElement(LoziAlmond, { x: 50, y: 75, rot: 0 }),
+      React.createElement(LoziAlmond, { x: 66, y: 71, rot: 15 }),
+    ),
+  );
+}
+const ROLE_DEFS = [
+  { id: "customer", icon: "user", glyph: "customer" },
+  { id: "farmer", icon: "leaf", glyph: "farmer" },
+  { id: "retail", icon: "store", glyph: "retail" },
+  { id: "wholesale", icon: "warehouse", glyph: "wholesale" },
+];
+function Register({
+  t,
+  lang,
+  onDone,
+  onVendorSendOtp,
+  onVendorVerify,
+  onVendorSetPassword,
+  onVendorSignIn,
+  onCustomerSignUp,
+  onSupport,
+  onGoLogin,
+  openTerms,
+  onDevSkip,
+}) {
+  const devMode = (function () {
+      try {
+        return /[?&]dev=1/.test(window.location.search)
+          ? (localStorage.setItem("lozi_dev", "1"), !0)
+          : localStorage.getItem("lozi_dev") === "1";
+      } catch (e) {
+        return /[?&]dev=1/.test(window.location.search);
+      }
+    })(),
+    [step, setStep] = useStateA("role"),
+    [role, setRole] = useStateA(""),
+    [kind, setKind] = useStateA(""),
+    [name, setName] = useStateA(""),
+    [n1, setN1] = useStateA(""),
+    [n2, setN2] = useStateA(""),
+    [n3, setN3] = useStateA(""),
+    [n4, setN4] = useStateA(""),
+    [agree, setAgree] = useStateA(!1),
+    [phone, setPhone] = useStateA(""),
+    [email, setEmail] = useStateA(""),
+    [password, setPassword] = useStateA(""),
+    [code, setCode] = useStateA(""),
+    [setupToken, setSetupToken] = useStateA(""),
+    [busy, setBusy] = useStateA(!1),
+    [err, setErr] = useStateA(""),
+    [blocked, setBlocked] = useStateA(""),
+    [info, setInfo] = useStateA(""),
+    resolvedRole =
+      role === "farmer"
+        ? kind === "raisin"
+          ? "farmer_raisin"
+          : "farmer_almond"
+        : role,
+    isVendor = role === "farmer" || role === "retail" || role === "wholesale",
+    roleReady = role && (role !== "farmer" || kind),
+    vendorName = [n1, n2, n3, n4]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(" "),
+    nameTooShort = (v) => v.trim().length > 0 && v.trim().length < 2,
+    nameErr =
+      nameTooShort(n1) ||
+      nameTooShort(n2) ||
+      nameTooShort(n3) ||
+      nameTooShort(n4),
+    namesReady =
+      n1.trim().length >= 2 &&
+      n2.trim().length >= 2 &&
+      n3.trim().length >= 2 &&
+      n4.trim().length >= 2,
+    phoneReady = phone.trim().replace(/[^0-9]/g, "").length >= 7,
+    emailReady = /\S+@\S+\.\S+/.test(email.trim()),
+    finish = (withPerson) =>
+      onDone({
+        role: resolvedRole || "customer",
+        person: withPerson ? { name, phone } : null,
+      }),
+    vendorSend = async () => {
+      if (!phoneReady) return;
+      (setErr(""), setBlocked(""), setBusy(!0));
+      const r = await onVendorSendOtp({ phone: phone.trim() });
+      if ((setBusy(!1), r && r.ok)) return setStep("otp");
+      if (r && r.reason === "not_authorized")
+        return setBlocked("not_authorized");
+      if (r && r.reason === "rate_limited") return setBlocked("rate_limited");
+      setErr((r && (r.error || r.reason)) || "تعذّر إرسال الرمز");
+    },
+    vendorVerify = async () => {
+      (setErr(""), setBusy(!0));
+      const r = await onVendorVerify({
+        phone: phone.trim(),
+        code: code.trim(),
+      });
+      if ((setBusy(!1), r && r.ok))
+        return (setSetupToken(r.setup_token), setStep("setpw"));
+      setErr(
+        (r &&
+          (r.error ||
+            (r.reason === "invalid_code"
+              ? "الرمز غير صحيح أو منتهي"
+              : r.reason))) ||
+          "الرمز غير صحيح",
+      );
+    },
+    vendorSetPw = async () => {
+      if (password.length < 4) return setErr("كلمة المرور ٤ أحرف على الأقل");
+      (setErr(""), setBusy(!0));
+      const r = await onVendorSetPassword({
+        phone: phone.trim(),
+        setup_token: setupToken,
+        password,
+      });
+      if (!r || !r.ok)
+        return (
+          setBusy(!1),
+          setErr((r && (r.error || r.reason)) || "تعذّر حفظ كلمة المرور")
+        );
+      const s = await onVendorSignIn({
+        phone: phone.trim(),
+        password,
+        role: resolvedRole,
+        name: vendorName,
+      });
+      (setBusy(!1), (!s || !s.ok) && setErr((s && s.error) || "تعذّر الدخول"));
+    },
+    customerSignUp = async () => {
+      if (!name.trim() || !emailReady || !phoneReady || password.length < 6)
+        return;
+      (setErr(""), setInfo(""), setBusy(!0));
+      const r = await onCustomerSignUp({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        phone: phone.trim(),
+      });
+      if ((setBusy(!1), r && r.ok && r.needsConfirm))
+        return setInfo(
+          "تم إنشاء الحساب! افتح بريدك وأكّد الحساب ثم سجّل الدخول.",
+        );
+      (r && r.ok) || setErr((r && r.error) || "تعذّر إنشاء الحساب");
+    };
+  return React.createElement(
+    "div",
+    { className: "screen register" },
+    step === "role" &&
+      React.createElement(
+        "div",
+        { className: "reg-step" },
+        React.createElement(
+          "div",
+          { className: "reg-brand" },
+          React.createElement(LoziBadge, { size: 88 }),
+        ),
+        React.createElement("h1", { className: "reg-title" }, t.choose_role),
+        React.createElement("p", { className: "reg-sub" }, t.choose_role_sub),
+        React.createElement(
+          "div",
+          { className: "role-grid" },
+          ROLE_DEFS.map((r) =>
+            React.createElement(
+              "button",
+              {
+                key: r.id,
+                className: `role-card ${role === r.id ? "on" : ""}`,
+                onClick: () => {
+                  (setRole(r.id), r.id !== "farmer" && setKind(""));
+                },
+              },
+              React.createElement(
+                "span",
+                { className: `role-ic role-${r.id}` },
+                React.createElement(Icon, {
+                  name: r.icon,
+                  size: 24,
+                  color: "#fff",
+                }),
+              ),
+              React.createElement("strong", null, t["role_" + r.id]),
+              React.createElement("span", null, t["role_" + r.id + "_d"]),
+              role === r.id &&
+                React.createElement(
+                  "span",
+                  { className: "role-check" },
+                  React.createElement(Icon, {
+                    name: "check",
+                    size: 13,
+                    color: "#fff",
+                    stroke: 3,
+                  }),
+                ),
+            ),
+          ),
+        ),
+        role === "farmer" &&
+          React.createElement(
+            "div",
+            { className: "farmer-kind" },
+            React.createElement(
+              "div",
+              { className: "fk-label" },
+              t.farmer_kind,
+            ),
+            React.createElement(
+              "div",
+              { className: "seg seg-2" },
+              React.createElement(
+                "button",
+                {
+                  className: kind === "almond" ? "on" : "",
+                  onClick: () => setKind("almond"),
+                },
+                t.farmer_almond,
+              ),
+              React.createElement(
+                "button",
+                {
+                  className: kind === "raisin" ? "on" : "",
+                  onClick: () => setKind("raisin"),
+                },
+                t.farmer_raisin,
+              ),
+            ),
+          ),
+        React.createElement(
+          "div",
+          { className: "reg-foot" },
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: !roleReady,
+              onClick: () => setStep("method"),
+            },
+            t.cont,
+          ),
+          React.createElement(
+            "button",
+            { className: "skip-link", onClick: onGoLogin },
+            "لديك حساب؟ تسجيل الدخول",
+          ),
+        ),
+      ),
+    step === "method" &&
+      React.createElement(
+        "div",
+        { className: "reg-step" },
+        React.createElement(
+          "button",
+          {
+            className: "reg-back",
+            onClick: () => {
+              (setErr(""), setBlocked(""), setStep("role"));
+            },
+          },
+          React.createElement(Icon, {
+            name: t.dir === "rtl" ? "chevron" : "back",
+            size: 20,
+            color: "var(--ink)",
+          }),
+        ),
+        React.createElement(
+          "div",
+          { className: "reg-brand" },
+          React.createElement(LoziBadge, { size: 88 }),
+        ),
+        React.createElement(
+          "h1",
+          { className: "reg-title" },
+          isVendor ? "مرحباً بك في لوزي" : t.welcome,
+        ),
+        React.createElement(
+          "p",
+          { className: "reg-sub" },
+          isVendor
+            ? "قم بإنشاء حسابك، لتجعل سوق المكسرات بين يديك"
+            : t["role_" + role] +
+                (role === "farmer" && kind ? " · " + t["farmer_" + kind] : ""),
+        ),
+        React.createElement(
+          "div",
+          { className: "country-field" },
+          React.createElement("span", { className: "cf-flag" }, "🇾🇪"),
+          React.createElement(
+            "div",
+            { className: "cf-text" },
+            React.createElement("strong", null, t.yemen),
+          ),
+          React.createElement(Icon, {
+            name: "check",
+            size: 16,
+            color: "var(--green-deep)",
+            stroke: 3,
+          }),
+        ),
+        isVendor
+          ? blocked
+            ? React.createElement(
+                "div",
+                { className: "form-fields" },
+                React.createElement(
+                  "p",
+                  {
+                    className: "terms",
+                    style: {
+                      color: "var(--danger)",
+                      fontWeight: 700,
+                      fontSize: 14,
+                    },
+                  },
+                  blocked === "not_authorized"
+                    ? "رقمك غير مفعّل للتسجيل كمورد. تواصل مع الدعم لتفعيل حسابك."
+                    : "تم إرسال رمز خلال آخر ٢٤ ساعة. حاول لاحقاً أو تواصل مع الدعم.",
+                ),
+                React.createElement(
+                  "button",
+                  { className: "btn btn-wa", onClick: onSupport },
+                  React.createElement(Icon, {
+                    name: "whatsapp",
+                    size: 20,
+                    color: "#fff",
+                  }),
+                  React.createElement(
+                    "span",
+                    null,
+                    "تواصل مع الدعم عبر واتساب",
+                  ),
+                ),
+                React.createElement(
+                  "button",
+                  { className: "skip-link", onClick: () => setBlocked("") },
+                  "رجوع",
+                ),
+              )
+            : React.createElement(
+                "div",
+                { className: "form-fields" },
+                React.createElement(
+                  "p",
+                  { className: "reg-hint" },
+                  "قم بإدخال الاسم كما في الهوية",
+                ),
+                React.createElement(
+                  "div",
+                  { className: "name-grid" },
+                  React.createElement("input", {
+                    className: nameTooShort(n1)
+                      ? "field-input invalid"
+                      : "field-input",
+                    value: n1,
+                    onChange: (e) => setN1(e.target.value),
+                    placeholder: "الاسم الأول",
+                  }),
+                  React.createElement("input", {
+                    className: nameTooShort(n2)
+                      ? "field-input invalid"
+                      : "field-input",
+                    value: n2,
+                    onChange: (e) => setN2(e.target.value),
+                    placeholder: "الاسم الثاني",
+                  }),
+                  React.createElement("input", {
+                    className: nameTooShort(n3)
+                      ? "field-input invalid"
+                      : "field-input",
+                    value: n3,
+                    onChange: (e) => setN3(e.target.value),
+                    placeholder: "الاسم الثالث",
+                  }),
+                  React.createElement("input", {
+                    className: nameTooShort(n4)
+                      ? "field-input invalid"
+                      : "field-input",
+                    value: n4,
+                    onChange: (e) => setN4(e.target.value),
+                    placeholder: "اللقب",
+                  }),
+                ),
+                nameErr &&
+                  React.createElement(
+                    "p",
+                    { className: "name-err" },
+                    "يجب أن يتكون كل اسم من حرفين على الأقل",
+                  ),
+                React.createElement(
+                  "label",
+                  { className: "field" },
+                  React.createElement(
+                    "span",
+                    { className: "field-label" },
+                    t.phone,
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "phone-input" },
+                    React.createElement(
+                      "span",
+                      { className: "phone-cc" },
+                      "+967",
+                    ),
+                    React.createElement("input", {
+                      className: "field-input",
+                      value: phone,
+                      onChange: (e) => setPhone(e.target.value),
+                      placeholder: t.phone_ph,
+                      inputMode: "tel",
+                    }),
+                  ),
+                ),
+                err &&
+                  React.createElement(
+                    "p",
+                    { className: "terms", style: { color: "var(--danger)" } },
+                    String(err),
+                  ),
+                React.createElement(
+                  "label",
+                  { className: "terms-check" },
+                  React.createElement("input", {
+                    type: "checkbox",
+                    checked: agree,
+                    onChange: (e) => setAgree(e.target.checked),
+                  }),
+                  React.createElement(
+                    "span",
+                    null,
+                    "أوافق على ",
+                    React.createElement(
+                      "button",
+                      {
+                        type: "button",
+                        className: "terms-link",
+                        onClick: openTerms,
+                      },
+                      "الشروط والأحكام",
+                    ),
+                  ),
+                ),
+                React.createElement(
+                  "button",
+                  {
+                    className: "btn btn-green",
+                    disabled: busy || !namesReady || !phoneReady || !agree,
+                    onClick: vendorSend,
+                  },
+                  React.createElement(Icon, {
+                    name: "phone",
+                    size: 20,
+                    color: "#fff",
+                  }),
+                  React.createElement(
+                    "span",
+                    null,
+                    busy ? "جارٍ الإرسال..." : "متابعة",
+                  ),
+                ),
+                devMode &&
+                  React.createElement(
+                    "button",
+                    {
+                      className: "skip-link",
+                      style: { color: "var(--gold-deep)", fontWeight: 800 },
+                      onClick: () => onDevSkip && onDevSkip(resolvedRole),
+                    },
+                    "تخطّي — دخول تجريبي بدون رمز",
+                  ),
+              )
+          : React.createElement(
+              "div",
+              { className: "form-fields" },
+              React.createElement(
+                "label",
+                { className: "field" },
+                React.createElement(
+                  "span",
+                  { className: "field-label" },
+                  t.full_name,
+                ),
+                React.createElement("input", {
+                  className: "field-input",
+                  value: name,
+                  onChange: (e) => setName(e.target.value),
+                  placeholder: t.full_name_ph,
+                }),
+              ),
+              React.createElement(
+                "label",
+                { className: "field" },
+                React.createElement(
+                  "span",
+                  { className: "field-label" },
+                  "البريد الإلكتروني",
+                ),
+                React.createElement("input", {
+                  className: "field-input",
+                  type: "email",
+                  value: email,
+                  onChange: (e) => setEmail(e.target.value),
+                  placeholder: "name@example.com",
+                  inputMode: "email",
+                  autoCapitalize: "off",
+                }),
+              ),
+              React.createElement(
+                "label",
+                { className: "field" },
+                React.createElement(
+                  "span",
+                  { className: "field-label" },
+                  "كلمة المرور",
+                ),
+                React.createElement("input", {
+                  className: "field-input",
+                  type: "password",
+                  value: password,
+                  onChange: (e) => setPassword(e.target.value),
+                  placeholder: "••••••••",
+                }),
+              ),
+              React.createElement(
+                "label",
+                { className: "field" },
+                React.createElement(
+                  "span",
+                  { className: "field-label" },
+                  t.phone,
+                ),
+                React.createElement(
+                  "div",
+                  { className: "phone-input" },
+                  React.createElement(
+                    "span",
+                    { className: "phone-cc" },
+                    "+967",
+                  ),
+                  React.createElement("input", {
+                    className: "field-input",
+                    value: phone,
+                    onChange: (e) => setPhone(e.target.value),
+                    placeholder: t.phone_ph,
+                    inputMode: "tel",
+                  }),
+                ),
+              ),
+              info &&
+                React.createElement(
+                  "p",
+                  {
+                    className: "terms",
+                    style: { color: "var(--green-deep)", fontWeight: 700 },
+                  },
+                  info,
+                ),
+              err &&
+                React.createElement(
+                  "p",
+                  { className: "terms", style: { color: "var(--danger)" } },
+                  String(err),
+                ),
+              React.createElement(
+                "button",
+                {
+                  className: "btn btn-green",
+                  disabled:
+                    busy ||
+                    !name.trim() ||
+                    !emailReady ||
+                    !phoneReady ||
+                    password.length < 6,
+                  onClick: customerSignUp,
+                },
+                React.createElement(Icon, {
+                  name: "check",
+                  size: 20,
+                  color: "#fff",
+                  stroke: 3,
+                }),
+                React.createElement(
+                  "span",
+                  null,
+                  busy ? "جارٍ الإنشاء..." : "إنشاء حساب",
+                ),
+              ),
+              React.createElement(
+                "p",
+                { className: "terms" },
+                t.agree_pre,
+                " ",
+                React.createElement(
+                  "button",
+                  { className: "terms-link", onClick: openTerms },
+                  t.terms_link,
+                ),
+              ),
+            ),
+      ),
+    step === "otp" &&
+      React.createElement(
+        "div",
+        { className: "reg-step" },
+        React.createElement(
+          "button",
+          {
+            className: "reg-back",
+            onClick: () => {
+              (setErr(""), setStep("method"));
+            },
+          },
+          React.createElement(Icon, {
+            name: t.dir === "rtl" ? "chevron" : "back",
+            size: 20,
+            color: "var(--ink)",
+          }),
+        ),
+        React.createElement(
+          "div",
+          { className: "reg-brand" },
+          React.createElement(
+            "div",
+            { className: "logo-mark lg" },
+            React.createElement(Icon, {
+              name: "phone",
+              size: 42,
+              color: "var(--green-deep)",
+            }),
+          ),
+        ),
+        React.createElement(
+          "h1",
+          { className: "reg-title" },
+          "أدخل رمز التحقق",
+        ),
+        React.createElement(
+          "p",
+          { className: "reg-sub" },
+          "أرسلنا رمزاً عبر SMS إلى +967 " + phone,
+        ),
+        React.createElement(
+          "div",
+          { className: "form-fields" },
+          React.createElement(
+            "label",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              "رمز التحقق",
+            ),
+            React.createElement("input", {
+              className: "field-input",
+              value: code,
+              onChange: (e) => setCode(e.target.value.replace(/[^0-9]/g, "")),
+              placeholder: "٦ أرقام",
+              inputMode: "numeric",
+              maxLength: 6,
+              style: {
+                textAlign: "center",
+                letterSpacing: ".4em",
+                fontSize: 20,
+              },
+            }),
+          ),
+        ),
+        err &&
+          React.createElement(
+            "p",
+            { className: "terms", style: { color: "var(--danger)" } },
+            String(err),
+          ),
+        React.createElement(
+          "div",
+          { className: "reg-foot" },
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: busy || code.trim().length < 4,
+              onClick: vendorVerify,
+            },
+            React.createElement(Icon, {
+              name: "check",
+              size: 18,
+              color: "#fff",
+              stroke: 3,
+            }),
+            React.createElement(
+              "span",
+              null,
+              busy ? "جارٍ التحقق..." : "تأكيد",
+            ),
+          ),
+          React.createElement(
+            "button",
+            { className: "skip-link", onClick: vendorSend, disabled: busy },
+            "إعادة إرسال الرمز",
+          ),
+        ),
+      ),
+    step === "setpw" &&
+      React.createElement(
+        "div",
+        { className: "reg-step" },
+        React.createElement(
+          "div",
+          { className: "reg-brand" },
+          React.createElement(
+            "div",
+            { className: "logo-mark lg" },
+            React.createElement(Icon, {
+              name: "shield",
+              size: 42,
+              color: "var(--green-deep)",
+            }),
+          ),
+        ),
+        React.createElement(
+          "h1",
+          { className: "reg-title" },
+          "إعداد كلمة المرور",
+        ),
+        React.createElement(
+          "p",
+          { className: "reg-sub" },
+          "ستدخل لاحقاً برقم هاتفك وكلمة المرور هذه.",
+        ),
+        React.createElement(
+          "div",
+          { className: "form-fields" },
+          React.createElement(
+            "label",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              "كلمة المرور",
+            ),
+            React.createElement("input", {
+              className: "field-input",
+              type: "password",
+              value: password,
+              onChange: (e) => setPassword(e.target.value),
+              placeholder: "••••••••",
+            }),
+          ),
+        ),
+        err &&
+          React.createElement(
+            "p",
+            { className: "terms", style: { color: "var(--danger)" } },
+            String(err),
+          ),
+        React.createElement(
+          "div",
+          { className: "reg-foot" },
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: busy || password.length < 4,
+              onClick: vendorSetPw,
+            },
+            React.createElement(Icon, {
+              name: "check",
+              size: 18,
+              color: "#fff",
+              stroke: 3,
+            }),
+            React.createElement("span", null, busy ? "جارٍ..." : "حفظ ودخول"),
+          ),
+        ),
+      ),
+  );
+}
+function GoogleG() {
+  return React.createElement(
+    "svg",
+    { width: "20", height: "20", viewBox: "0 0 48 48" },
+    React.createElement("path", {
+      fill: "#4285F4",
+      d: "M45 24c0-1.6-.1-2.8-.4-4H24v8h12c-.2 2-1.6 5-4.6 7l7 5.4C42.6 36.6 45 31 45 24Z",
+    }),
+    React.createElement("path", {
+      fill: "#34A853",
+      d: "M24 46c5.9 0 10.8-2 14.4-5.3l-7-5.4c-1.9 1.3-4.5 2.2-7.4 2.2-5.7 0-10.5-3.8-12.2-9l-7.3 5.6C7.8 41.5 15.3 46 24 46Z",
+    }),
+    React.createElement("path", {
+      fill: "#FBBC05",
+      d: "M11.8 28.5c-.4-1.3-.7-2.7-.7-4.5s.3-3.2.7-4.5l-7.3-5.6C2.9 17 2 20.4 2 24s.9 7 2.5 10.1l7.3-5.6Z",
+    }),
+    React.createElement("path", {
+      fill: "#EA4335",
+      d: "M24 10.8c3.2 0 5.4 1.4 6.6 2.5l4.9-4.8C32.8 5.7 27.9 3.8 24 3.8 15.3 3.8 7.8 8.3 4.5 14.9l7.3 5.6C13.5 14.6 18.3 10.8 24 10.8Z",
+    }),
+  );
+}
+const SEC_GLYPH = {
+  almond: "almond",
+  raisin: "raisin",
+  retail: "store",
+  wholesale: "warehouse",
+  savings: "bolt",
+};
+function Home({
+  t,
+  lang,
+  go,
+  role,
+  avail,
+  catalog,
+  storesMap,
+  isSeller,
+  sellSection,
+  notifCount = 0,
+  onBell,
+  onAddCrop,
+  openStore,
+  openProduct,
+  addToCart,
+  favs,
+  toggleFav,
+  loadStatus,
+  onRetry,
+}) {
+  const cats = [
+      {
+        id: "almond",
+        label: t.sec_almond,
+        go: () => go("sections", { section: "almond" }),
+      },
+      {
+        id: "raisin",
+        label: t.sec_raisin,
+        go: () => go("sections", { section: "raisin" }),
+      },
+      {
+        id: "retail",
+        label: t.sec_retail,
+        go: () => go("sections", { section: "retail" }),
+      },
+      { id: "savings", label: t.cat_savings, go: () => go("savings") },
+    ],
+    showWholesale = avail.includes("wholesale"),
+    featured = (() => {
+      const seen = {},
+        out = [];
+      (catalog || []).forEach((p) => {
+        const v = p._vendor;
+        if (!v || p.cat === "wholesale") return;
+        if (!seen[v]) {
+          seen[v] = {
+            vendor: v,
+            name:
+              (storesMap && storesMap[v] && storesMap[v].name) ||
+              (lang === "ar" ? "متجر" : "Store"),
+            image: storesMap && storesMap[v] && storesMap[v].image,
+            products: [],
+          };
+          out.push(seen[v]);
+        }
+        seen[v].products.push(p);
+      });
+      return out.slice(0, 4);
+    })(),
+    popular = (catalog || LOZI_PRODUCTS)
+      .filter(
+        (p) =>
+          (p.cat === "almond" || p.cat === "raisin") && p.sale !== "wholesale",
+      )
+      .slice(0, 4),
+    isFarmer = sellSection === "almond" || sellSection === "raisin",
+    sellLabel = isFarmer ? t.add_crop : t.add_product,
+    sellSub = isFarmer
+      ? t.add_product_sub_farmer
+      : sellSection === "wholesale"
+        ? t.add_product_sub_wholesale
+        : t.add_product_sub_retail,
+    dataLoading = loadStatus === "loading" && !(catalog && catalog.length),
+    dataError = loadStatus === "error" && !(catalog && catalog.length);
+  return React.createElement(
+    "div",
+    { className: "screen home" },
+    React.createElement(
+      "header",
+      { className: "home-head" },
+      React.createElement(
+        "div",
+        { className: "home-greet" },
+        React.createElement(
+          "span",
+          { className: "home-loc" },
+          React.createElement(Icon, {
+            name: "location",
+            size: 14,
+            color: "var(--green-deep)",
+          }),
+          lang === "ar" ? "صنعاء، اليمن" : "Sanaa, Yemen",
+        ),
+        React.createElement("h1", null, t.appName),
+      ),
+      React.createElement(
+        "button",
+        { className: "bell-btn", onClick: onBell },
+        React.createElement(Icon, {
+          name: "bell",
+          size: 20,
+          color: "var(--ink)",
+        }),
+        notifCount > 0 && React.createElement("i", { className: "bell-dot" }),
+      ),
+    ),
+    React.createElement(
+      "button",
+      { className: "search-bar", onClick: () => go("sections") },
+      React.createElement(Icon, {
+        name: "search",
+        size: 20,
+        color: "var(--muted)",
+      }),
+      React.createElement("span", null, t.search_ph),
+    ),
+    React.createElement(
+      "div",
+      { className: "cat-row" },
+      cats.map((c) =>
+        React.createElement(
+          "button",
+          { key: c.id, className: `cat-tile cat-${c.id}`, onClick: c.go },
+          React.createElement(
+            "span",
+            { className: "cat-ic" },
+            React.createElement(CatGlyph, { id: c.id }),
+          ),
+          React.createElement("span", null, c.label),
+        ),
+      ),
+    ),
+    isSeller &&
+      React.createElement(
+        "button",
+        {
+          className: `farmer-banner ${isFarmer ? "" : "seller"}`,
+          onClick: onAddCrop,
+        },
+        React.createElement(
+          "span",
+          { className: "fb-ic" },
+          React.createElement(Icon, {
+            name: isFarmer
+              ? "leaf"
+              : sellSection === "wholesale"
+                ? "warehouse"
+                : "store",
+            size: 26,
+            color: "#fff",
+          }),
+        ),
+        React.createElement(
+          "div",
+          { className: "wb-txt" },
+          React.createElement("strong", null, sellLabel),
+          React.createElement("span", null, sellSub),
+        ),
+        React.createElement(Icon, { name: "plus", size: 22, color: "#fff" }),
+      ),
+    showWholesale &&
+      React.createElement(
+        "button",
+        {
+          className: "wholesale-banner",
+          onClick: () => go("sections", { section: "wholesale" }),
+        },
+        React.createElement(
+          "span",
+          { className: "wb-ic" },
+          React.createElement(Icon, {
+            name: "warehouse",
+            size: 26,
+            color: "#fff",
+          }),
+        ),
+        React.createElement(
+          "div",
+          { className: "wb-txt" },
+          React.createElement("strong", null, t.sec_wholesale),
+          React.createElement(
+            "span",
+            null,
+            lang === "ar"
+              ? "أسعار الجملة لمحلات التجزئة"
+              : "Wholesale prices for retailers",
+          ),
+        ),
+        React.createElement(Icon, {
+          name: t.dir === "rtl" ? "back" : "fwd",
+          size: 20,
+          color: "#fff",
+        }),
+      ),
+    React.createElement(SecHead, {
+      title: t.featured_stores,
+      action: t.see_all,
+      onAction: () => go("sections"),
+    }),
+    dataError
+      ? React.createElement(ErrorRetry, { onRetry })
+      : React.createElement(
+          "div",
+          { className: "store-list" },
+          dataLoading
+            ? React.createElement(SkeletonStores, { count: 3 })
+            : featured.map((v) =>
+                React.createElement(
+                  "div",
+                  {
+                    key: v.vendor,
+                    className: "store-card",
+                    onClick: () => go("vstore", { vendorId: v.vendor }),
+                  },
+                  React.createElement(
+                    "div",
+                    { className: "store-img" },
+                    React.createElement(Img, {
+                      id: v.image || "store",
+                      ph: lang === "ar" ? "المتجر" : "Store",
+                      radius: 16,
+                    }),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "store-body" },
+                    React.createElement(
+                      "div",
+                      { className: "store-top" },
+                      React.createElement(
+                        "div",
+                        { className: "store-name" },
+                        v.name,
+                      ),
+                      storesMap &&
+                        storesMap[v.vendor] &&
+                        storesMap[v.vendor].trustedBadge
+                        ? React.createElement(TrustBadge, {
+                            size: 16,
+                            withLabel: !0,
+                          })
+                        : null,
+                    ),
+                    storesMap &&
+                      storesMap[v.vendor] &&
+                      storesMap[v.vendor].rating != null
+                      ? React.createElement(
+                          "div",
+                          { className: "store-trust" },
+                          React.createElement(
+                            "span",
+                            { className: "store-rate" },
+                            React.createElement(Icon, {
+                              name: "star",
+                              size: 12,
+                              color: "var(--gold-deep)",
+                            }),
+                            Number(storesMap[v.vendor].rating).toFixed(1),
+                            storesMap[v.vendor].ratingsCount
+                              ? " (" + storesMap[v.vendor].ratingsCount + ")"
+                              : "",
+                          ),
+                        )
+                      : null,
+                    React.createElement(
+                      "div",
+                      { className: "store-addr" },
+                      React.createElement(Icon, {
+                        name: "store",
+                        size: 12,
+                        color: "var(--muted)",
+                      }),
+                      lang === "ar"
+                        ? v.products.length + " منتج"
+                        : v.products.length + " products",
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "store-minprice" },
+                      lang === "ar" ? "يبدأ من " : "From ",
+                      React.createElement(Money, {
+                        v: Math.min.apply(
+                          null,
+                          v.products.map((p) => Number(p.price) || 0),
+                        ),
+                        cls: "price",
+                        small: !0,
+                      }),
+                    ),
+                  ),
+                ),
+              ),
+        ),
+    !dataError && React.createElement(SecHead, { title: t.offers }),
+    !dataError &&
+      React.createElement(
+        "div",
+        { className: "prod-grid" },
+        dataLoading
+          ? React.createElement(SkeletonGrid, { count: 4 })
+          : popular.map((p) =>
+              React.createElement(ProductCard, {
+                key: p.id,
+                p,
+                t,
+                lang,
+                onOpen: openProduct,
+                onAdd: addToCart,
+                fav: favs.includes(p.id),
+                onFav: toggleFav,
+              }),
+            ),
+      ),
+  );
+}
+function CatGlyph({ id }) {
+  return id === "almond"
+    ? React.createElement(
+        "svg",
+        { width: "26", height: "26", viewBox: "0 0 24 24" },
+        React.createElement("path", {
+          d: "M12 3C8 6 6 10 6 14c0 4 3 7 6 7s6-3 6-7c0-4-2-8-6-11Z",
+          fill: "#fff",
+        }),
+      )
+    : id === "raisin"
+      ? React.createElement(
+          "svg",
+          { width: "26", height: "26", viewBox: "0 0 24 24", fill: "#fff" },
+          React.createElement("circle", { cx: "9", cy: "10", r: "3.5" }),
+          React.createElement("circle", { cx: "15", cy: "9", r: "3" }),
+          React.createElement("circle", { cx: "12", cy: "15", r: "3.5" }),
+        )
+      : id === "retail"
+        ? React.createElement(Icon, {
+            name: "store",
+            size: "24",
+            color: "#fff",
+          })
+        : id === "wholesale"
+          ? React.createElement(Icon, {
+              name: "warehouse",
+              size: 24,
+              color: "#fff",
+            })
+          : React.createElement(Icon, {
+              name: "bolt",
+              size: 24,
+              color: "#fff",
+            });
+}
+function TrustBadge({ size = 16, withLabel }) {
+  return React.createElement(
+    "span",
+    { className: "trust-badge", title: "متجر موثوق" },
+    React.createElement(Icon, {
+      name: "star",
+      size: Math.round(size * 0.72),
+      color: "#fff",
+    }),
+    withLabel
+      ? React.createElement("span", { className: "tb-label" }, "موثوق")
+      : null,
+  );
+}
+function FilterSheet({
+  open,
+  onClose,
+  onApply,
+  onClear,
+  value,
+  varieties,
+  showBundle,
+  lang,
+}) {
+  const [d, setD] = React.useState(value);
+  React.useEffect(() => {
+    if (open) setD(value);
+  }, [open]);
+  if (!open) return null;
+  const tog = (k) => setD(Object.assign({}, d, { [k]: !d[k] })),
+    togVar = (id) => {
+      const has = d.varieties.includes(id);
+      setD(
+        Object.assign({}, d, {
+          varieties: has
+            ? d.varieties.filter((x) => x !== id)
+            : d.varieties.concat([id]),
+        }),
+      );
+    },
+    setP = (k, v) =>
+      setD(Object.assign({}, d, { [k]: String(v).replace(/[^0-9]/g, "") })),
+    row = (label, k) =>
+      React.createElement(
+        "button",
+        {
+          type: "button",
+          className: "flt-toggle" + (d[k] ? " on" : ""),
+          onClick: () => tog(k),
+        },
+        React.createElement("span", null, label),
+        React.createElement("span", { className: "flt-sw" }),
+      );
+  return React.createElement(
+    "div",
+    { className: "modal-overlay", onClick: onClose },
+    React.createElement(
+      "div",
+      { className: "sheet", onClick: (e) => e.stopPropagation() },
+      React.createElement("div", { className: "sheet-handle" }),
+      React.createElement(
+        "div",
+        { className: "sheet-scroll" },
+        React.createElement("h2", { className: "flt-title" }, "الفلاتر"),
+        varieties && varieties.length
+          ? React.createElement(
+              "div",
+              { className: "flt-group" },
+              React.createElement("div", { className: "flt-label" }, "الصنف"),
+              React.createElement(
+                "div",
+                { className: "flt-chips" },
+                varieties.map((v) =>
+                  React.createElement(
+                    "button",
+                    {
+                      key: v.id,
+                      type: "button",
+                      className:
+                        "chip" + (d.varieties.includes(v.id) ? " on" : ""),
+                      onClick: () => togVar(v.id),
+                    },
+                    (v.label && (v.label[lang] || v.label.ar)) || v.id,
+                  ),
+                ),
+              ),
+            )
+          : null,
+        React.createElement(
+          "div",
+          { className: "flt-group" },
+          React.createElement(
+            "div",
+            { className: "flt-label" },
+            "السعر (ريال)",
+          ),
+          React.createElement(
+            "div",
+            { className: "flt-price" },
+            React.createElement("input", {
+              className: "flt-input",
+              inputMode: "numeric",
+              placeholder: "من",
+              value: d.priceMin,
+              onChange: (e) => setP("priceMin", e.target.value),
+            }),
+            React.createElement("span", { className: "flt-dash" }, "—"),
+            React.createElement("input", {
+              className: "flt-input",
+              inputMode: "numeric",
+              placeholder: "إلى",
+              value: d.priceMax,
+              onChange: (e) => setP("priceMax", e.target.value),
+            }),
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "flt-group" },
+          row("خالٍ من المرارة", "shahti"),
+          row("توصيل مجاني", "freeDelivery"),
+          showBundle ? row("عروض المشكّل", "bundle") : null,
+          row("خصم عام", "discount"),
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "sheet-foot flt-foot" },
+        React.createElement(
+          "button",
+          { type: "button", className: "flt-clear", onClick: onClear },
+          "مسح الفلاتر",
+        ),
+        React.createElement(
+          "button",
+          { type: "button", className: "flt-apply", onClick: () => onApply(d) },
+          "تطبيق",
+        ),
+      ),
+    ),
+  );
+}
+function SectionBrowse({
+  t,
+  lang,
+  go,
+  avail,
+  catalog,
+  init,
+  initType,
+  storesMap,
+  openStore,
+  openProduct,
+  addToCart,
+  favs,
+  toggleFav,
+  loadStatus,
+  onRetry,
+  browse,
+  sectionVarieties,
+}) {
+  const start = avail.includes(init) ? init : avail[0],
+    [sec, setSec] = useStateA(start),
+    [type, setType] = useStateA(initType || "all"),
+    [q, setQ] = useStateA(""),
+    [sort, setSort] = useStateA("default"),
+    [catFilter, setCatFilter] = useStateA("all"),
+    [filters, setFilters] = useStateA({
+      varieties: [],
+      priceMin: "",
+      priceMax: "",
+      shahti: !1,
+      freeDelivery: !1,
+      bundle: !1,
+      discount: !1,
+    }),
+    [filterOpen, setFilterOpen] = useStateA(!1),
+    [srvRows, setSrvRows] = useStateA(null),
+    PRODUCTS = catalog || LOZI_PRODUCTS,
+    BROWSE = srvRows != null ? srvRows : PRODUCTS,
+    varList = (s) => (sectionVarieties && sectionVarieties[s]) || [],
+    hasVar = (s) => varList(s).length > 0,
+    effVars =
+      filters.varieties && filters.varieties.length
+        ? filters.varieties
+        : type !== "all"
+          ? [type]
+          : [],
+    rpcSort = sort === "default" ? "best" : sort,
+    isRetail = sec === "retail",
+    activeFilters =
+      (filters.varieties && filters.varieties.length ? 1 : 0) +
+      (filters.priceMin !== "" || filters.priceMax !== "" ? 1 : 0) +
+      (filters.shahti ? 1 : 0) +
+      (filters.freeDelivery ? 1 : 0) +
+      (filters.bundle ? 1 : 0) +
+      (filters.discount ? 1 : 0),
+    clearFilters = () => {
+      setFilters({
+        varieties: [],
+        priceMin: "",
+        priceMax: "",
+        shahti: !1,
+        freeDelivery: !1,
+        bundle: !1,
+        discount: !1,
+      });
+      setType("all");
+      setFilterOpen(!1);
+    },
+    storeRating = (vid) => storesMap && storesMap[vid] && storesMap[vid].rating,
+    secLabel = {
+      almond: t.sec_almond,
+      raisin: t.sec_raisin,
+      retail: t.sec_retail,
+      wholesale: t.sec_wholesale,
+    },
+    catLabel = {
+      almond: t.sec_almond,
+      raisin: t.sec_raisin,
+      retail: t.sec_retail,
+      wholesale: t.sec_wholesale,
+    },
+    storeName = (vid) =>
+      (storesMap && storesMap[vid] && storesMap[vid].name) ||
+      (lang === "ar" ? "متجر" : "Store"),
+    storeImg = (vid) => storesMap && storesMap[vid] && storesMap[vid].image,
+    priceOf = (p) => Number(p.price) || 0,
+    nameStr = (p) => {
+      const n = p.name;
+      return ((n && (n[lang] || n.ar || n.en)) || "") + "";
+    },
+    inSec = (p) =>
+      sec === "wholesale"
+        ? p.cat === "wholesale"
+        : p.cat === sec && p.cat !== "wholesale",
+    applySort = (arr) =>
+      sort === "price_asc"
+        ? arr.slice().sort((a, b) => priceOf(a) - priceOf(b))
+        : sort === "price_desc"
+          ? arr.slice().sort((a, b) => priceOf(b) - priceOf(a))
+          : sort === "rating"
+            ? arr
+                .slice()
+                .sort(
+                  (a, b) =>
+                    (storeRating(b._vendor) || -1) -
+                    (storeRating(a._vendor) || -1),
+                )
+            : arr,
+    query = q.trim().toLowerCase(),
+    searching = query.length > 0,
+    openVendor = (vid) => vid && go("vstore", { vendorId: vid }),
+    filterBar = React.createElement(
+      "div",
+      { className: "sb-filter" },
+      React.createElement(
+        "div",
+        { className: "search-bar live" },
+        React.createElement(Icon, {
+          name: "search",
+          size: 18,
+          color: "var(--muted)",
+        }),
+        React.createElement("input", {
+          className: "search-input",
+          value: q,
+          onChange: (e) => setQ(e.target.value),
+          placeholder: t.search_ph,
+          inputMode: "search",
+        }),
+        q &&
+          React.createElement(
+            "button",
+            { className: "search-clear", onClick: () => setQ("") },
+            React.createElement(Icon, {
+              name: "close",
+              size: 16,
+              color: "var(--muted)",
+            }),
+          ),
+      ),
+      React.createElement(
+        "select",
+        {
+          className: "sb-sort",
+          value: sort,
+          onChange: (e) => setSort(e.target.value),
+        },
+        React.createElement(
+          "option",
+          { value: "default" },
+          lang === "ar" ? "الترتيب: الأنسب" : "Sort: Best",
+        ),
+        React.createElement(
+          "option",
+          { value: "price_asc" },
+          lang === "ar" ? "السعر: الأرخص أولاً" : "Price: Low→High",
+        ),
+        React.createElement(
+          "option",
+          { value: "price_desc" },
+          lang === "ar" ? "السعر: الأغلى أولاً" : "Price: High→Low",
+        ),
+        React.createElement(
+          "option",
+          { value: "rating" },
+          lang === "ar" ? "الأعلى تقييماً" : "Top rated",
+        ),
+        React.createElement(
+          "option",
+          { value: "newest" },
+          lang === "ar" ? "الأحدث" : "Newest",
+        ),
+      ),
+      React.createElement(
+        "button",
+        {
+          type: "button",
+          className: "sb-filterbtn" + (activeFilters ? " on" : ""),
+          onClick: () => setFilterOpen(!0),
+          title: "الفلاتر",
+        },
+        React.createElement(Icon, {
+          name: "filter",
+          size: 18,
+          color: activeFilters ? "#fff" : "var(--green-deep)",
+        }),
+        activeFilters
+          ? React.createElement(
+              "span",
+              { className: "filter-badge" },
+              activeFilters,
+            )
+          : null,
+      ),
+    );
+  React.useEffect(() => {
+    let live = !0;
+    if (!browse) {
+      setSrvRows(null);
+      return () => {
+        live = !1;
+      };
+    }
+    browse({
+      section: sec,
+      sort: rpcSort,
+      varieties: effVars,
+      priceMin: filters.priceMin,
+      priceMax: filters.priceMax,
+      shahti: filters.shahti,
+      freeDelivery: filters.freeDelivery,
+      bundle: filters.bundle,
+      discount: filters.discount,
+      limit: 200,
+    }).then((rows) => {
+      if (live) setSrvRows(rows);
+    });
+    return () => {
+      live = !1;
+    };
+  }, [sec, type, sort, filters]);
+  const filterSheet = React.createElement(FilterSheet, {
+    open: filterOpen,
+    onClose: () => setFilterOpen(!1),
+    onApply: (d) => {
+      setFilters(d);
+      setFilterOpen(!1);
+    },
+    onClear: clearFilters,
+    value: filters,
+    varieties: varList(sec),
+    showBundle: isRetail,
+    lang,
+  });
+  if (loadStatus === "loading" && !(PRODUCTS && PRODUCTS.length))
+    return React.createElement(
+      "div",
+      { className: "screen sections" },
+      React.createElement(
+        "div",
+        { className: "stores-head" },
+        React.createElement("h2", null, t.stores_title),
+      ),
+      filterBar,
+      React.createElement(SkeletonStores, { count: 4 }),
+    );
+  if (loadStatus === "error" && !(PRODUCTS && PRODUCTS.length))
+    return React.createElement(
+      "div",
+      { className: "screen sections" },
+      React.createElement(
+        "div",
+        { className: "stores-head" },
+        React.createElement("h2", null, t.stores_title),
+      ),
+      filterBar,
+      React.createElement(ErrorRetry, { onRetry }),
+    );
+  if (searching) {
+    let results = PRODUCTS.filter(
+      (p) =>
+        (catFilter === "all" || p.cat === catFilter) &&
+        (nameStr(p) + " " + storeName(p._vendor)).toLowerCase().includes(query),
+    );
+    results = applySort(results);
+    const cats = ["all"].concat(avail);
+    return React.createElement(
+      "div",
+      { className: "screen sections" },
+      React.createElement(
+        "div",
+        { className: "stores-head" },
+        React.createElement("h2", null, t.stores_title),
+      ),
+      filterBar,
+      React.createElement(
+        "div",
+        { className: "type-row" },
+        cats.map((c) =>
+          React.createElement(
+            "button",
+            {
+              key: c,
+              className: `chip ${catFilter === c ? "on" : ""}`,
+              onClick: () => setCatFilter(c),
+            },
+            c === "all"
+              ? lang === "ar"
+                ? "كل الأقسام"
+                : "All sections"
+              : catLabel[c],
+          ),
+        ),
+      ),
+      React.createElement(SecHead, {
+        title:
+          (lang === "ar" ? "نتائج البحث" : "Search results") +
+          " (" +
+          results.length +
+          ")",
+      }),
+      results.length
+        ? React.createElement(
+            "div",
+            { className: "prod-grid pad" },
+            results.map((p) =>
+              React.createElement(
+                "div",
+                { key: p.id, className: "search-result" },
+                React.createElement(
+                  "button",
+                  {
+                    className: "sr-store",
+                    onClick: (e) => {
+                      e.stopPropagation();
+                      openVendor(p._vendor);
+                    },
+                  },
+                  React.createElement(Icon, {
+                    name: "store",
+                    size: 12,
+                    color: "var(--green-deep)",
+                  }),
+                  storeName(p._vendor),
+                ),
+                React.createElement(ProductCard, {
+                  p,
+                  t,
+                  lang,
+                  onOpen: openProduct,
+                  onAdd: addToCart,
+                  fav: favs.includes(p.id),
+                  onFav: toggleFav,
+                }),
+              ),
+            ),
+          )
+        : React.createElement(
+            "div",
+            { className: "empty" },
+            React.createElement(
+              "div",
+              { className: "empty-ic" },
+              React.createElement(Icon, {
+                name: "search",
+                size: 38,
+                color: "var(--gold-deep)",
+              }),
+            ),
+            React.createElement(
+              "h3",
+              null,
+              lang === "ar" ? "لا توجد نتائج مطابقة" : "No matching results",
+            ),
+          ),
+      filterSheet,
+    );
+  }
+  if (sec === "wholesale" && !avail.includes("wholesale"))
+    return React.createElement(
+      "div",
+      { className: "screen sections" },
+      React.createElement(
+        "div",
+        { className: "stores-head" },
+        React.createElement("h2", null, t.stores_title),
+      ),
+      filterBar,
+      React.createElement(
+        "div",
+        { className: "empty" },
+        React.createElement(
+          "div",
+          { className: "empty-ic" },
+          React.createElement(Icon, {
+            name: "warehouse",
+            size: 38,
+            color: "var(--gold-deep)",
+          }),
+        ),
+        React.createElement("h3", null, t.wholesale_locked),
+      ),
+    );
+  const inThisSec = BROWSE.filter(inSec).filter(
+      (p) => !hasVar(sec) || type === "all" || p.variety === type,
+    ),
+    seen = {},
+    vendors = [];
+  inThisSec.forEach((p) => {
+    const v = p._vendor;
+    if (!v) return;
+    if (!seen[v]) {
+      seen[v] = {
+        vendor: v,
+        name: storeName(v),
+        image: storeImg(v),
+        products: [],
+      };
+      vendors.push(seen[v]);
+    }
+    seen[v].products.push(p);
+  });
+  let vlist = vendors;
+  if (sort === "price_asc" || sort === "price_desc")
+    vlist = vendors.slice().sort((a, b) => {
+      const ma = Math.min.apply(null, a.products.map(priceOf)),
+        mb = Math.min.apply(null, b.products.map(priceOf));
+      return sort === "price_asc" ? ma - mb : mb - ma;
+    });
+  else if (sort === "rating")
+    vlist = vendors
+      .slice()
+      .sort(
+        (a, b) => (storeRating(b.vendor) || -1) - (storeRating(a.vendor) || -1),
+      );
+  const storeCardLive = (v) =>
+    React.createElement(
+      "div",
+      {
+        key: v.vendor,
+        className: "store-card",
+        onClick: () => openVendor(v.vendor),
+      },
+      React.createElement(
+        "div",
+        { className: "store-img" },
+        React.createElement(Img, {
+          id: v.image || "store",
+          ph: lang === "ar" ? "المتجر" : "Store",
+          radius: 16,
+        }),
+        sec === "wholesale" &&
+          React.createElement(
+            "span",
+            { className: "wh-corner" },
+            t.wholesale_badge,
+          ),
+      ),
+      React.createElement(
+        "div",
+        { className: "store-body" },
+        React.createElement(
+          "div",
+          { className: "store-top" },
+          React.createElement("div", { className: "store-name" }, v.name),
+          storesMap && storesMap[v.vendor] && storesMap[v.vendor].trustedBadge
+            ? React.createElement(TrustBadge, { size: 16, withLabel: !0 })
+            : null,
+        ),
+        storesMap && storesMap[v.vendor] && storesMap[v.vendor].rating != null
+          ? React.createElement(
+              "div",
+              { className: "store-trust" },
+              React.createElement(
+                "span",
+                { className: "store-rate" },
+                React.createElement(Icon, {
+                  name: "star",
+                  size: 12,
+                  color: "var(--gold-deep)",
+                }),
+                Number(storesMap[v.vendor].rating).toFixed(1),
+                storesMap[v.vendor].ratingsCount
+                  ? " (" + storesMap[v.vendor].ratingsCount + ")"
+                  : "",
+              ),
+            )
+          : null,
+        React.createElement(
+          "div",
+          { className: "store-addr" },
+          React.createElement(Icon, {
+            name: "store",
+            size: 12,
+            color: "var(--muted)",
+          }),
+          lang === "ar"
+            ? v.products.length + " منتج"
+            : v.products.length + " products",
+        ),
+        React.createElement(
+          "div",
+          { className: "store-minprice" },
+          lang === "ar" ? "يبدأ من " : "From ",
+          React.createElement(Money, {
+            v: Math.min.apply(null, v.products.map(priceOf)),
+            cls: "price",
+            small: !0,
+          }),
+        ),
+      ),
+    );
+  return React.createElement(
+    "div",
+    { className: "screen sections" },
+    React.createElement(
+      "div",
+      { className: "stores-head" },
+      React.createElement("h2", null, t.stores_title),
+    ),
+    filterBar,
+    React.createElement(
+      "div",
+      { className: "seg-row" },
+      avail.map((s) =>
+        React.createElement(
+          "button",
+          {
+            key: s,
+            className: `seg-pill ${sec === s ? "on" : ""} ${s === "wholesale" ? "wh" : ""}`,
+            onClick: () => {
+              setSec(s);
+              setType("all");
+            },
+          },
+          s === "wholesale" &&
+            React.createElement(Icon, {
+              name: "warehouse",
+              size: 13,
+              color: sec === s ? "#fff" : "var(--gold-deep)",
+            }),
+          secLabel[s],
+        ),
+      ),
+    ),
+    sec === "wholesale" &&
+      React.createElement(
+        "div",
+        { className: "wh-note" },
+        React.createElement(Icon, {
+          name: "warehouse",
+          size: 15,
+          color: "var(--gold-deep)",
+        }),
+        lang === "ar"
+          ? "أسعار جملة — لمحلات التجزئة"
+          : "Wholesale prices — for retailers",
+      ),
+    hasVar(sec) &&
+      React.createElement(
+        "div",
+        { className: "type-row" },
+        React.createElement(
+          "button",
+          {
+            className: `chip ${type === "all" ? "on" : ""}`,
+            onClick: () => setType("all"),
+          },
+          t.all_types,
+        ),
+        varList(sec).map((a) =>
+          React.createElement(
+            "button",
+            {
+              key: a.id,
+              className: `chip ${type === a.id ? "on" : ""}`,
+              onClick: () => setType(a.id),
+            },
+            (a.label && (a.label[lang] || a.label.ar)) || a.id,
+          ),
+        ),
+      ),
+    React.createElement(SecHead, {
+      title: t.stores_in_sec || (lang === "ar" ? "المتاجر" : "Stores"),
+    }),
+    vlist.length
+      ? React.createElement(
+          "div",
+          { className: "store-list pad-sm" },
+          vlist.map(storeCardLive),
+        )
+      : React.createElement(
+          "div",
+          { className: "empty" },
+          React.createElement(
+            "div",
+            { className: "empty-ic" },
+            React.createElement(Icon, {
+              name: "store",
+              size: 38,
+              color: "var(--gold-deep)",
+            }),
+          ),
+          React.createElement(
+            "h3",
+            null,
+            activeFilters
+              ? "لا توجد نتائج مطابقة للفلاتر"
+              : lang === "ar"
+                ? "لا توجد متاجر في هذا القسم بعد"
+                : "No stores in this section yet",
+          ),
+          activeFilters
+            ? React.createElement(
+                "button",
+                { className: "flt-empty-clear", onClick: clearFilters },
+                "مسح الفلاتر",
+              )
+            : null,
+        ),
+    filterSheet,
+  );
+}
+function StoreProfile({
+  s,
+  t,
+  lang,
+  onBack,
+  openProduct,
+  addToCart,
+  favs,
+  toggleFav,
+}) {
+  const prods = LOZI_PRODUCTS.filter((p) => p.store === s.id);
+  return React.createElement(
+    "div",
+    { className: "screen store-profile" },
+    React.createElement(
+      "div",
+      { className: "sp-hero" },
+      React.createElement(Img, {
+        id: `${s.img}-cover`,
+        ph: lang === "ar" ? "غلاف المتجر" : "Cover",
+        radius: 0,
+        shape: "rect",
+        style: { width: "100%", height: "100%" },
+      }),
+      React.createElement(
+        "button",
+        { className: "hero-back", onClick: onBack },
+        React.createElement(Icon, {
+          name: t.dir === "rtl" ? "chevron" : "back",
+          size: 22,
+          color: "var(--ink)",
+        }),
+      ),
+      React.createElement("div", { className: "sp-hero-grad" }),
+    ),
+    React.createElement(
+      "div",
+      { className: "sp-card" },
+      React.createElement(
+        "div",
+        { className: "sp-logo" },
+        React.createElement(Img, {
+          id: s.img,
+          ph: "",
+          radius: 18,
+          style: { width: 64, height: 64 },
+        }),
+      ),
+      React.createElement(
+        "div",
+        { className: "sp-info" },
+        React.createElement(
+          "h2",
+          null,
+          s.name[lang],
+          s.verified && React.createElement(VerifiedSeal, { size: 18 }),
+        ),
+        React.createElement(
+          "div",
+          { className: "sp-rate" },
+          React.createElement(Stars, { value: s.rating, size: 15 }),
+          React.createElement("span", null, "· ", s.reviews, " ", t.reviews),
+        ),
+        React.createElement(
+          "div",
+          { className: "sp-addr" },
+          React.createElement(Icon, {
+            name: "location",
+            size: 13,
+            color: "var(--muted)",
+          }),
+          s.addr[lang],
+        ),
+      ),
+    ),
+    s.offers &&
+      s.offers.length > 0 &&
+      React.createElement(
+        "div",
+        { className: "offers-block" },
+        React.createElement(
+          "div",
+          { className: "ob-head" },
+          React.createElement(Icon, {
+            name: "tag",
+            size: 15,
+            color: "var(--green-deep)",
+          }),
+          t.offers_avail,
+        ),
+        React.createElement(
+          "div",
+          { className: "ob-list" },
+          s.offers.map((o, i) =>
+            React.createElement(
+              "div",
+              { key: i, className: `ob-item ob-${o.type}` },
+              React.createElement(
+                "span",
+                { className: "ob-ic" },
+                React.createElement(Icon, {
+                  name: offerIcon(o),
+                  size: 16,
+                  color: "#fff",
+                }),
+              ),
+              React.createElement(
+                "span",
+                { className: "ob-text" },
+                offerText(o, t, lang),
+              ),
+            ),
+          ),
+        ),
+      ),
+    React.createElement(SecHead, { title: t.store_products }),
+    React.createElement(
+      "div",
+      { className: "prod-grid pad" },
+      prods.map((p) =>
+        React.createElement(ProductCard, {
+          key: p.id,
+          p,
+          t,
+          lang,
+          onOpen: openProduct,
+          onAdd: addToCart,
+          fav: favs.includes(p.id),
+          onFav: toggleFav,
+        }),
+      ),
+    ),
+  );
+}
+function Login({
+  t,
+  lang,
+  onCustomerSignIn,
+  onCustomerForgot,
+  onVendorSignIn,
+  onVendorSendOtp,
+  onVendorVerify,
+  onVendorSetPassword,
+  onSupport,
+  goRegister,
+}) {
+  const [tab, setTab] = useStateA("customer"),
+    [email, setEmail] = useStateA(""),
+    [phone, setPhone] = useStateA(""),
+    [password, setPassword] = useStateA(""),
+    [busy, setBusy] = useStateA(!1),
+    [err, setErr] = useStateA(""),
+    [forgot, setForgot] = useStateA(""),
+    [code, setCode] = useStateA(""),
+    [setupToken, setSetupToken] = useStateA(""),
+    [newpw, setNewpw] = useStateA(""),
+    [custForgot, setCustForgot] = useStateA(""),
+    emailOk = /\S+@\S+\.\S+/.test(email.trim()),
+    phoneOk = phone.trim().replace(/[^0-9]/g, "").length >= 7,
+    customerLogin = async () => {
+      (setErr(""), setBusy(!0));
+      const r = await onCustomerSignIn({ email: email.trim(), password });
+      (setBusy(!1),
+        (!r || !r.ok) &&
+          setErr((r && r.error) || "البريد أو كلمة المرور غير صحيحة"));
+    },
+    customerForgotSend = async () => {
+      if (!emailOk) return setErr("أدخل بريدك الإلكتروني");
+      (setErr(""), setBusy(!0));
+      const r = await onCustomerForgot({ email: email.trim() });
+      if ((setBusy(!1), r && r.ok)) return setCustForgot("sent");
+      setErr((r && r.error) || "تعذّر إرسال رابط الاستعادة");
+    },
+    vendorLogin = async () => {
+      (setErr(""), setBusy(!0));
+      const r = await onVendorSignIn({ phone: phone.trim(), password });
+      (setBusy(!1),
+        (!r || !r.ok) &&
+          setErr((r && r.error) || "الرقم أو كلمة المرور غير صحيحة"));
+    },
+    forgotSend = async () => {
+      (setErr(""), setBusy(!0));
+      const r = await onVendorSendOtp({
+        phone: phone.trim(),
+        purpose: "reset",
+      });
+      if ((setBusy(!1), r && r.ok)) return setForgot("code");
+      setErr(
+        (r &&
+          (r.error ||
+            (r.reason === "rate_limited"
+              ? "تم إرسال رمز مؤخراً، حاول لاحقاً"
+              : r.reason === "no_account"
+                ? "لا يوجد حساب بهذا الرقم"
+                : r.reason))) ||
+          "تعذّر إرسال الرمز",
+      );
+    },
+    forgotVerify = async () => {
+      (setErr(""), setBusy(!0));
+      const r = await onVendorVerify({
+        phone: phone.trim(),
+        code: code.trim(),
+        purpose: "reset",
+      });
+      if ((setBusy(!1), r && r.ok))
+        return (setSetupToken(r.setup_token), setForgot("newpw"));
+      setErr((r && (r.error || "الرمز غير صحيح")) || "الرمز غير صحيح");
+    },
+    forgotSet = async () => {
+      if (newpw.length < 4) return setErr("كلمة المرور ٤ أحرف على الأقل");
+      (setErr(""), setBusy(!0));
+      const r = await onVendorSetPassword({
+        phone: phone.trim(),
+        setup_token: setupToken,
+        password: newpw,
+      });
+      if (!r || !r.ok)
+        return (
+          setBusy(!1),
+          setErr((r && (r.error || "تعذّر الحفظ")) || "تعذّر الحفظ")
+        );
+      const s = await onVendorSignIn({ phone: phone.trim(), password: newpw });
+      (setBusy(!1), (!s || !s.ok) && setErr((s && s.error) || "تعذّر الدخول"));
+    };
+  return React.createElement(
+    "div",
+    { className: "screen register" },
+    React.createElement(
+      "div",
+      { className: "reg-step" },
+      React.createElement(
+        "div",
+        { className: "reg-brand" },
+        React.createElement(LoziBadge, { size: 88 }),
+      ),
+      React.createElement("h1", { className: "reg-title" }, "تسجيل الدخول"),
+      React.createElement(
+        "div",
+        { className: "seg seg-2", style: { marginBottom: 14 } },
+        React.createElement(
+          "button",
+          {
+            className: tab === "customer" ? "on" : "",
+            onClick: () => {
+              (setTab("customer"), setErr(""), setForgot(""));
+            },
+          },
+          "زبون",
+        ),
+        React.createElement(
+          "button",
+          {
+            className: tab === "vendor" ? "on" : "",
+            onClick: () => {
+              (setTab("vendor"), setErr(""), setForgot(""));
+            },
+          },
+          "متجر / مزارع",
+        ),
+      ),
+      tab === "customer" &&
+        custForgot === "" &&
+        React.createElement(
+          "div",
+          { className: "form-fields" },
+          React.createElement(
+            "label",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              "البريد الإلكتروني",
+            ),
+            React.createElement("input", {
+              className: "field-input",
+              type: "email",
+              value: email,
+              onChange: (e) => setEmail(e.target.value),
+              placeholder: "name@example.com",
+              inputMode: "email",
+              autoCapitalize: "off",
+            }),
+          ),
+          React.createElement(
+            "label",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              "كلمة المرور",
+            ),
+            React.createElement("input", {
+              className: "field-input",
+              type: "password",
+              value: password,
+              onChange: (e) => setPassword(e.target.value),
+              placeholder: "••••••••",
+            }),
+          ),
+          err &&
+            React.createElement(
+              "p",
+              { className: "terms", style: { color: "var(--danger)" } },
+              String(err),
+            ),
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: busy || !emailOk || !password,
+              onClick: customerLogin,
+            },
+            React.createElement(Icon, {
+              name: "check",
+              size: 18,
+              color: "#fff",
+              stroke: 3,
+            }),
+            React.createElement("span", null, busy ? "جارٍ..." : "دخول"),
+          ),
+          React.createElement(
+            "button",
+            {
+              className: "skip-link",
+              onClick: () => {
+                (setErr(""), setCustForgot("on"));
+              },
+            },
+            "نسيت كلمة المرور؟",
+          ),
+        ),
+      tab === "customer" &&
+        custForgot === "on" &&
+        React.createElement(
+          "div",
+          { className: "form-fields" },
+          React.createElement(
+            "p",
+            { className: "reg-sub" },
+            "أدخل بريدك وسنرسل لك رابطاً لإعادة تعيين كلمة المرور.",
+          ),
+          React.createElement(
+            "label",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              "البريد الإلكتروني",
+            ),
+            React.createElement("input", {
+              className: "field-input",
+              type: "email",
+              value: email,
+              onChange: (e) => setEmail(e.target.value),
+              placeholder: "name@example.com",
+              inputMode: "email",
+              autoCapitalize: "off",
+            }),
+          ),
+          err &&
+            React.createElement(
+              "p",
+              { className: "terms", style: { color: "var(--danger)" } },
+              String(err),
+            ),
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: busy || !emailOk,
+              onClick: customerForgotSend,
+            },
+            React.createElement(Icon, {
+              name: "mail",
+              size: 18,
+              color: "#fff",
+            }),
+            React.createElement(
+              "span",
+              null,
+              busy ? "جارٍ..." : "إرسال رابط الاستعادة",
+            ),
+          ),
+          React.createElement(
+            "button",
+            {
+              className: "skip-link",
+              onClick: () => {
+                (setCustForgot(""), setErr(""));
+              },
+            },
+            "رجوع",
+          ),
+        ),
+      tab === "customer" &&
+        custForgot === "sent" &&
+        React.createElement(
+          "div",
+          { className: "form-fields" },
+          React.createElement(
+            "p",
+            {
+              className: "terms",
+              style: { color: "var(--green-deep)", fontWeight: 700 },
+            },
+            "📩 أرسلنا رابط إعادة التعيين إلى بريدك. افتح الرسالة واضغط الرابط لاختيار كلمة مرور جديدة.",
+          ),
+          React.createElement(
+            "button",
+            {
+              className: "skip-link",
+              onClick: () => {
+                (setCustForgot(""), setErr(""));
+              },
+            },
+            "رجوع لتسجيل الدخول",
+          ),
+        ),
+      tab === "vendor" &&
+        forgot === "" &&
+        React.createElement(
+          "div",
+          { className: "form-fields" },
+          React.createElement(
+            "label",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              "رقم الهاتف",
+            ),
+            React.createElement(
+              "div",
+              { className: "phone-input" },
+              React.createElement("span", { className: "phone-cc" }, "+967"),
+              React.createElement("input", {
+                className: "field-input",
+                value: phone,
+                onChange: (e) => setPhone(e.target.value),
+                placeholder: "7XXXXXXXX",
+                inputMode: "tel",
+              }),
+            ),
+          ),
+          React.createElement(
+            "label",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              "كلمة المرور",
+            ),
+            React.createElement("input", {
+              className: "field-input",
+              type: "password",
+              value: password,
+              onChange: (e) => setPassword(e.target.value),
+              placeholder: "••••••••",
+            }),
+          ),
+          err &&
+            React.createElement(
+              "p",
+              { className: "terms", style: { color: "var(--danger)" } },
+              String(err),
+            ),
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: busy || !phoneOk || !password,
+              onClick: vendorLogin,
+            },
+            React.createElement(Icon, {
+              name: "check",
+              size: 18,
+              color: "#fff",
+              stroke: 3,
+            }),
+            React.createElement("span", null, busy ? "جارٍ..." : "دخول"),
+          ),
+          React.createElement(
+            "button",
+            {
+              className: "skip-link",
+              onClick: () => {
+                (setErr(""), setForgot("phone"));
+              },
+            },
+            "نسيت كلمة المرور؟",
+          ),
+        ),
+      tab === "vendor" &&
+        forgot === "phone" &&
+        React.createElement(
+          "div",
+          { className: "form-fields" },
+          React.createElement(
+            "p",
+            { className: "reg-sub" },
+            "أدخل رقمك لإرسال رمز التحقق",
+          ),
+          React.createElement(
+            "label",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              "رقم الهاتف",
+            ),
+            React.createElement(
+              "div",
+              { className: "phone-input" },
+              React.createElement("span", { className: "phone-cc" }, "+967"),
+              React.createElement("input", {
+                className: "field-input",
+                value: phone,
+                onChange: (e) => setPhone(e.target.value),
+                placeholder: "7XXXXXXXX",
+                inputMode: "tel",
+              }),
+            ),
+          ),
+          err &&
+            React.createElement(
+              "p",
+              { className: "terms", style: { color: "var(--danger)" } },
+              String(err),
+            ),
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: busy || !phoneOk,
+              onClick: forgotSend,
+            },
+            React.createElement(Icon, {
+              name: "phone",
+              size: 18,
+              color: "#fff",
+            }),
+            React.createElement("span", null, busy ? "جارٍ..." : "إرسال رمز"),
+          ),
+          React.createElement(
+            "button",
+            {
+              className: "skip-link",
+              onClick: () => {
+                (setForgot(""), setErr(""));
+              },
+            },
+            "رجوع",
+          ),
+        ),
+      tab === "vendor" &&
+        forgot === "code" &&
+        React.createElement(
+          "div",
+          { className: "form-fields" },
+          React.createElement(
+            "p",
+            { className: "reg-sub" },
+            "أرسلنا رمزاً إلى +967 " + phone,
+          ),
+          React.createElement(
+            "label",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              "رمز التحقق",
+            ),
+            React.createElement("input", {
+              className: "field-input",
+              value: code,
+              onChange: (e) => setCode(e.target.value.replace(/[^0-9]/g, "")),
+              placeholder: "٦ أرقام",
+              inputMode: "numeric",
+              maxLength: 6,
+              style: {
+                textAlign: "center",
+                letterSpacing: ".4em",
+                fontSize: 20,
+              },
+            }),
+          ),
+          err &&
+            React.createElement(
+              "p",
+              { className: "terms", style: { color: "var(--danger)" } },
+              String(err),
+            ),
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: busy || code.trim().length < 4,
+              onClick: forgotVerify,
+            },
+            React.createElement(Icon, {
+              name: "check",
+              size: 18,
+              color: "#fff",
+              stroke: 3,
+            }),
+            React.createElement("span", null, busy ? "جارٍ..." : "تأكيد"),
+          ),
+        ),
+      tab === "vendor" &&
+        forgot === "newpw" &&
+        React.createElement(
+          "div",
+          { className: "form-fields" },
+          React.createElement(
+            "p",
+            { className: "reg-sub" },
+            "اختر كلمة مرور جديدة",
+          ),
+          React.createElement(
+            "label",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              "كلمة المرور الجديدة",
+            ),
+            React.createElement("input", {
+              className: "field-input",
+              type: "password",
+              value: newpw,
+              onChange: (e) => setNewpw(e.target.value),
+              placeholder: "••••••••",
+            }),
+          ),
+          err &&
+            React.createElement(
+              "p",
+              { className: "terms", style: { color: "var(--danger)" } },
+              String(err),
+            ),
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: busy || newpw.length < 4,
+              onClick: forgotSet,
+            },
+            React.createElement(Icon, {
+              name: "check",
+              size: 18,
+              color: "#fff",
+              stroke: 3,
+            }),
+            React.createElement("span", null, busy ? "جارٍ..." : "حفظ ودخول"),
+          ),
+        ),
+      React.createElement(
+        "button",
+        { className: "skip-link", onClick: onSupport, style: { marginTop: 6 } },
+        "تواصل مع الدعم عبر واتساب",
+      ),
+      React.createElement(
+        "button",
+        { className: "skip-link", onClick: goRegister },
+        "ليس لديك حساب؟ إنشاء حساب جديد",
+      ),
+    ),
+  );
+}
+function ResetPassword({ onSetNewPassword }) {
+  const [password, setPassword] = useStateA(""),
+    [busy, setBusy] = useStateA(!1),
+    [err, setErr] = useStateA(""),
+    submit = async () => {
+      if (password.length < 6) return setErr("كلمة المرور ٦ أحرف على الأقل");
+      (setErr(""), setBusy(!0));
+      const r = await onSetNewPassword({ password });
+      (setBusy(!1),
+        (!r || !r.ok) && setErr((r && r.error) || "تعذّر حفظ كلمة المرور"));
+    };
+  return React.createElement(
+    "div",
+    { className: "screen register" },
+    React.createElement(
+      "div",
+      { className: "reg-step" },
+      React.createElement(
+        "div",
+        { className: "reg-brand" },
+        React.createElement(
+          "div",
+          { className: "logo-mark lg" },
+          React.createElement(Icon, {
+            name: "shield",
+            size: 42,
+            color: "var(--green-deep)",
+          }),
+        ),
+      ),
+      React.createElement(
+        "h1",
+        { className: "reg-title" },
+        "إعادة تعيين كلمة المرور",
+      ),
+      React.createElement(
+        "p",
+        { className: "reg-sub" },
+        "اختر كلمة مرور جديدة لحسابك.",
+      ),
+      React.createElement(
+        "div",
+        { className: "form-fields" },
+        React.createElement(
+          "label",
+          { className: "field" },
+          React.createElement(
+            "span",
+            { className: "field-label" },
+            "كلمة المرور الجديدة",
+          ),
+          React.createElement("input", {
+            className: "field-input",
+            type: "password",
+            value: password,
+            onChange: (e) => setPassword(e.target.value),
+            placeholder: "••••••••",
+          }),
+        ),
+      ),
+      err &&
+        React.createElement(
+          "p",
+          { className: "terms", style: { color: "var(--danger)" } },
+          String(err),
+        ),
+      React.createElement(
+        "div",
+        { className: "reg-foot" },
+        React.createElement(
+          "button",
+          {
+            className: "btn btn-green",
+            disabled: busy || password.length < 6,
+            onClick: submit,
+          },
+          React.createElement(Icon, {
+            name: "check",
+            size: 18,
+            color: "#fff",
+            stroke: 3,
+          }),
+          React.createElement("span", null, busy ? "جارٍ..." : "حفظ والدخول"),
+        ),
+      ),
+    ),
+  );
+}
+function VendorStore({
+  t,
+  lang,
+  vendorId,
+  me,
+  products,
+  onBack,
+  openProduct,
+  addToCart,
+  favs,
+  toggleFav,
+  showToast,
+  sectionVarieties,
+}) {
+  const [store, setStore] = useStateA(null),
+    [reviews, setReviews] = useStateA(null),
+    [writing, setWriting] = useStateA(!1),
+    [rating, setRating] = useStateA(5),
+    [comment, setComment] = useStateA(""),
+    [busy, setBusy] = useStateA(!1),
+    [canReview, setCanReview] = useStateA(!1),
+    [vsSort, setVsSort] = useStateA("default"),
+    [vsFilters, setVsFilters] = useStateA({
+      varieties: [],
+      priceMin: "",
+      priceMax: "",
+      shahti: !1,
+      freeDelivery: !1,
+      bundle: !1,
+      discount: !1,
+    }),
+    [vsFilterOpen, setVsFilterOpen] = useStateA(!1),
+    load = () => {
+      !window.LOZI_SB ||
+        !vendorId ||
+        (window.LOZI_SB.from("stores")
+          .select(
+            "name,description,hours,image_path,trusted_badge,badge_source,average_rating,ratings_count,shahti_free,free_delivery,offers",
+          )
+          .eq("vendor_id", vendorId)
+          .maybeSingle()
+          .then(({ data }) => setStore(data || {})),
+        window.LOZI_SB.from("reviews")
+          .select("*")
+          .eq("store_vendor_id", vendorId)
+          .order("created_at", { ascending: !1 })
+          .then(({ data }) => {
+            setReviews(data || []);
+            me &&
+              me.id &&
+              window.LOZI_SB.from("orders")
+                .select("id")
+                .eq("customer_id", me.id)
+                .eq("seller_vendor_id", vendorId)
+                .in("status", ["delivered", "done"])
+                .limit(1)
+                .then(({ data: o }) => setCanReview(!!(o && o.length)));
+          }));
+    };
+  React.useEffect(load, [vendorId]);
+  const avg =
+      reviews && reviews.length
+        ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length
+        : 0,
+    submit = async () => {
+      if (!comment.trim() || busy) return;
+      if (!me || !me.id) {
+        showToast && showToast("سجّل الدخول لكتابة تقييم");
+        return;
+      }
+      setBusy(!0);
+      const { error } = await window.LOZI_SB.from("reviews").insert({
+        store_vendor_id: vendorId,
+        user_id: me.id,
+        rating,
+        comment: comment.trim(),
+        reviewer_name: me.name || null,
+      });
+      if ((setBusy(!1), error)) {
+        showToast &&
+          showToast(
+            error.code === "23505"
+              ? "لقد قيّمت هذا المتجر مسبقاً"
+              : /policy|row-level/i.test(error.message || "")
+                ? "يمكنك التقييم بعد استلام طلب من هذا المتجر"
+                : "خطأ: " + error.message,
+          );
+        return;
+      }
+      (setWriting(!1),
+        setComment(""),
+        setRating(5),
+        load(),
+        showToast && showToast("شكراً لتقييمك ✓"));
+    },
+    s = store || {};
+  const vsSec0 = (products && products[0] && products[0].cat) || "",
+    vsVars = (sectionVarieties && sectionVarieties[vsSec0]) || [],
+    vsActive =
+      (vsFilters.varieties.length ? 1 : 0) +
+      (vsFilters.priceMin !== "" || vsFilters.priceMax !== "" ? 1 : 0) +
+      (vsFilters.shahti ? 1 : 0) +
+      (vsFilters.freeDelivery ? 1 : 0) +
+      (vsFilters.bundle ? 1 : 0) +
+      (vsFilters.discount ? 1 : 0),
+    vsPrice = (p) => Number(p.price) || 0,
+    storeFree =
+      s.free_delivery === !0 || !!(s.offers && s.offers.freeDelivery === !0),
+    storeBundle = !!(
+      s.offers &&
+      s.offers.bundle &&
+      s.offers.bundle.active !== !1
+    ),
+    storeDiscount = !!(
+      s.offers &&
+      s.offers.discount &&
+      Number(s.offers.discount.percent) > 0
+    ),
+    clearVs = () => {
+      setVsFilters({
+        varieties: [],
+        priceMin: "",
+        priceMax: "",
+        shahti: !1,
+        freeDelivery: !1,
+        bundle: !1,
+        discount: !1,
+      });
+      setVsFilterOpen(!1);
+    };
+  let vsShown = (products || []).filter(
+    (p) =>
+      (!vsFilters.varieties.length ||
+        vsFilters.varieties.includes(p.variety)) &&
+      (vsFilters.priceMin === "" || vsPrice(p) >= Number(vsFilters.priceMin)) &&
+      (vsFilters.priceMax === "" || vsPrice(p) <= Number(vsFilters.priceMax)) &&
+      (!vsFilters.shahti || p.shahtiStatus === "approved") &&
+      (!vsFilters.freeDelivery || storeFree) &&
+      (!vsFilters.bundle || storeBundle) &&
+      (!vsFilters.discount || p.old != null || storeDiscount),
+  );
+  vsShown =
+    vsSort === "price_asc"
+      ? vsShown.slice().sort((a, b) => vsPrice(a) - vsPrice(b))
+      : vsSort === "price_desc"
+        ? vsShown.slice().sort((a, b) => vsPrice(b) - vsPrice(a))
+        : vsSort === "default"
+          ? vsShown
+              .slice()
+              .sort(
+                (a, b) =>
+                  (b.stock == null || b.stock > 0 ? 1 : 0) -
+                    (a.stock == null || a.stock > 0 ? 1 : 0) ||
+                  (b.shahtiStatus === "approved" ? 1 : 0) -
+                    (a.shahtiStatus === "approved" ? 1 : 0),
+              )
+          : vsShown;
+  const vsFilterSheet = React.createElement(FilterSheet, {
+    open: vsFilterOpen,
+    onClose: () => setVsFilterOpen(!1),
+    onApply: (d) => {
+      setVsFilters(d);
+      setVsFilterOpen(!1);
+    },
+    onClear: clearVs,
+    value: vsFilters,
+    varieties: vsVars,
+    showBundle: vsSec0 === "retail",
+    lang,
+  });
+  return React.createElement(
+    "div",
+    { className: "screen vendor-store" },
+    React.createElement(
+      "div",
+      { className: "sp-hero" },
+      s.image_path
+        ? React.createElement(Img, {
+            id: s.image_path,
+            ph: "",
+            radius: 0,
+            shape: "rect",
+            style: { width: "100%", height: "100%" },
+          })
+        : React.createElement("div", { className: "vs-hero-bg" }),
+      React.createElement(
+        "button",
+        { className: "hero-back", onClick: onBack },
+        React.createElement(Icon, {
+          name: t.dir === "rtl" ? "chevron" : "back",
+          size: 22,
+          color: "var(--ink)",
+        }),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "vs-body" },
+      React.createElement(
+        "h1",
+        { className: "vs-name" },
+        s.name || "متجر",
+        products &&
+          products.some(
+            (p) => p.shahtiStatus === "approved" && p.active !== !1,
+          ) &&
+          React.createElement(
+            "span",
+            { className: "vs-seal", title: "خالٍ من المرارة" },
+            React.createElement(ShahtiGlyph, { size: 16 }),
+          ),
+        s.trusted_badge &&
+          React.createElement(TrustBadge, { size: 18, withLabel: !0 }),
+      ),
+      React.createElement(
+        "div",
+        { className: "vs-rate" },
+        React.createElement(Stars, { value: avg, size: 16 }),
+        React.createElement(
+          "span",
+          { className: "vs-rcount" },
+          "· ",
+          reviews ? reviews.length : 0,
+          " تقييم",
+        ),
+      ),
+      me &&
+        me.id &&
+        vendorId &&
+        me.id !== vendorId &&
+        React.createElement(
+          "button",
+          {
+            className: "vs-msg-btn",
+            onClick: () =>
+              window.LoziChat &&
+              window.LoziChat.open({ vendorId: vendorId, storeName: s.name }),
+            style: {
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              width: "100%",
+              margin: "2px 0 14px",
+              padding: "13px",
+              border: "none",
+              borderRadius: "14px",
+              background: "var(--green-deep,#264B32)",
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: "15px",
+              fontFamily: "inherit",
+              cursor: "pointer",
+            },
+          },
+          React.createElement(Icon, { name: "chat", size: 18, color: "#fff" }),
+          "مراسلة المتجر",
+        ),
+      s.description &&
+        React.createElement("p", { className: "vs-desc" }, s.description),
+      s.hours &&
+        React.createElement(
+          "div",
+          { className: "vs-hours" },
+          React.createElement(Icon, {
+            name: "calendar",
+            size: 14,
+            color: "var(--green-deep)",
+          }),
+          s.hours,
+        ),
+      products &&
+        products.length > 0 &&
+        React.createElement(
+          "div",
+          null,
+          React.createElement(SecHead, { title: "المنتجات" }),
+          React.createElement(
+            "div",
+            { className: "sb-filter vs-sortrow" },
+            React.createElement(
+              "select",
+              {
+                className: "sb-sort",
+                style: { flex: 1 },
+                value: vsSort,
+                onChange: (e) => setVsSort(e.target.value),
+              },
+              React.createElement(
+                "option",
+                { value: "default" },
+                "الترتيب: الأنسب",
+              ),
+              React.createElement(
+                "option",
+                { value: "price_asc" },
+                "السعر: الأرخص أولاً",
+              ),
+              React.createElement(
+                "option",
+                { value: "price_desc" },
+                "السعر: الأغلى أولاً",
+              ),
+              React.createElement("option", { value: "newest" }, "الأحدث"),
+            ),
+            React.createElement(
+              "button",
+              {
+                type: "button",
+                className: "sb-filterbtn" + (vsActive ? " on" : ""),
+                onClick: () => setVsFilterOpen(!0),
+                title: "الفلاتر",
+              },
+              React.createElement(Icon, {
+                name: "filter",
+                size: 18,
+                color: vsActive ? "#fff" : "var(--green-deep)",
+              }),
+              vsActive
+                ? React.createElement(
+                    "span",
+                    { className: "filter-badge" },
+                    vsActive,
+                  )
+                : null,
+            ),
+          ),
+          vsShown.length
+            ? React.createElement(
+                "div",
+                { className: "prod-grid pad" },
+                vsShown.map((p) =>
+                  React.createElement(ProductCard, {
+                    key: p.id,
+                    p,
+                    t,
+                    lang,
+                    onOpen: openProduct,
+                    onAdd: addToCart,
+                    fav: favs.includes(p.id),
+                    onFav: toggleFav,
+                  }),
+                ),
+              )
+            : React.createElement(
+                "div",
+                { className: "empty" },
+                React.createElement("h3", null, "لا توجد نتائج مطابقة للفلاتر"),
+                React.createElement(
+                  "button",
+                  { className: "flt-empty-clear", onClick: clearVs },
+                  "مسح الفلاتر",
+                ),
+              ),
+        ),
+      vsFilterSheet,
+      React.createElement(
+        "div",
+        { className: "vs-rev-head" },
+        React.createElement(SecHead, { title: "التقييمات" }),
+        me && me.id && reviews && reviews.some((r) => r.user_id === me.id)
+          ? React.createElement(
+              "span",
+              {
+                className: "vs-write-hint",
+                style: {
+                  fontSize: "12px",
+                  color: "var(--muted)",
+                  fontWeight: 700,
+                },
+              },
+              "لقد قيّمت هذا المتجر ✓",
+            )
+          : canReview
+            ? React.createElement(
+                "button",
+                { className: "vs-write", onClick: () => setWriting(!0) },
+                React.createElement(Icon, {
+                  name: "plus",
+                  size: 15,
+                  color: "var(--green-deep)",
+                }),
+                "اكتب تقييماً",
+              )
+            : me && me.id
+              ? React.createElement(
+                  "span",
+                  {
+                    className: "vs-write-hint",
+                    style: {
+                      fontSize: "12px",
+                      color: "var(--muted)",
+                      fontWeight: 700,
+                    },
+                  },
+                  "يمكنك التقييم بعد استلام طلبك من هذا المتجر",
+                )
+              : null,
+      ),
+      reviews === null
+        ? React.createElement(Spinner, { label: "جارٍ تحميل التقييمات…" })
+        : reviews.length
+          ? React.createElement(
+              "div",
+              { className: "vs-reviews" },
+              reviews.map((r) =>
+                React.createElement(
+                  "div",
+                  { className: "rev-card", key: r.id },
+                  React.createElement(
+                    "div",
+                    { className: "rev-top" },
+                    React.createElement(
+                      "strong",
+                      null,
+                      r.reviewer_name || "عميل",
+                    ),
+                    React.createElement(Stars, { value: r.rating, size: 13 }),
+                  ),
+                  r.comment &&
+                    React.createElement(
+                      "p",
+                      { className: "rev-comment" },
+                      r.comment,
+                    ),
+                  r.reply &&
+                    React.createElement(
+                      "div",
+                      { className: "rev-reply" },
+                      React.createElement("b", null, "ردّ المتجر:"),
+                      " ",
+                      r.reply,
+                    ),
+                ),
+              ),
+            )
+          : React.createElement(
+              "div",
+              { className: "sdash-empty" },
+              React.createElement(
+                "div",
+                { className: "sdash-empty-ic" },
+                React.createElement(Icon, {
+                  name: "star",
+                  size: 30,
+                  color: "var(--gold-deep)",
+                }),
+              ),
+              React.createElement(
+                "p",
+                null,
+                "لا توجد تقييمات بعد — ستظهر هنا بعد أول عملية بيع.",
+              ),
+            ),
+    ),
+    writing &&
+      React.createElement(
+        "div",
+        { className: "modal-overlay", onClick: () => setWriting(!1) },
+        React.createElement(
+          "div",
+          { className: "sheet", onClick: (e) => e.stopPropagation() },
+          React.createElement("div", { className: "sheet-handle" }),
+          React.createElement(
+            "div",
+            { className: "sheet-scroll" },
+            React.createElement(
+              "div",
+              { className: "sub-head" },
+              React.createElement(
+                "div",
+                {
+                  className: "sub-badge",
+                  style: { background: "var(--green)" },
+                },
+                React.createElement(Icon, {
+                  name: "star",
+                  size: 22,
+                  color: "#fff",
+                }),
+              ),
+              React.createElement("h2", null, "اكتب تقييمك"),
+            ),
+            React.createElement(
+              "div",
+              { className: "rate-pick" },
+              [1, 2, 3, 4, 5].map((n) =>
+                React.createElement(
+                  "button",
+                  {
+                    key: n,
+                    className: "rate-star",
+                    onClick: () => setRating(n),
+                  },
+                  React.createElement(Icon, {
+                    name: "star",
+                    size: 32,
+                    color: n <= rating ? "var(--gold-deep)" : "var(--sand-2)",
+                  }),
+                ),
+              ),
+            ),
+            React.createElement(
+              "label",
+              { className: "field" },
+              React.createElement(
+                "span",
+                { className: "field-label" },
+                "تعليقك",
+              ),
+              React.createElement("textarea", {
+                className: "field-input store-desc",
+                rows: 4,
+                value: comment,
+                onChange: (e) => setComment(e.target.value),
+                placeholder: "كيف كانت تجربتك مع المتجر؟",
+              }),
+            ),
+          ),
+          React.createElement(
+            "div",
+            { className: "sheet-foot" },
+            React.createElement(
+              "button",
+              {
+                className: "btn btn-green",
+                disabled: !comment.trim() || busy,
+                onClick: submit,
+              },
+              React.createElement(Icon, {
+                name: "check",
+                size: 18,
+                color: "#fff",
+                stroke: 3,
+              }),
+              React.createElement(
+                "span",
+                null,
+                busy ? "جارٍ الإرسال…" : "إرسال التقييم",
+              ),
+            ),
+          ),
+        ),
+      ),
+  );
+}
+Object.assign(window, {
+  Splash,
+  Register,
+  Login,
+  ResetPassword,
+  Home,
+  SectionBrowse,
+  StoreProfile,
+  VendorStore,
+  ProductCard,
+  StoreCard,
+  LoziMark,
+  ShahtiGlyph,
+});
 
-const{useState:useS,useEffect:useE}=React,SECTION_ORDER=["almond","raisin","retail","wholesale"];function sectionsForRole(role){const canWholesale=role==="retail"||role==="wholesale";return SECTION_ORDER.filter(s=>s!=="wholesale"||canWholesale)}function addMonths(date,m){const d=new Date(date);return d.setMonth(d.getMonth()+m),d}function fmtDate(d,lang){return d?new Date(d).toLocaleDateString(lang==="ar"?"ar-EG":"en-GB",{day:"2-digit",month:"long",year:"numeric"}):"—"}function sbDate(iso){try{const d=new Date(iso);return{ar:d.toLocaleDateString("ar-EG"),en:d.toLocaleDateString("en-GB")}}catch(e){return{ar:"محفوظ",en:"Saved"}}}function MyBundles({t,lang,bundles,limit,onBack,onAdd,onToggle,onDelete,onEdit}){const used=bundles.length,atLimit=used>=limit;return React.createElement("div",{className:"screen myproducts"},React.createElement(TopBar,{title:"العروض المشكّلة",onBack,t}),React.createElement("div",{className:"myp-sum"},React.createElement("div",{className:"myp-sum-stat"},React.createElement("strong",null,used),React.createElement("span",null,"عرض مشكّل")),React.createElement("div",{className:"myp-sum-stat"},React.createElement("strong",null,limit),React.createElement("span",null,"الحد الأقصى")),React.createElement("button",{className:"myp-add",disabled:atLimit,onClick:onAdd},React.createElement(Icon,{name:"plus",size:16,color:"#fff",stroke:2.4}),"عرض جديد")),atLimit&&React.createElement("div",{className:"bundle-limit-note"},React.createElement(Icon,{name:"bolt",size:14,color:"var(--gold-deep)"}),"الحد الأقصى للعروض المشكّلة لمتجرك هو "+limit),React.createElement("div",{className:"myp-list"},bundles.length?bundles.map(p=>React.createElement(MyProductCard,{key:p.id,p,t,lang,onToggle,onDelete,onEdit})):React.createElement("div",{className:"sdash-empty"},React.createElement("div",{className:"sdash-empty-ic"},React.createElement(Icon,{name:"tag",size:34,color:"var(--gold-deep)"})),React.createElement("p",null,"لا توجد عروض مشكّلة بعد."),!atLimit&&React.createElement("button",{className:"myp-add solo",onClick:onAdd},React.createElement(Icon,{name:"plus",size:16,color:"#fff",stroke:2.4}),"إنشاء عرض مشكّل"))));}
-function BundleSheet({t,lang,initial,onClose,onPublish}){const editing=!!initial,[name,setName]=useStateS(editing&&(initial.name[lang]||initial.name.ar)||""),[price,setPrice]=useStateS(editing&&initial.price?String(initial.price):""),[stock,setStock]=useStateS(editing&&initial.stock!=null?String(initial.stock):""),[items,setItems]=useStateS(editing&&Array.isArray(initial.items)&&initial.items.length?initial.items.map(it=>({name:it.name||"",weight:it.weight!=null?String(it.weight):"",unit:it.unit==="kilo"?"kilo":"gram"})):[{name:"",weight:"",unit:"gram"},{name:"",weight:"",unit:"gram"}]),[photos,setPhotos]=useStateS(()=>(editing&&initial.images||[]).map((u,i)=>({url:u,thumb:(initial.thumbs||[])[i]}))),onPickPhotos=e=>{const add=[];Array.from(e.target.files||[]).forEach(f=>{f.type&&f.type.indexOf("image/")!==0||f.size>10*1024*1024||add.push({file:f,url:URL.createObjectURL(f)})}),setPhotos(ps=>[...ps,...add].slice(0,4)),e.target.value=""},removePhoto=i=>setPhotos(ps=>ps.filter((_,x)=>x!==i)),setItem=(i,k,v)=>setItems(arr=>arr.map((it,j)=>j===i?{...it,[k]:v}:it)),addItem=()=>setItems(arr=>[...arr,{name:"",weight:"",unit:"gram"}]),removeItem=i=>setItems(arr=>arr.length>1?arr.filter((_,j)=>j!==i):arr),cleanItems=items.map(it=>({name:it.name.trim(),weight:String(it.weight||"").trim(),unit:it.unit==="kilo"?"kilo":"gram"})).filter(it=>it.name),ready=!!(name.trim()&&price&&Number(price)>0&&cleanItems.length>=2),publish=()=>{if(!ready)return;const stockVal=stock!==""?Math.max(0,Math.floor(Number(stock)||0)):null,crop={id:editing?initial.id:"mine-"+Date.now(),store:editing?initial.store:"mine-retail",cat:"retail",bundle:!0,items:cleanItems,stock:stockVal,price:Number(price),name:{ar:name.trim(),en:name.trim()},weight:{ar:"عرض مشكّل",en:"Mixed bundle"},desc:{ar:"عرض مشكّل — محتويات وأوزان ثابتة بسعر واحد.",en:"Mixed bundle — fixed contents and weights, one price."},photoItems:photos.map(p=>p.file?{file:p.file}:{url:p.url,thumb:p.thumb})};onPublish(crop,editing),onClose()};return React.createElement("div",{className:"modal-overlay",onClick:onClose},React.createElement("div",{className:"sheet",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"sheet-handle"}),React.createElement("div",{className:"sheet-scroll"},React.createElement("div",{className:"sub-head"},React.createElement("div",{className:"sub-badge",style:{background:"var(--gold-deep)"}},React.createElement(Icon,{name:"tag",size:22,color:"#fff"})),React.createElement("h2",null,editing?"تعديل عرض مشكّل":"إنشاء عرض مشكّل")),React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},"اسم العرض"),React.createElement("input",{className:"field-input",value:name,onChange:e=>setName(e.target.value),placeholder:"مثال: عرض المكسّرات المشكّل"})),React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},"السعر الإجمالي (ريال)"),React.createElement("input",{className:"field-input",value:price,onChange:e=>setPrice(e.target.value.replace(/[^0-9]/g,"")),placeholder:"سعر العرض كاملاً",inputMode:"numeric"})),React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},"الكمية المتوفّرة (اتركه فارغاً لغير محدود)"),React.createElement("input",{className:"field-input",value:stock,onChange:e=>setStock(e.target.value.replace(/[^0-9]/g,"")),placeholder:"مثال: ١٠",inputMode:"numeric"})),React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},"مكوّنات العرض (صنف + وزن ثابت)"),items.map((it,i)=>React.createElement("div",{className:"bundle-item-card",key:i},React.createElement("div",{className:"bundle-item-top"},React.createElement("span",{className:"bundle-item-no"},"الصنف "+(i+1)),React.createElement("button",{className:"bundle-item-del",disabled:items.length<=1,onClick:()=>removeItem(i)},React.createElement(Icon,{name:"trash",size:15,color:"var(--danger)"}))),React.createElement("input",{className:"field-input",value:it.name,onChange:e=>setItem(i,"name",e.target.value),placeholder:"الصنف (مثال: لوز)"}),React.createElement("div",{className:"bundle-wu"},React.createElement("input",{className:"field-input",style:{flex:1},value:it.weight,onChange:e=>setItem(i,"weight",e.target.value),inputMode:"decimal",placeholder:"الوزن (٢٥٠)"}),React.createElement("select",{className:"field-input bundle-item-unit",value:it.unit||"gram",onChange:e=>setItem(i,"unit",e.target.value)},React.createElement("option",{value:"gram"},"جرام"),React.createElement("option",{value:"kilo"},"كيلو"))))),React.createElement("button",{className:"bundle-add-item",onClick:addItem},React.createElement(Icon,{name:"plus",size:15,color:"var(--green-deep)",stroke:2.4}),"إضافة صنف")),React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},"صورة العرض"),React.createElement("div",{className:"photo-grid"},photos.map((p,i)=>React.createElement("div",{className:"photo-thumb",key:i},React.createElement("img",{src:p.url,alt:""}),React.createElement("button",{className:"photo-del",onClick:()=>removePhoto(i)},React.createElement(Icon,{name:"close",size:13,color:"#fff",stroke:3})))),photos.length<4&&React.createElement("label",{className:"photo-add"},React.createElement("input",{type:"file",accept:"image/*",multiple:!0,onChange:onPickPhotos,style:{display:"none"}}),React.createElement(Icon,{name:"upload",size:20,color:"var(--green-deep)"}),React.createElement("span",null,"إضافة صورة")))),React.createElement("div",{className:"bundle-sheet-note"},React.createElement(Icon,{name:"check",size:13,color:"var(--green-deep)",stroke:3}),"يُباع العرض كاملاً بمحتوياته وأوزانه الثابتة. يمكنك إظهاره أو إخفاؤه من قائمة العروض.")),React.createElement("div",{className:"sheet-foot"},React.createElement("button",{className:"btn btn-green",disabled:!ready,onClick:publish},React.createElement(Icon,{name:"check",size:18,color:"#fff",stroke:3}),React.createElement("span",null,editing?"حفظ التعديل":"نشر العرض")))));}
-function OfflineBanner(){const[off,setOff]=React.useState(typeof navigator!=="undefined"&&navigator.onLine===!1);React.useEffect(()=>{const on=()=>setOff(!1),down=()=>setOff(!0);window.addEventListener("online",on);window.addEventListener("offline",down);return()=>{window.removeEventListener("online",on);window.removeEventListener("offline",down)}},[]);return off?React.createElement("div",{className:"lz-offline",role:"alert"},React.createElement("svg",{className:"lz-offline-ic",width:18,height:18,viewBox:"0 0 24 24",fill:"none",stroke:"#fff",strokeWidth:2.2,strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"m2 2 20 20"}),React.createElement("path",{d:"M8.5 16.4a5 5 0 0 1 7 0"}),React.createElement("path",{d:"M5 12.9a10 10 0 0 1 5.2-2.6"}),React.createElement("path",{d:"M19 12.9a10 10 0 0 0-3.2-2.2"}),React.createElement("path",{d:"M2 8.8a16 16 0 0 1 6.5-3.4"}),React.createElement("path",{d:"M22 8.8a16 16 0 0 0-8.3-3.7"}),React.createElement("path",{d:"M12 20h.01"})),React.createElement("span",null,"خطأ: لا يوجد إنترنت")):null}function Spinner({size=36,label}){return React.createElement("div",{className:"lz-load"},React.createElement("span",{className:"lz-spin",style:{width:size,height:size}}),label?React.createElement("p",{className:"lz-load-txt"},label):null)}function SkeletonCard(){return React.createElement("div",{className:"lz-skel-card"},React.createElement("div",{className:"lz-skel-img lz-shimmer"}),React.createElement("div",{className:"lz-skel-body"},React.createElement("div",{className:"lz-skel-line lz-shimmer",style:{width:"80%"}}),React.createElement("div",{className:"lz-skel-line lz-shimmer",style:{width:"50%"}})))}function SkeletonGrid({count=4}){return Array.from({length:count}).map((_,i)=>React.createElement(SkeletonCard,{key:i}))}function SkeletonStores({count=4}){return React.createElement("div",{className:"lz-skel-stores"},Array.from({length:count}).map((_,i)=>React.createElement("div",{className:"lz-skel-store",key:i},React.createElement("div",{className:"lz-skel-thumb lz-shimmer"}),React.createElement("div",{className:"lz-skel-meta"},React.createElement("div",{className:"lz-skel-line lz-shimmer",style:{width:"60%"}}),React.createElement("div",{className:"lz-skel-line lz-shimmer",style:{width:"40%"}})))))}function ErrorRetry({onRetry,msg}){return React.createElement("div",{className:"lz-error"},React.createElement("div",{className:"lz-error-ic"},React.createElement("svg",{width:30,height:30,viewBox:"0 0 24 24",fill:"none",stroke:"var(--gold-deep)",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"}),React.createElement("path",{d:"M12 9v4"}),React.createElement("path",{d:"M12 17h.01"}))),React.createElement("p",{className:"lz-error-txt"},msg||"حدث خطأ، يرجى إعادة المحاولة."),onRetry?React.createElement("button",{className:"lz-retry",onClick:onRetry},React.createElement("svg",{width:16,height:16,viewBox:"0 0 24 24",fill:"none",stroke:"#fff",strokeWidth:2.4,strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M3 12a9 9 0 0 1 15-6.7L21 8"}),React.createElement("path",{d:"M21 3v5h-5"}),React.createElement("path",{d:"M21 12a9 9 0 0 1-15 6.7L3 16"}),React.createElement("path",{d:"M3 21v-5h5"})),"إعادة المحاولة"):null)}function App(){const[lang,setLang]=useS("ar"),[currency,setCurrencyState]=useS("YER"),[stage,setStage]=useS(()=>window.LOZI_RECOVERY?"reset":sessionStorage.getItem("lozi_active")?localStorage.getItem("lozi_stage")||"register":"splash"),[screen,setScreen]=useS("home"),[params,setParams]=useS({}),[tab,setTab]=useS("home"),[hist,setHist]=useS([]),[cart,setCart]=useS([]),[favs,setFavs]=useS(()=>{try{return JSON.parse(localStorage.getItem("lozi_favs"))||[]}catch(e){return[]}}),[orders,setOrders]=useS(LOZI_ORDERS_SEED),[reports,setReports]=useS([]),[notifs,setNotifs]=useS(LOZI_NOTIFS_SEED),[subscribed,setSubscribed]=useS(!1),[subPending,setSubPending]=useS(!1),[subOpen,setSubOpen]=useS(!1),[termsOpen,setTermsOpen]=useS(!1),[supportOpen,setSupportOpen]=useS(!1),[support,setSupport]=useS(()=>{try{return JSON.parse(localStorage.getItem("lozi_support"))||LOZI_SUPPORT_SEED}catch(e){return LOZI_SUPPORT_SEED}}),[supportWa,setSupportWa]=useS("777184208"),[verif,setVerif]=useS(null),[verifOpen,setVerifOpen]=useS(!1),[store,setStore]=useS(null),[uploadProg,setUploadProg]=useS(null),[addCropOpen,setAddCropOpen]=useS(!1),[dbProducts,setDbProducts]=useS([]),[productsLoad,setProductsLoad]=useS("loading"),[userId,setUserId]=useS(null),rowToProduct=r=>({...r.data||{},id:r.id,cat:r.category||r.data&&r.data.cat,price:r.price!=null?r.price:r.data&&r.data.price,active:r.status!=="hidden",_vendor:r.vendor_id,shahtiStatus:r.shahti_status||r.data&&r.data.shahtiStatus||null,stock:r.stock!=null?r.stock:r.data&&r.data.stock!=null?r.data.stock:null,pinned:r.pinned===!0,pinnedAt:r.pinned_at||null}),isBlockedAccount=async uid=>{if(!window.LOZI_SB||!uid)return!1;try{const{data,error}=await window.LOZI_SB.from("profiles").select("status").eq("user_id",uid).maybeSingle();if(error||!data)return!1;if(data.status==="banned")return await window.LOZI_SB.auth.signOut(),setStage("login"),showToast("تم حظر هذا الحساب. للاستفسار تواصل مع الدعم."),!0;if(data.status==="suspended")return(window.LoziGuard&&window.LoziGuard.showSuspended()),!0}catch(e){}return!1},loadProducts=()=>{window.LOZI_SB&&window.LOZI_SB.from("products").select("*").then(({data,error})=>{if(error){console.warn("load products:",error.message);setProductsLoad("error");return}setDbProducts((data||[]).map(rowToProduct)),setProductsLoad("ready")},()=>setProductsLoad("error"))},[editingProduct,setEditingProduct]=useS(null),[bundleSheetOpen,setBundleSheetOpen]=useS(!1),[editingBundle,setEditingBundle]=useS(null),[bundleLimit,setBundleLimit]=useS(1),[sellerOrders,setSellerOrders]=useS(typeof LOZI_SELLER_ORDERS_SEED!="undefined"?LOZI_SELLER_ORDERS_SEED:[]),[walletPayOpen,setWalletPayOpen]=useS(!1),[lastPay,setLastPay]=useS({amount:9800,date:{ar:"٣١ مايو",en:"May 31"},status:"approved"}),[seenNewOrders,setSeenNewOrders]=useS([]),[sub,setSub]=useS({start:null,expiry:null}),[userRole,setUserRole]=useS(()=>localStorage.getItem("lozi_role")||"customer"),[themeMode,setThemeMode]=useS(()=>localStorage.getItem("lozi_theme")||"light"),[person,setPerson]=useS(()=>{try{return JSON.parse(localStorage.getItem("lozi_person"))||{name:"",phone:"",city:"",address:""}}catch(e){return{name:"",phone:"",city:"",address:""}}}),[toast,setToast]=useS(""),t=LOZI_T[lang];setCurrency(currency),useE(()=>{document.documentElement.lang=lang,document.documentElement.dir=t.dir},[lang]),useE(()=>{stage!=="splash"&&stage!=="reset"&&(localStorage.setItem("lozi_stage",stage),sessionStorage.setItem("lozi_active","1"))},[stage]),useE(()=>{localStorage.setItem("lozi_role",userRole)},[userRole]),useE(()=>{localStorage.setItem("lozi_person",JSON.stringify(person))},[person]);const resolveTheme=mode=>{if(mode==="dark")return"dark";if(mode==="light")return"light";const h=new Date().getHours();return h>=18||h<6?"dark":"light"};useE(()=>{localStorage.setItem("lozi_theme",themeMode);const apply=()=>{const root=document.querySelector(".app-root");root&&root.setAttribute("data-theme",resolveTheme(themeMode))};if(apply(),themeMode==="auto"){const iv=setInterval(apply,6e4);return()=>clearInterval(iv)}},[themeMode]),useE(()=>{localStorage.setItem("lozi_support",JSON.stringify(support))},[support]),useE(()=>{if(!window.LOZI_SB)return;if(window.LOZI_RECOVERY){setStage("reset");return}const sub2=window.LOZI_SB.auth.onAuthStateChange(event=>{event==="PASSWORD_RECOVERY"&&setStage("reset")});return window.LOZI_SB.auth.getSession().then(async({data})=>{if(window.LOZI_RECOVERY){setStage("reset");return}const u=data&&data.session&&data.session.user;if(!u||await isBlockedAccount(u.id))return;setUserId(u.id);const md=u.user_metadata||{};md.role&&setUserRole(md.role==="farmer"?"farmer_almond":md.role),setPerson(p=>({...p,name:md.name||md.full_name||p.name,phone:md.phone||(u.phone?"+"+u.phone:p.phone)})),setStage("app")}),()=>{try{sub2.data.subscription.unsubscribe()}catch(e){}}},[]),useE(()=>{window.LOZI_SB&&loadCustomerOrders()},[]),useE(()=>{try{localStorage.setItem("lozi_favs",JSON.stringify(favs))}catch(e){}},[favs]),useE(()=>{if(!window.LOZI_SB||!userId)return;window.LOZI_SB.from("favorites").select("product_id").eq("user_id",userId).then(({data,error})=>{error||!data||setFavs(data.map(r=>r.product_id))})},[userId]);const rowToCustomerOrder=r=>({id:r.order_no||String(r.id).slice(0,6),status:r.status==="new"?"received":r.status||"received",total:r.total||0,delivery_fee:r.delivery_fee!=null?r.delivery_fee:null,wholesale:(Array.isArray(r.items)?r.items:[]).some(it=>{const pr=dbProducts.find(p=>p.id===it.p);return pr&&pr.cat==="wholesale"}),pay:r.pay||"cod",date:sbDate(r.created_at),items:Array.isArray(r.items)?r.items:[],seller:r.seller_vendor_id||null,rid:r.id,vendor:r.vendor||null}),loadCustomerOrders=()=>{!window.LOZI_SB||!userId||window.LOZI_SB.from("orders").select("*").eq("customer_id",userId).order("created_at",{ascending:!1}).then(({data,error})=>{error||setOrders((data||[]).map(rowToCustomerOrder))})};useE(()=>{loadCustomerOrders()},[userId]);const rowToSellerOrder=r=>({id:r.order_no||String(r.id).slice(0,6),status:r.status==="received"||r.status==="payreview"?"new":r.status||"new",total:r.total||0,pay:r.pay||"cod",items:Array.isArray(r.items)?r.items:[],customer:r.customer||{name:""},rejectReason:r.reject_reason||null,date:sbDate(r.created_at),placed:sbDate(r.created_at)}),loadSellerOrders=()=>{const seller=userRole!=="customer";!window.LOZI_SB||!userId||!seller||window.LOZI_SB.from("orders").select("*").eq("seller_vendor_id",userId).order("created_at",{ascending:!1}).then(({data,error})=>{error||setSellerOrders((data||[]).map(rowToSellerOrder))})};useE(()=>{loadSellerOrders()},[userRole,userId]),useE(()=>{screen==="orders"&&loadCustomerOrders(),screen==="dashboard"&&loadSellerOrders()},[screen]),useE(()=>{loadProducts()},[stage,userId]),useE(()=>{window.LOZI_SB&&window.LOZI_SB.from("settings").select("key,value").then(({data,error})=>{if(error||!data)return;const bl=data.find(r=>r.key==="retail_bundle_limit");if(bl&&bl.value!=null&&bl.value!==""){const n=parseInt(bl.value,10);if(isFinite(n)&&n>=0)setBundleLimit(n)}const row=data.find(r=>r.key==="support_wa");if(row&&row.value){const local=String(row.value).replace(/[^0-9]/g,"").replace(/^967/,"");setSupportWa(local),setSupport(list=>list.map(n=>n.primary?{...n,phone:local}:n))}})},[]);const loadVerif=()=>{!(userRole==="farmer_almond"||userRole==="farmer_raisin"||userRole==="retail"||userRole==="wholesale")||!userId||!window.LOZI_SB||window.LOZI_SB.from("vendor_verifications").select("status,doc_path,note").eq("user_id",userId).maybeSingle().then(({data,error})=>{error||setVerif(data||{status:"none"})})};useE(()=>{loadVerif()},[userRole,userId]);const loadStore=()=>{!(userRole==="farmer_almond"||userRole==="farmer_raisin"||userRole==="retail"||userRole==="wholesale")||!userId||!window.LOZI_SB||window.LOZI_SB.from("stores").select("name,description,hours,enabled,shahti_free,image_path,offers,min_order_amount,min_order_enabled").eq("vendor_id",userId).maybeSingle().then(({data,error})=>{error||setStore(data?{name:data.name,description:data.description,hours:data.hours,enabled:data.enabled,shahti_free:data.shahti_free,image:data.image_path,offers:data.offers||null,minOrderAmount:data.min_order_amount!=null?Number(data.min_order_amount):null,minOrderEnabled:data.min_order_enabled===!0}:{name:""})})};useE(()=>{loadStore()},[userRole,userId]);const[myRating,setMyRating]=useS({avg:0,count:0}),loadMyRating=()=>{!(userRole==="farmer_almond"||userRole==="farmer_raisin"||userRole==="retail"||userRole==="wholesale")||!userId||!window.LOZI_SB||window.LOZI_SB.from("reviews").select("rating").eq("store_vendor_id",userId).then(({data,error})=>{error||!data||setMyRating({count:data.length,avg:data.length?data.reduce((a,r)=>a+r.rating,0)/data.length:0})})};useE(()=>{loadMyRating()},[userRole,userId]);const[storeOffers,setStoreOffers]=useS({}),[storesMap,setStoresMap]=useS({}),[sectionVarieties,setSectionVarieties]=useS({}),loadStoreOffers=()=>{window.LOZI_SB&&window.LOZI_SB.from("stores").select("vendor_id,name,image_path,offers,trusted_badge,badge_source,average_rating,ratings_count,shahti_free,free_delivery,min_order_amount,min_order_enabled").then(({data,error})=>{if(error||!data)return;const m={},names={};data.forEach(r=>{r.offers&&(m[r.vendor_id]=r.offers),names[r.vendor_id]={name:r.name,image:r.image_path,trustedBadge:r.trusted_badge===!0,badgeSource:r.badge_source,rating:r.average_rating!=null?Number(r.average_rating):null,ratingsCount:r.ratings_count||0,shahtiFree:r.shahti_free===!0,freeDelivery:r.free_delivery===!0,minOrderAmount:r.min_order_amount!=null?Number(r.min_order_amount):null,minOrderEnabled:r.min_order_enabled===!0,offers:r.offers||null}}),setStoreOffers(m),setStoresMap(names)})},loadSectionVarieties=()=>{window.LOZI_SB&&window.LOZI_SB.from("section_varieties").select("section,variety_id,label_ar,label_en,sort").order("sort").then(({data,error})=>{if(error||!data)return;const mm={};data.forEach(r=>{(mm[r.section]=mm[r.section]||[]).push({id:r.variety_id,label:{ar:r.label_ar,en:r.label_en||r.label_ar}})}),setSectionVarieties(mm)})};useE(()=>{loadStoreOffers()},[stage,userId]);useE(()=>{loadSectionVarieties()},[]);const withDiscount=p=>{const off=storeOffers[p._vendor],d=off&&off.discount;return!d||!d.percent||!p.price||!(d.scope==="all"||d.scope==="product"&&d.productId===p.id)?p:{...p,price:Math.round(p.price*(1-d.percent/100)),old:p.price}},browseProducts=async(o)=>{if(!window.LOZI_SB||!window.LOZI_SB.rpc)return null;try{const{data,error}=await window.LOZI_SB.rpc("browse_products",{p_section:o.section||null,p_sort:o.sort||"best",p_varieties:o.varieties&&o.varieties.length?o.varieties:null,p_price_min:o.priceMin!=null&&o.priceMin!==""?Number(o.priceMin):null,p_price_max:o.priceMax!=null&&o.priceMax!==""?Number(o.priceMax):null,p_shahti_only:!!o.shahti,p_free_delivery_only:!!o.freeDelivery,p_bundle_only:!!o.bundle,p_discount_only:!!o.discount,p_limit:o.limit||120,p_offset:o.offset||0});if(error||!data)return null;return data.map(rowToProduct).map(withDiscount)}catch(e){return null}},submitVerif=async({address,idFront,idBack,commercialFile,shopFile})=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{data:au}=await window.LOZI_SB.auth.getUser(),uid=au&&au.user&&au.user.id;if(!uid)return{ok:!1,error:"سجّل الدخول أولاً"};const mk=(file,tag)=>{const ext=(String(file.name).split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";return{file,bucket:"vendor-docs",path:uid+"/"+tag+"-"+Date.now()+"."+ext,key:tag}},jobs=[mk(idFront,"id_front"),mk(idBack,"id_back")];commercialFile&&jobs.push(mk(commercialFile,"commercial")),shopFile&&jobs.push(mk(shopFile,"shop"));const res=await uploadFiles(jobs.map(j=>({file:j.file,bucket:j.bucket,path:j.path}))),docs={};for(let i=0;i<jobs.length;i++){if(!res[i]||!res[i].ok)return{ok:!1,error:res[i]&&res[i].error||"تعذّر رفع الملف"};docs[jobs[i].key]=jobs[i].path}const{error}=await window.LOZI_SB.from("vendor_verifications").upsert({user_id:uid,status:"pending",doc_path:docs.id_front,docs,address,name:person&&person.name||null,phone:person&&person.phone||(au.user.phone?"+"+au.user.phone:null),note:null,submitted_at:new Date().toISOString()},{onConflict:"user_id"});return error?{ok:!1,error:error.message}:(setVerif({status:"pending",doc_path:docs.id_front}),{ok:!0})},showToast=m=>{setToast(m),setTimeout(()=>setToast(""),1500)},toggleLang=()=>setLang(l=>l==="ar"?"en":"ar"),TAB_SCREENS=["home","sections","savings","cart","profile","dashboard","wallet"],go=(s,p={})=>{setHist(h=>TAB_SCREENS.includes(s)?[]:[...h,{screen,params}]),setScreen(s),setParams(p),TAB_SCREENS.includes(s)?setTab(s):s==="store"||s==="product"||s==="vstore"?setTab("sections"):s==="myproducts"||s==="mystore"||s==="myoffers"||s==="myreviews"?setTab("dashboard"):["orders","favorites","reports","settings","personal","subscription"].includes(s)&&setTab("profile");const main=document.querySelector(".app-main");main&&(main.scrollTop=0)},goBack=()=>{setHist(h=>{if(!h.length)return setScreen("home"),setTab("home"),[];const prev=h[h.length-1];return setScreen(prev.screen),setParams(prev.params),setTab(TAB_SCREENS.includes(prev.screen)?prev.screen:prev.screen==="store"?"sections":tab),h.slice(0,-1)});const main=document.querySelector(".app-main");main&&(main.scrollTop=0)},addToCart=(p,q=1,meta)=>{setCart(c=>{const ex=c.find(it=>it.p.id===p.id);if(meta&&meta.byAmount){const item={p,q,byAmount:!0,grams:meta.grams,amount:meta.amount};return ex?c.map(it=>it.p.id===p.id?item:it):[...c,item]}return ex?c.map(it=>it.p.id===p.id?{...it,q:it.q+q,byAmount:!1}:it):[...c,{p,q}]}),showToast(t.added)},setQty=(id,q)=>setCart(c=>c.map(it=>it.p.id===id?{...it,q}:it)),removeItem=id=>setCart(c=>c.filter(it=>it.p.id!==id)),toggleFav=id=>{const has=favs.includes(id);setFavs(f=>f.includes(id)?f.filter(x=>x!==id):[...f,id]);if(window.LOZI_SB&&userId){const q=has?window.LOZI_SB.from("favorites").delete().eq("user_id",userId).eq("product_id",id):window.LOZI_SB.from("favorites").upsert({user_id:userId,product_id:id});Promise.resolve(q).then(({error})=>{error&&console.warn("favorite sync:",error.message)})}},confirmOrder=async(vendorId,pay="cod",receiptFile)=>{const grp=cart.filter(it=>it.p._vendor===vendorId);if(!grp.length)return;const subtotal=grp.reduce((a,it)=>a+it.p.price*it.q,0),deliveryFee=typeof feeFor=="function"?feeFor(grp,storeOffers):1e3,total=subtotal+(deliveryFee||0),id=String(Date.now()).slice(-6),items=grp.map(it=>it.byAmount?({p:it.p.id,q:1,name:it.p.name&&(it.p.name.ar||it.p.name)||"",weight:"≈ "+it.grams+" جم",price:Math.round(it.amount)}):({p:it.p.id,q:it.q,name:it.p.name&&(it.p.name.ar||it.p.name)||"",weight:it.p.weight&&(it.p.weight.ar||it.p.weight)||"",price:it.p.price}));setOrders(o=>[{id,status:"received",date:{ar:"الآن",en:"Just now"},total,pay,items,seller:vendorId},...o]),setCart(c=>c.filter(it=>it.p._vendor!==vendorId)),pay==="prepaid"&&showToast(t.prepaid_sent_toast),go("success",{review:pay==="prepaid"});let payReceipt=null;if(receiptFile&&window.LOZI_SB&&userId){let blob=receiptFile,ext="webp";try{blob=await compressImage(receiptFile)}catch(e){ext=(String(receiptFile.name).split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg"}const path="receipts/"+userId+"/"+id+"-"+Math.random().toString(36).slice(2,8)+"."+ext;try{const res=await uploadFiles([{file:blob,bucket:"product-images",path}]);res[0]&&res[0].ok&&(payReceipt=lozPublicUrl("product-images",path))}catch(e){}}window.LOZI_SB&&userId&&window.LOZI_SB.from("orders").insert({order_no:id,seller_vendor_id:vendorId,customer_id:userId,vendor:vendorId,status:"new",pay,total,delivery_fee:deliveryFee,items,customer:person||null,pay_receipt:payReceipt,pay_status:pay==="prepaid"?"pending":null}).then(({error})=>{error?console.warn("save order:",error.message):(loadCustomerOrders(),setTimeout(loadProducts,600))})},reorder=o=>{go("cart"),showToast(t.added)},cancelOrder=id=>{setOrders(os=>os.filter(o=>o.id!==id)),window.LOZI_SB&&userId&&window.LOZI_SB.from("orders").delete().eq("order_no",id).eq("customer_id",userId).then(()=>{})},unreadNotifs=notifs.filter(n=>!n.read).length,sellerNotifs=sellerOrders.filter(o=>o.status==="new").map(o=>({id:"so-"+o.id,type:"order",read:seenNewOrders.includes(o.id),link:"dashboard",title:{ar:"طلب جديد وصلك 🛎️",en:"New order received 🛎️"},body:{ar:`طلب #${o.id} من ${o.customer.name} · ${moneyStr(o.total)}`,en:`Order #${o.id} from ${o.customer.name} · ${moneyStr(o.total)}`},time:o.placed})),unreadSellerNotifs=sellerOrders.filter(o=>o.status==="new"&&!seenNewOrders.includes(o.id)).length,openNotifs=()=>{go("notifications"),isSeller?setSeenNewOrders(sellerOrders.filter(o=>o.status==="new").map(o=>o.id)):setNotifs(ns=>ns.map(n=>({...n,read:!0})))},rowToReport=r=>({id:r.id,typeId:r.type_id,orderId:r.order_id,target:r.target,subject:r.subject,desc:r.description,status:r.status,reply:r.reply||null,date:{ar:new Date(r.created_at).toLocaleDateString("ar-EG"),en:new Date(r.created_at).toLocaleDateString("en-GB")}}),loadReports=()=>{!window.LOZI_SB||!userId||window.LOZI_SB.from("reports").select("*").eq("user_id",userId).order("created_at",{ascending:!1}).then(({data,error})=>{error||setReports((data||[]).map(rowToReport))})};useE(()=>{loadReports()},[userId]);const submitReport=async r=>{const id=String(Date.now()).slice(-5);if(setReports(rs=>[{id,status:"review",date:{ar:"الآن",en:"Just now"},reply:null,...r},...rs]),showToast(t.rep_sent),window.LOZI_SB&&userId){const{error}=await window.LOZI_SB.from("reports").insert({user_id:userId,type_id:r.typeId,target:r.target,subject:r.subject,description:r.desc,order_id:r.orderId,reporter_name:person&&person.name||null,reporter_phone:person&&person.phone||null,status:"review"});error||loadReports()}},reportOrder=o=>{const first=findP(o.items[0].p),vk=vendorKey(first),info=vendorInfo(vk,lang),typeId=vk==="farmers"?"farmer":vk==="lozi"?"general":"retail";go("reports",{prefill:{typeId,target:typeId==="general"?"":info.name,orderId:o.id}})},reviewStore=o=>{const first=o.items&&o.items[0]&&findP(o.items[0].p),vid=first&&first._vendor;if(!vid){showToast("تعذّر تحديد المتجر");return}go("vstore",{vendorId:vid})},compressImage=(file,maxDim=1600,quality=.82)=>new Promise((resolve,reject)=>{const img=new Image,url=URL.createObjectURL(file);img.onload=()=>{URL.revokeObjectURL(url);let w=img.width,h=img.height;if(w>maxDim||h>maxDim){const r=Math.min(maxDim/w,maxDim/h);w=Math.round(w*r),h=Math.round(h*r)}const c=document.createElement("canvas");c.width=w,c.height=h,c.getContext("2d").drawImage(img,0,0,w,h),c.toBlob(b=>b?resolve(b):reject(new Error("encode")),"image/webp",quality)},img.onerror=()=>{URL.revokeObjectURL(url),reject(new Error("load"))},img.src=url}),uploadFiles=async jobs=>{const total=jobs.length;if(!total)return[];const started=Date.now();setUploadProg({pct:0});const{data:sess}=await window.LOZI_SB.auth.getSession(),token=sess&&sess.session&&sess.session.access_token,results=[];for(let i=0;i<total;i++){const j=jobs[i];let res=await lozUploadXHR(j.bucket,j.path,j.file,token,p=>setUploadProg({pct:(i+p)/total}));if(!res||!res.ok){const up=await window.LOZI_SB.storage.from(j.bucket).upload(j.path,j.file,{upsert:!0,contentType:j.file.type||void 0});res=up.error?{ok:!1,error:up.error.message}:{ok:!0}}setUploadProg({pct:(i+1)/total}),results.push(res)}const elapsed=Date.now()-started;return elapsed<700&&await new Promise(r=>setTimeout(r,700-elapsed)),setUploadProg(null),results},addCrop=async(crop,isEdit)=>{if(setAddCropOpen(!1),setEditingProduct(null),userRole!=="customer"&&!(verif&&verif.status==="approved")){showToast("فعّل حسابك أولاً للنشر"),setVerifOpen(!0);return}if(!window.LOZI_SB){showToast(isEdit?t.product_updated:t.crop_published);return}const{data:au}=await window.LOZI_SB.auth.getUser(),uid=au&&au.user&&au.user.id;if(!uid){showToast("سجّل الدخول أولاً");return}/* TODO(Pro): replace manual two-version generation with Supabase Image Transformations (request any size/format on-the-fly via the image URL render params instead of storing multiple copies). */const items=crop.photoItems||[],images=new Array(items.length).fill(null),thumbs=new Array(items.length).fill(null),jobs=[];items.some(it=>it.file)&&setUploadProg({pct:0});for(let i=0;i<items.length;i++){if(items[i].url){images[i]=items[i].url,thumbs[i]=items[i].thumb||items[i].url;continue}let blob=items[i].file,ext="webp";try{blob=await compressImage(items[i].file,1600,.82)}catch(e){ext=(String(items[i].file.name).split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg"}const stamp=Date.now()+"-"+Math.random().toString(36).slice(2,8),path=uid+"/"+stamp+"."+ext;jobs.push({file:blob,bucket:"product-images",path,idx:i,kind:"full"});let tblob=null;try{tblob=await compressImage(items[i].file,500,.72)}catch(e){tblob=null}tblob&&jobs.push({file:tblob,bucket:"product-images",path:uid+"/"+stamp+"-thumb.webp",idx:i,kind:"thumb"})}try{if(jobs.length){const res2=await uploadFiles(jobs.map(j=>({file:j.file,bucket:j.bucket,path:j.path})));let failErr="";jobs.forEach((j,k)=>{if(res2[k]&&res2[k].ok){const pub=lozPublicUrl("product-images",j.path);j.kind==="thumb"?thumbs[j.idx]=pub:images[j.idx]=pub}else j.kind!=="thumb"&&(failErr=res2[k]&&res2[k].error||"فشل الرفع")}),failErr&&showToast("تعذّر رفع الصورة: "+failErr)}}finally{setUploadProg(null)}const data=Object.assign({},crop);delete data.photoItems;const fullUrls=[],thumbUrls=[];for(let i=0;i<images.length;i++)images[i]&&(fullUrls.push(images[i]),thumbUrls.push(thumbs[i]||images[i]));data.images=fullUrls,data.img=fullUrls[0]||data.img,data.thumbs=thumbUrls,data.thumb=thumbUrls[0]||data.img;const role3=userRole.indexOf("farmer")===0?"farmer":userRole,seg=crop.cat==="wholesale"?"wholesale":crop.cat==="retail"?"retail":null,row={vendor_id:uid,vendor_role:role3,market_segment:seg,category:crop.cat,name:crop.name&&crop.name.ar||"",description:crop.desc&&crop.desc.ar||null,price:crop.price!=null?Number(crop.price):null,status:"available",data,shahti_status:data.shahtiStatus||null,stock:data.stock!=null?data.stock:null},res=isEdit&&crop.id?await window.LOZI_SB.from("products").update(row).eq("id",crop.id):await window.LOZI_SB.from("products").insert(row);if(res.error){showToast("خطأ: "+res.error.message);return}showToast(isEdit?t.product_updated:t.crop_published),loadProducts()},saveStore=async({name,description,hours,enabled,imageFile,minOrderEnabled,minOrderAmount})=>{if(!window.LOZI_SB)return showToast("الخدمة غير متاحة"),{ok:!1};const{data:au}=await window.LOZI_SB.auth.getUser(),uid=au&&au.user&&au.user.id;if(!uid)return showToast("سجّل الدخول أولاً"),{ok:!1};let image_path=store&&store.image||null;if(imageFile){let blob=imageFile,ext="webp";try{blob=await compressImage(imageFile)}catch(e){ext=(String(imageFile.name).split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg"}const path=uid+"/store-"+Date.now()+"."+ext,res=await uploadFiles([{file:blob,bucket:"product-images",path}]);res[0]&&res[0].ok&&(image_path=lozPublicUrl("product-images",path))}const{error}=await window.LOZI_SB.from("stores").upsert({vendor_id:uid,name,description,hours,enabled,image_path,min_order_enabled:minOrderEnabled===!0,min_order_amount:minOrderEnabled&&minOrderAmount?Number(minOrderAmount):null,updated_at:new Date().toISOString()},{onConflict:"vendor_id"});return error?(showToast("خطأ: "+error.message),{ok:!1,error:error.message}):(setStore(st=>({...st||{},name,description,hours,enabled,image:image_path,minOrderEnabled:minOrderEnabled===!0,minOrderAmount:minOrderEnabled&&minOrderAmount?Number(minOrderAmount):null})),showToast("تم حفظ الملف التجاري"),go("dashboard"),{ok:!0})},saveOffers=async offers=>{if(!window.LOZI_SB)return showToast("الخدمة غير متاحة"),{ok:!1};const{data:au}=await window.LOZI_SB.auth.getUser(),uid=au&&au.user&&au.user.id;if(!uid)return showToast("سجّل الدخول أولاً"),{ok:!1};const{error}=await window.LOZI_SB.from("stores").upsert({vendor_id:uid,offers,updated_at:new Date().toISOString()},{onConflict:"vendor_id"});return error?(showToast("خطأ: "+error.message),{ok:!1,error:error.message}):(setStore(st=>({...st||{},offers})),setStoreOffers(m=>Object.assign({},m,{[uid]:offers})),showToast("تم حفظ العروض"),go("dashboard"),{ok:!0})},myProducts=dbProducts.filter(p=>p._vendor&&p._vendor===userId).map(withDiscount),myBundles=myProducts.filter(p=>p.bundle),myRegularProducts=myProducts.filter(p=>!p.bundle),pinProduct=async(id,pin)=>{if(!window.LOZI_SB)return;if(pin){const cnt=myProducts.filter(x=>x.pinned&&x.id!==id).length;if(cnt>=3){showToast("الحد الأقصى 3 منتجات مثبّتة");return;}}setDbProducts(ps=>ps.map(x=>x.id===id?{...x,pinned:pin}:x));const r=await window.LOZI_SB.from("products").update({pinned:pin,pinned_at:pin?new Date().toISOString():null}).eq("id",id);r.error?(showToast("خطأ: "+r.error.message),loadProducts()):showToast(pin?"تم التثبيت 📌":"تم إلغاء التثبيت");},toggleProduct=async id=>{if(!window.LOZI_SB)return;const p=myProducts.find(x=>x.id===id),next=p&&p.active===!1?"active":"hidden";setDbProducts(ps=>ps.map(x=>x.id===id?{...x,active:next!=="hidden"}:x));const{error}=await window.LOZI_SB.from("products").update({status:next}).eq("id",id);error&&(showToast("خطأ: "+error.message),loadProducts())},removeProduct=async id=>{if(!window.LOZI_SB)return;setDbProducts(ps=>ps.filter(x=>x.id!==id));const{error}=await window.LOZI_SB.from("products").delete().eq("id",id);if(error){showToast("خطأ: "+error.message),loadProducts();return}showToast(t.myp_removed)},startEditProduct=id=>{const p=myProducts.find(x=>x.id===id);p&&(setEditingProduct(p),setAddCropOpen(!0))},openAddBundle=()=>{if(isSeller&&!sellerApproved){setVerifOpen(!0);return}if(userRole!=="retail")return;if(myProducts.filter(p=>p.bundle).length>=bundleLimit){showToast("الحد الأقصى للعروض المشكّلة لمتجرك هو "+bundleLimit);return}setEditingBundle(null),setBundleSheetOpen(!0)},startEditBundle=id=>{const p=myProducts.find(x=>x.id===id);p&&(setEditingBundle(p),setBundleSheetOpen(!0))},SELLER_FLOW={new:"preparing",preparing:"delivering",delivering:"delivered"},updateOrderStatus=(id,status,extra)=>{!window.LOZI_SB||!userId||window.LOZI_SB.from("orders").update(Object.assign({status},extra||{})).eq("order_no",id).eq("seller_vendor_id",userId).then(({error})=>{error&&showToast("خطأ: "+error.message)})},advanceSellerOrder=id=>setSellerOrders(os=>os.map(o=>{if(o.id===id&&SELLER_FLOW[o.status]){const next=SELLER_FLOW[o.status];return updateOrderStatus(id,next),{...o,status:next}}return o})),assignSellerCourier=(id,who)=>setSellerOrders(os=>os.map(o=>o.id===id?{...o,courier:who}:o)),rejectSellerOrder=(id,reason)=>{setSellerOrders(os=>os.map(o=>o.id===id?{...o,status:"rejected",rejectReason:reason}:o)),updateOrderStatus(id,"rejected",{reject_reason:reason}),showToast(t.rej_done)},submitWalletPay=()=>{setWalletPayOpen(!1),setLastPay({amount:LOZI_WALLET_DUE,date:{ar:"الآن",en:"Just now"},status:"review"}),showToast(t.wal_pay_submitted)},openSub=()=>setSubOpen(!0),submitSub=()=>{setSubOpen(!1),setSubPending(!0),showToast(t.sub_pending),setTimeout(()=>{const start=new Date;setSub({start,expiry:addMonths(start,LOZI_SUB.months)}),setSubPending(!1),setSubscribed(!0)},3200)},onRegistered=({role,person:pers})=>{setUserRole(role),pers&&setPerson(pers),setStage("app"),go("home")},e164=p=>String(p).charAt(0)==="+"?String(p):"+967"+String(p).replace(/[^0-9]/g,"").replace(/^0+/,""),appRole=r=>r==="farmer"?"farmer_almond":r,openSupportWa=()=>{try{window.open("https://wa.me/967"+String(supportWa).replace(/[^0-9]/g,"").replace(/^967/,""),"_blank")}catch(e){}},invokeFn=async(fn,body2)=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{data,error}=await window.LOZI_SB.functions.invoke(fn,{body:body2});if(!error)return data||{ok:!1};try{const b=await error.context.json();if(b&&(b.reason==="not_authorized"||b.reason==="rate_limited"))return b;if(b)return{ok:!1,error:b.detail||b.reason||error.message}}catch(e){}return{ok:!1,error:error.message}},onVendorSendOtp=({phone:ph,purpose="register"})=>invokeFn("request-otp",{phone:e164(ph),purpose}),onVendorVerify=({phone:ph,code,purpose="register"})=>invokeFn("verify-otp",{phone:e164(ph),code,purpose}),onVendorSetPassword=({phone:ph,setup_token,password})=>invokeFn("vendor-forgot-password",{phone:e164(ph),setup_token,password}),onVendorSignIn=async({phone:ph,password,role,name})=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{data,error}=await window.LOZI_SB.auth.signInWithPassword({phone:e164(ph),password});if(error)return{ok:!1,error:error.message};if(data.user&&await isBlockedAccount(data.user.id))return{ok:!1,error:"هذا الحساب معلّق أو محظور. تواصل مع الدعم."};data.user&&setUserId(data.user.id);const md=data.user&&data.user.user_metadata||{};if(name&&name!==md.name)try{await window.LOZI_SB.auth.updateUser({data:{name}})}catch(e){}return onRegistered({role:appRole(role||md.role)||"customer",person:{name:name||md.name||"",phone:e164(ph)}}),{ok:!0}},onDevSkip=async role=>{if(!window.LOZI_SB){showToast("الخدمة غير متاحة");return}if(!window.LOZI_SB.auth.signInAnonymously){showToast("حدّث الصفحة — الإصدار قديم");return}const{data,error}=await window.LOZI_SB.auth.signInAnonymously();if(error){showToast("فعّل «Anonymous» في Supabase أولاً");return}const uid=data.user&&data.user.id;uid&&setUserId(uid);const r=appRole(role)||"retail";try{await window.LOZI_SB.auth.updateUser({data:{role:r,name:"تاجر تجريبي"}})}catch(e){}try{await window.LOZI_SB.from("vendor_verifications").upsert({user_id:uid,status:"approved"},{onConflict:"user_id"})}catch(e){}setVerif({status:"approved"}),onRegistered({role:r,person:{name:"تاجر تجريبي",phone:""}})},onCustomerSignIn=async({email,password})=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{data,error}=await window.LOZI_SB.auth.signInWithPassword({email,password});if(error)return{ok:!1,error:error.message};if(data.user&&await isBlockedAccount(data.user.id))return{ok:!1,error:"هذا الحساب معلّق أو محظور. تواصل مع الدعم."};data.user&&setUserId(data.user.id);const md=data.user&&data.user.user_metadata||{};return onRegistered({role:appRole(md.role)||"customer",person:{name:md.name||"",phone:md.phone||""}}),{ok:!0}},onCustomerSignUp=async({name,email,password,phone:ph})=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const appUrl=window.location.origin+window.location.pathname,{data,error}=await window.LOZI_SB.auth.signUp({email,password,options:{emailRedirectTo:appUrl,data:{role:"customer",name,phone:e164(ph)}}});if(error)return{ok:!1,error:error.message};if(data.session){data.user&&setUserId(data.user.id);try{await window.LOZI_SB.from("customers").insert({user_id:data.user.id,full_name:name,phone:e164(ph),email})}catch(e){}return onRegistered({role:"customer",person:{name,phone:e164(ph)}}),{ok:!0}}if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0)return{ok:!1,alreadyRegistered:!0,error:"هذا البريد الإلكتروني مسجّل بالفعل. إن لم تؤكّد حسابك بعد فابحث عن رسالة التأكيد في بريدك، وإلا فسجّل الدخول مباشرة."};return{ok:!0,needsConfirm:!0}},onCustomerForgot=async({email})=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{error}=await window.LOZI_SB.auth.resetPasswordForEmail(email,{redirectTo:window.location.href.split("#")[0].split("?")[0]});return error?{ok:!1,error:(error.message||"تعذّر الإرسال")+(error.status?" ("+error.status+")":"")}:{ok:!0}},onSetNewPassword=async({password})=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{data,error}=await window.LOZI_SB.auth.updateUser({password});if(error)return{ok:!1,error:error.message};data.user&&setUserId(data.user.id);try{window.LOZI_RECOVERY=!1}catch(e){}const md=data.user&&data.user.user_metadata||{};return onRegistered({role:appRole(md.role)||"customer",person:{name:md.name||"",phone:md.phone||(data.user.phone?"+"+data.user.phone:"")}}),{ok:!0}},onLogout=()=>{if(window.LOZI_SB)try{window.LOZI_SB.auth.signOut()}catch(e){}localStorage.removeItem("lozi_stage"),localStorage.removeItem("lozi_role"),localStorage.removeItem("lozi_person"),setUserRole("customer"),setPerson({name:"",phone:"",city:"",address:""}),setFavs([]),setStage("login")},requestDeleteAccount=async()=>{if(!window.LOZI_SB)return{ok:!1,error:"الخدمة غير متاحة"};const{data:au}=await window.LOZI_SB.auth.getUser(),u=au&&au.user;if(!u)return{ok:!1,error:"سجّل الدخول أولاً"};const{error}=await window.LOZI_SB.from("deletion_requests").upsert({user_id:u.id,role:userRole,name:person&&person.name||u.user_metadata&&u.user_metadata.name||null,phone:person&&person.phone||(u.phone?"+"+u.phone:null),email:u.email||null,status:"pending",created_at:new Date().toISOString()},{onConflict:"user_id"});return error?{ok:!1,error:error.message}:{ok:!0}},cartCount=cart.reduce((a,it)=>a+it.q,0),showNav=stage==="app"&&TAB_SCREENS.includes(screen),isFarmCat=p=>p.cat==="almond"||p.cat==="raisin",catalog=dbProducts.filter(p=>p.active!==!1&&p.cat!=="savings"&&p.cat!=="vip"&&!(isFarmCat(p)&&p.stock!=null&&p.stock<=0)).map(withDiscount),savingsProducts=dbProducts.filter(p=>p.cat==="savings"&&p.active!==!1).map(withDiscount).sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)),vipProducts=dbProducts.filter(p=>p.cat==="vip"&&p.active!==!1).map(withDiscount).sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)),allProducts=[...catalog,...savingsProducts,...vipProducts,...LOZI_SAVINGS],findP=p=>typeof p=="string"?allProducts.find(x=>x.id===p):p,avail=sectionsForRole(userRole),sellSection={farmer_almond:"almond",farmer_raisin:"raisin",retail:"retail",wholesale:"wholesale"}[userRole]||null,isSeller=!!sellSection,sellerApproved=verif&&verif.status==="approved",openAddProduct=()=>{if(isSeller&&!sellerApproved){setVerifOpen(!0);return}setEditingProduct(null),setAddCropOpen(!0)};let body=null;if(stage==="splash")body=React.createElement(Splash,{onDone:()=>setStage(localStorage.getItem("lozi_stage")||"register")});else if(stage==="register")body=React.createElement(Register,{t,lang,onDone:onRegistered,onVendorSendOtp,onVendorVerify,onVendorSetPassword,onVendorSignIn,onCustomerSignUp,onSupport:openSupportWa,onGoLogin:()=>setStage("login"),openTerms:()=>setTermsOpen(!0),onDevSkip});else if(stage==="login")body=React.createElement(Login,{t,lang,onCustomerSignIn,onCustomerForgot,onVendorSignIn,onVendorSendOtp,onVendorVerify,onVendorSetPassword,onSupport:openSupportWa,goRegister:()=>setStage("register")});else if(stage==="reset")body=React.createElement(ResetPassword,{onSetNewPassword});else switch(screen){case"home":body=React.createElement(Home,{t,lang,go,role:userRole,avail,catalog,storesMap,isSeller,sellSection,notifCount:isSeller?unreadSellerNotifs:unreadNotifs,onBell:openNotifs,onAddCrop:openAddProduct,openStore:s=>go("store",{store:s}),openProduct:p=>go("product",{p}),addToCart,favs,toggleFav,loadStatus:productsLoad,onRetry:loadProducts});break;case"sections":body=React.createElement(SectionBrowse,{t,lang,go,avail,catalog,storesMap,init:params.section,initType:params.type,openStore:s=>go("store",{store:s}),openProduct:p=>go("product",{p}),addToCart,favs,toggleFav,loadStatus:productsLoad,onRetry:loadProducts,browse:browseProducts,sectionVarieties});break;case"store":body=React.createElement(StoreProfile,{s:params.store,t,lang,onBack:goBack,openProduct:p=>go("product",{p}),addToCart,favs,toggleFav});break;case"vstore":body=React.createElement(VendorStore,{t,lang,vendorId:params.vendorId,me:{id:userId,name:person&&person.name},products:catalog.filter(p=>p._vendor===params.vendorId).sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)),onBack:goBack,openProduct:p=>go("product",{p}),addToCart,favs,toggleFav,showToast,sectionVarieties});break;case"product":body=React.createElement(Product,{p:findP(params.p),t,lang,onBack:goBack,addToCart,fav:favs.includes(findP(params.p).id),onFav:toggleFav,go});break;case"cart":body=React.createElement(Cart,{t,lang,items:cart,setQty,removeItem,go,offers:storeOffers,storesMap});break;case"checkout":body=React.createElement(Checkout,{t,lang,items:cart.filter(it=>it.p._vendor===params.vendor),vendor:params.vendor,person,onSaveAddress:a=>setPerson(p=>({...p,...a})),onBack:()=>go("cart"),onConfirm:(pay,receipt)=>confirmOrder(params.vendor,pay,receipt),offers:storeOffers,storesMap});break;case"success":body=React.createElement(OrderSuccess,{t,go,review:params.review});break;case"orders":body=React.createElement(Orders,{t,lang,orders,onBack:()=>go("profile"),reorder,cancel:cancelOrder,reportOrder,go,isSeller,role:userRole,onReview:reviewStore});break;case"savings":body=React.createElement(Savings,{t,lang,products:savingsProducts,subscribed,subPending,onSubscribe:openSub,openProduct:p=>go("product",{p}),addToCart,favs,toggleFav,onVip:()=>go("vip"),canSubscribe:userRole!=="retail"&&userRole!=="wholesale"});break;case"vip":body=React.createElement(Vip,{t,lang,products:vipProducts,openProduct:p=>go("product",{p}),addToCart,favs,toggleFav,onBack:()=>go("savings")});break;case"dashboard":body=React.createElement(SellerDashboard,{t,lang,role:userRole,person,storeName:store&&store.name,orders:sellerOrders,onAdvance:advanceSellerOrder,onAssign:assignSellerCourier,onReject:rejectSellerOrder,productCount:myProducts.length,go,onAddProduct:openAddProduct,onMyProducts:()=>go("myproducts"),onStore:()=>go("mystore"),onOffers:()=>go("myoffers"),onReviews:()=>go("myreviews"),onBundles:()=>go("mybundles"),showBundles:userRole==="retail",rating:myRating,verifStatus:verif?verif.status:"none",onVerify:()=>setVerifOpen(!0)});break;case"mystore":body=React.createElement(SellerStore,{t,lang,store,verifStatus:verif?verif.status:"none",onBack:()=>go("dashboard"),onSave:saveStore,onVerify:()=>setVerifOpen(!0)});break;case"myoffers":body=React.createElement(SellerOffersReviews,{t,lang,store,products:myProducts,vendorId:userId,role:userRole,onBack:()=>go("dashboard"),onSave:saveOffers,onBundles:()=>go("mybundles")});break;case"myreviews":body=React.createElement(SellerReviews,{t,lang,vendorId:userId,onBack:()=>go("dashboard")});break;case"myproducts":body=React.createElement(MyProducts,{t,lang,role:userRole,products:myRegularProducts,onBack:()=>go("dashboard"),onAdd:openAddProduct,onToggle:toggleProduct,onDelete:removeProduct,onEdit:startEditProduct,onPin:pinProduct});break;case"mybundles":body=React.createElement(MyBundles,{t,lang,bundles:myBundles,limit:bundleLimit,onBack:()=>go("dashboard"),onAdd:openAddBundle,onToggle:toggleProduct,onDelete:removeProduct,onEdit:startEditBundle});break;case"wallet":body=isSeller?React.createElement(SellerWallet,{t,lang,person,due:LOZI_WALLET_DUE,deadline:t.wal_deadline_val,lastPay,orders:LOZI_COMMISSION_ORDERS,onPay:()=>setWalletPayOpen(!0)}):React.createElement(Home,{t,lang,go,role:userRole,avail,catalog,storesMap,isSeller,sellSection,notifCount:unreadNotifs,onBell:openNotifs,onAddCrop:openAddProduct,openStore:s=>go("store",{store:s}),openProduct:p=>go("product",{p}),addToCart,favs,toggleFav});break;case"profile":body=React.createElement(Profile,{t,lang,go,favCount:favs.length,subscribed,subPending,role:userRole,person,isSeller,dashCount:sellerOrders.filter(o=>o.status==="new").length});break;case"personal":body=React.createElement(PersonalInfo,{t,lang,role:userRole,onBack:goBack,person,onSave:p=>{setPerson(p),showToast(t.saved)}});break;case"subscription":body=React.createElement(SubscriptionDetails,{t,lang,onBack:goBack,subscribed,subPending,sub,onSubscribe:openSub,fmtDate});break;case"favorites":body=React.createElement(Favorites,{t,lang,favs,catalog:allProducts,onBack:goBack,openProduct:p=>go("product",{p}),addToCart,toggleFav,go});break;case"reports":body=React.createElement(Reports,{t,lang,onBack:goBack,reports,onSubmit:submitReport,prefill:params.prefill,showToast});break;case"notifications":body=React.createElement(Notifications,{t,lang,notifs:isSeller?sellerNotifs:notifs,onBack:goBack,go});break;case"settings":body=React.createElement(Settings,{t,lang,onBack:()=>go("profile"),toggleLang,currency,setCurrencyState,themeMode,setThemeMode,openTerms:()=>setTermsOpen(!0),go,person,onLogout,openSupport:()=>setSupportOpen(!0),onRequestDelete:requestDeleteAccount});break;default:body=null}const chrome=stage==="app";return React.createElement("div",{className:"app-root",dir:t.dir},React.createElement(OfflineBanner,null),React.createElement("div",{className:`app-main ${showNav?"with-nav":""} ${chrome?"":"full"}`},body),showNav&&React.createElement(BottomNav,{active:tab,go,cartCount,t,isSeller}),subOpen&&React.createElement(SubModal,{t,lang,onClose:()=>setSubOpen(!1),onSubmitted:submitSub}),termsOpen&&React.createElement(TermsSheet,{t,lang,onClose:()=>setTermsOpen(!1)}),supportOpen&&React.createElement(SupportSheet,{t,lang,numbers:support,onClose:()=>setSupportOpen(!1)}),addCropOpen&&React.createElement(AddProductSheet,{t,lang,section:editingProduct&&editingProduct.cat||sellSection,role:userRole,initial:editingProduct,onClose:()=>{setAddCropOpen(!1),setEditingProduct(null)},onPublish:addCrop}),bundleSheetOpen&&React.createElement(BundleSheet,{t,lang,initial:editingBundle,onClose:()=>{setBundleSheetOpen(!1),setEditingBundle(null)},onPublish:addCrop}),verifOpen&&React.createElement(VerifySheet,{t,role:userRole,status:verif?verif.status:"none",note:verif?verif.note:null,onClose:()=>setVerifOpen(!1),onSubmit:submitVerif}),walletPayOpen&&React.createElement(CommissionPaySheet,{t,lang,amount:LOZI_WALLET_DUE,onClose:()=>setWalletPayOpen(!1),onSubmitted:submitWalletPay}),uploadProg&&React.createElement(UploadRing,{pct:uploadProg.pct}),React.createElement(Toast,{msg:toast}))}ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App,null));
+const { useState: useStateB } = React,
+  FEE = 1e3;
+function fmtPhone(p) {
+  var s = String(p == null ? "" : p).replace(/[^\d]/g, "");
+  s = s.replace(/^00/, "").replace(/^967/, "").replace(/^0+/, "");
+  return s ? "+967 " + s : "";
+}
+function feeFor(items, offers) {
+  if (!items || !items.length) return FEE;
+  if (items.some((it) => it.p && it.p.cat === "wholesale")) return null;
+  const vid = items[0].p._vendor;
+  if (!vid || !items.every((it) => it.p._vendor === vid)) return FEE;
+  const off = offers && offers[vid],
+    min = off && off.freeDelivery && off.freeDelivery.min;
+  return min && items.reduce((a, it) => a + it.p.price * it.q, 0) >= min
+    ? 0
+    : FEE;
+}
+function weightKg(p) {
+  var raw = (p && p.weight && (p.weight.ar || p.weight.en || p.weight)) || "";
+  var s = String(raw)
+    .replace(/[٠-٩]/g, function (d) {
+      return "٠١٢٣٤٥٦٧٨٩".indexOf(d);
+    })
+    .replace(/[۰-۹]/g, function (d) {
+      return "۰۱۲۳۴۵۶۷۸۹".indexOf(d);
+    });
+  var m = s.match(/[\d.]+/),
+    n = m ? parseFloat(m[0]) : NaN;
+  if (!isFinite(n) || n <= 0) n = 1;
+  var isKg = /كجم|كيلو|kg/i.test(s),
+    isG = !isKg && /غ|جم|غرام|gram/i.test(s);
+  return isG ? n / 1000 : n;
+}
+const perYear = (lang) => (lang === "ar" ? " / سنة" : " / yr");
+function Product({ p, t, lang, onBack, addToCart, fav, onFav, go }) {
+  const [qty, setQty] = useStateB(1),
+    [added, setAdded] = useStateB(!1),
+    [byAmount, setByAmount] = useStateB(!1),
+    [amount, setAmount] = useStateB(""),
+    store = LOZI_STORES.find((s) => s.id === p.store),
+    imgs = (p.images && p.images.length ? p.images : [p.img]).filter(Boolean),
+    soldOut = p.stock != null && p.stock <= 0,
+    maxQty = p.stock != null ? Math.max(0, Math.floor(p.stock)) : 999,
+    unit = p.stockUnit || "",
+    isConsumer = p.cat !== "wholesale",
+    wKg = weightKg(p),
+    pricePerKg = wKg > 0 ? p.price / wKg : p.price,
+    isQuarter = ["almond", "raisin", "savings"].indexOf(p.cat) >= 0,
+    amtMin = isQuarter ? Math.max(1, Math.ceil(pricePerKg * 0.25)) : 500,
+    amtNum = Math.max(0, Math.round(Number(amount) || 0)),
+    estGrams = pricePerKg > 0 ? Math.round((amtNum / pricePerKg) * 1000) : 0,
+    amtValid = amtNum >= amtMin,
+    doAdd = () => {
+      if (soldOut) return;
+      if (byAmount) {
+        if (!amtValid) return;
+        addToCart(p, amtNum / p.price, {
+          byAmount: !0,
+          grams: estGrams,
+          amount: amtNum,
+        });
+      } else addToCart(p, qty);
+      (setAdded(!0), setTimeout(() => setAdded(!1), 1400));
+    };
+  return React.createElement(
+    "div",
+    { className: "screen product" },
+    React.createElement(
+      "div",
+      { className: "pd-gallery" },
+      React.createElement(
+        "button",
+        { className: "hero-back", onClick: onBack },
+        React.createElement(Icon, {
+          name: t.dir === "rtl" ? "chevron" : "back",
+          size: 22,
+          color: "var(--ink)",
+        }),
+      ),
+      React.createElement(
+        "button",
+        { className: `pd-fav ${fav ? "on" : ""}`, onClick: () => onFav(p.id) },
+        React.createElement(Icon, {
+          name: "heart",
+          size: 20,
+          color: fav ? "#fff" : "var(--ink)",
+          fill: fav,
+        }),
+      ),
+      React.createElement(LoziCarousel, {
+        images: imgs,
+        ph: lang === "ar" ? "صورة المنتج" : "Product",
+        t,
+        lang,
+        arrows: !0,
+        dotsClickable: !0,
+        loop: !1,
+        zoomable: !0,
+      }),
+    ),
+    React.createElement(
+      "div",
+      { className: "pd-body" },
+      store &&
+        React.createElement(
+          "button",
+          { className: "pd-store", onClick: () => go("store", { store }) },
+          React.createElement(Icon, {
+            name: "store",
+            size: 14,
+            color: "var(--green-deep)",
+          }),
+          store.name[lang],
+          store.verified && React.createElement(VerifiedSeal, { size: 14 }),
+        ),
+      !store &&
+        p._vendor &&
+        React.createElement(
+          "button",
+          {
+            className: "pd-store",
+            onClick: () => go("vstore", { vendorId: p._vendor }),
+          },
+          React.createElement(Icon, {
+            name: "store",
+            size: 14,
+            color: "var(--green-deep)",
+          }),
+          "زيارة المتجر",
+        ),
+      React.createElement("h1", { className: "pd-name" }, p.name[lang]),
+      p.bundle
+        ? React.createElement(
+            "div",
+            { className: "pd-weight" },
+            lang === "ar"
+              ? "عرض مشكّل · سعر ثابت"
+              : "Mixed bundle · fixed price",
+          )
+        : React.createElement(
+            "div",
+            { className: "pd-weight" },
+            t.per,
+            " ",
+            p.weight[lang],
+          ),
+      soldOut
+        ? React.createElement(
+            "div",
+            { className: "pd-soldout" },
+            React.createElement(Icon, {
+              name: "close",
+              size: 14,
+              color: "var(--danger)",
+              stroke: 3,
+            }),
+            "نفد المخزون حالياً",
+          )
+        : p.stock != null &&
+            React.createElement(
+              "div",
+              { className: "pd-variety" },
+              React.createElement(Icon, {
+                name: "store",
+                size: 14,
+                color: "var(--green-deep)",
+              }),
+              "المتوفّر: ",
+              React.createElement("b", null, p.stock, " ", unit),
+            ),
+      p.availKg &&
+        !soldOut &&
+        React.createElement(
+          "div",
+          { className: "pd-variety" },
+          React.createElement(Icon, {
+            name: "leaf",
+            size: 14,
+            color: "var(--green-deep)",
+          }),
+          "متوفر ≈ ",
+          React.createElement("b", null, p.availKg, " كجم"),
+        ),
+      p.variety &&
+        React.createElement(
+          "div",
+          { className: "pd-variety" },
+          React.createElement(Icon, {
+            name: "leaf",
+            size: 14,
+            color: "var(--green-deep)",
+          }),
+          t.variety_label,
+          ": ",
+          React.createElement("b", null, VARIETY_LABEL(p.variety, lang)),
+        ),
+      p.shahtiStatus === "approved" &&
+        React.createElement(
+          "div",
+          { className: "shahti-card" },
+          React.createElement(
+            "span",
+            { className: "shahti-seal" },
+            React.createElement(ShahtiGlyph, { size: 20 }),
+          ),
+          React.createElement(
+            "div",
+            { className: "shahti-card-txt" },
+            React.createElement("strong", null, t.shahti_verified_title),
+            React.createElement("span", null, t.shahti_verified_desc),
+            p.inspect &&
+              React.createElement(
+                "span",
+                { className: "shahti-inspect" },
+                React.createElement(Icon, {
+                  name: "location",
+                  size: 12,
+                  color: "var(--gold-deep)",
+                }),
+                t.shahti_inspect_by,
+                ": ",
+                p.inspect[lang],
+              ),
+          ),
+        ),
+      React.createElement(
+        "div",
+        { className: "pd-price-row" },
+        React.createElement(Money, { v: p.price, cls: "pd-price", small: !0 }),
+        p.old &&
+          React.createElement(
+            "span",
+            { className: "price-old lg" },
+            fmtMoney(p.old).value,
+          ),
+      ),
+      React.createElement("div", { className: "pd-sec-title" }, t.description),
+      React.createElement("p", { className: "pd-desc" }, p.desc[lang]),
+      p.bundle &&
+        Array.isArray(p.items) &&
+        p.items.length > 0 &&
+        React.createElement(
+          "div",
+          { className: "pd-bundle" },
+          React.createElement(
+            "div",
+            { className: "pd-sec-title" },
+            lang === "ar" ? "محتويات العرض المشكّل" : "Bundle contents",
+          ),
+          React.createElement(
+            "div",
+            { className: "pd-bundle-list" },
+            p.items.map((it, i) =>
+              React.createElement(
+                "div",
+                { className: "pd-bundle-item", key: i },
+                React.createElement(
+                  "span",
+                  { className: "pbi-name" },
+                  it.name || "",
+                ),
+                React.createElement(
+                  "span",
+                  { className: "pbi-weight" },
+                  (
+                    (it.weight != null ? String(it.weight) : "") +
+                    (it.unit ? (it.unit === "kilo" ? " كيلو" : " جرام") : "")
+                  ).trim(),
+                ),
+              ),
+            ),
+          ),
+          React.createElement(
+            "div",
+            { className: "pd-bundle-note" },
+            React.createElement(Icon, {
+              name: "check",
+              size: 13,
+              color: "var(--green-deep)",
+              stroke: 3,
+            }),
+            lang === "ar"
+              ? "يُباع العرض كاملاً بمحتوياته وأوزانه الثابتة."
+              : "Sold as one fixed bundle — contents and weights can't be changed.",
+          ),
+        ),
+    ),
+    isConsumer &&
+      !p.bundle &&
+      React.createElement(
+        "div",
+        { className: "buy-mode", style: { padding: "0 16px 8px" } },
+        React.createElement(
+          "div",
+          { className: "chip-wrap", style: { marginBottom: 8 } },
+          React.createElement(
+            "button",
+            {
+              className: "chip " + (byAmount ? "" : "on"),
+              onClick: () => setByAmount(!1),
+            },
+            t.buy_mode_weight,
+          ),
+          React.createElement(
+            "button",
+            {
+              className: "chip " + (byAmount ? "on" : ""),
+              onClick: () => setByAmount(!0),
+            },
+            t.buy_mode_amount,
+          ),
+        ),
+        byAmount &&
+          React.createElement(
+            "div",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              t.amount_label,
+            ),
+            React.createElement("input", {
+              className: "inp",
+              type: "number",
+              inputMode: "numeric",
+              min: amtMin,
+              value: amount,
+              onChange: (e) => setAmount(e.target.value),
+              placeholder: t.amount_ph,
+            }),
+            React.createElement(
+              "div",
+              {
+                style: { fontSize: 12.5, color: "var(--muted)", marginTop: 6 },
+              },
+              isQuarter ? t.min_quarter_note : t.min_amount_note,
+            ),
+            amtNum > 0 &&
+              React.createElement(
+                "div",
+                {
+                  style: {
+                    marginTop: 6,
+                    fontWeight: 700,
+                    color: "var(--green-deep)",
+                  },
+                },
+                t.approx_qty,
+                " · ≈ ",
+                estGrams,
+                " ",
+                t.grams_short,
+              ),
+          ),
+      ),
+    React.createElement(
+      "div",
+      { className: "pd-footer" },
+      !byAmount &&
+        React.createElement(
+          "div",
+          { className: "stepper big" },
+          React.createElement(
+            "button",
+            { onClick: () => setQty(Math.max(1, qty - 1)) },
+            React.createElement(Icon, {
+              name: qty <= 1 ? "trash" : "minus",
+              size: 18,
+              color: "var(--ink)",
+            }),
+          ),
+          React.createElement("span", null, qty, unit ? " " + unit : ""),
+          React.createElement(
+            "button",
+            {
+              disabled: qty >= maxQty,
+              onClick: () => setQty(Math.min(maxQty, qty + 1)),
+            },
+            React.createElement(Icon, {
+              name: "plus",
+              size: 18,
+              color: "var(--ink)",
+            }),
+          ),
+        ),
+      React.createElement(
+        "button",
+        {
+          className: `btn btn-green flex1 ${added ? "ok" : ""}`,
+          disabled: soldOut || (byAmount && !amtValid),
+          onClick: doAdd,
+        },
+        React.createElement(Icon, {
+          name: added ? "check" : "cart",
+          size: 20,
+          color: "#fff",
+          stroke: added ? 3 : 2,
+        }),
+        React.createElement(
+          "span",
+          null,
+          soldOut
+            ? "نفد المخزون"
+            : added
+              ? t.added
+              : `${t.add_to_cart} · ${moneyStr(byAmount ? amtNum : p.price * qty)}`,
+        ),
+      ),
+    ),
+  );
+}
+function Cart({ t, lang, items, setQty, removeItem, go, offers, storesMap }) {
+  if (!items.length)
+    return React.createElement(
+      "div",
+      { className: "screen cart empty-screen" },
+      React.createElement("h2", { className: "screen-title" }, t.cart_title),
+      React.createElement(
+        "div",
+        { className: "empty" },
+        React.createElement(
+          "div",
+          { className: "empty-ic" },
+          React.createElement(Icon, {
+            name: "cart",
+            size: 40,
+            color: "var(--gold-deep)",
+          }),
+        ),
+        React.createElement("h3", null, t.cart_empty),
+        React.createElement("p", null, t.cart_empty_sub),
+        React.createElement(
+          PrimaryBtn,
+          { icon: "store", onClick: () => go("sections") },
+          t.browse,
+        ),
+      ),
+    );
+  const groups = {};
+  items.forEach((it) => {
+    const k = it.p._vendor || vendorKey(it.p);
+    (groups[k] = groups[k] || []).push(it);
+  });
+  const keys = Object.keys(groups);
+  return React.createElement(
+    "div",
+    { className: "screen cart" },
+    React.createElement("h2", { className: "screen-title" }, t.cart_title),
+    React.createElement(
+      "div",
+      { className: "cart-note" },
+      React.createElement(Icon, {
+        name: "store",
+        size: 15,
+        color: "var(--green-deep)",
+      }),
+      t.cart_per_store_note,
+    ),
+    keys.map((k) => {
+      const grp = groups[k],
+        mo = storesMap && storesMap[k],
+        sname = (mo && mo.name) || "متجر",
+        subtotal = grp.reduce((a, it) => a + it.p.price * it.q, 0),
+        fee = feeFor(grp, offers),
+        minAmt =
+          mo && mo.minOrderEnabled && mo.minOrderAmount > 0
+            ? mo.minOrderAmount
+            : 0,
+        belowMin = minAmt > 0 && subtotal < minAmt;
+      return React.createElement(
+        "div",
+        { key: k, className: "cart-group" },
+        React.createElement(
+          "div",
+          { className: "cg-head" },
+          React.createElement(
+            "span",
+            { className: "cg-ic" },
+            React.createElement(Icon, {
+              name: "store",
+              size: 16,
+              color: "#fff",
+            }),
+          ),
+          React.createElement("span", { className: "cg-name" }, sname),
+          React.createElement("span", { className: "cg-tag" }, t.order_from),
+        ),
+        React.createElement(
+          "div",
+          { className: "cart-list cg-list" },
+          grp.map((it) =>
+            React.createElement(
+              "div",
+              { key: it.p.id, className: "cart-row" },
+              React.createElement(Img, {
+                id: it.p.img,
+                ph: "",
+                radius: 14,
+                style: { width: 64, height: 64, flexShrink: 0 },
+              }),
+              React.createElement(
+                "div",
+                { className: "cart-mid" },
+                React.createElement(
+                  "div",
+                  { className: "cart-name" },
+                  it.p.name[lang],
+                ),
+                React.createElement(
+                  "div",
+                  { className: "cart-weight" },
+                  it.byAmount
+                    ? "≈ " + it.grams + " " + t.grams_short
+                    : it.p.weight[lang],
+                ),
+                it.byAmount
+                  ? React.createElement(
+                      "div",
+                      { className: "cart-price" },
+                      moneyStr(it.amount),
+                    )
+                  : React.createElement(Money, {
+                      v: it.p.price,
+                      cls: "cart-price",
+                      small: !0,
+                    }),
+              ),
+              it.byAmount
+                ? React.createElement(
+                    "button",
+                    {
+                      className: "cart-del-btn",
+                      onClick: () => removeItem(it.p.id),
+                      style: {
+                        width: 40,
+                        height: 40,
+                        borderRadius: 12,
+                        border: "1px solid var(--sand-2)",
+                        background: "#fff",
+                        flexShrink: 0,
+                      },
+                    },
+                    React.createElement(Icon, {
+                      name: "trash",
+                      size: 16,
+                      color: "var(--ink)",
+                    }),
+                  )
+                : React.createElement(
+                    "div",
+                    { className: "stepper" },
+                    React.createElement(
+                      "button",
+                      {
+                        onClick: () =>
+                          it.q <= 1
+                            ? removeItem(it.p.id)
+                            : setQty(it.p.id, it.q - 1),
+                      },
+                      React.createElement(Icon, {
+                        name: it.q <= 1 ? "trash" : "minus",
+                        size: 15,
+                        color: "var(--ink)",
+                      }),
+                    ),
+                    React.createElement("span", null, it.q),
+                    React.createElement(
+                      "button",
+                      { onClick: () => setQty(it.p.id, it.q + 1) },
+                      React.createElement(Icon, {
+                        name: "plus",
+                        size: 15,
+                        color: "var(--ink)",
+                      }),
+                    ),
+                  ),
+            ),
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "cg-summary" },
+          React.createElement(
+            "div",
+            { className: "sum-row" },
+            React.createElement("span", null, t.subtotal),
+            React.createElement("b", null, moneyStr(subtotal)),
+          ),
+          React.createElement(
+            "div",
+            { className: "sum-row" },
+            React.createElement("span", null, t.delivery_fee),
+            React.createElement(
+              "b",
+              null,
+              fee == null
+                ? React.createElement(
+                    "span",
+                    { className: "free-deliv" },
+                    "يحدّدها المشرف",
+                  )
+                : fee === 0
+                  ? React.createElement(
+                      "span",
+                      { className: "free-deliv" },
+                      "توصيل مجاني",
+                    )
+                  : moneyStr(fee),
+            ),
+          ),
+          React.createElement(
+            "div",
+            { className: "sum-row total" },
+            React.createElement("span", null, t.total),
+            React.createElement("b", null, moneyStr(subtotal + (fee || 0))),
+          ),
+          belowMin &&
+            React.createElement(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  color: "var(--danger)",
+                  fontWeight: 800,
+                  fontSize: "12.5px",
+                  lineHeight: 1.5,
+                  margin: "2px 0 10px",
+                },
+              },
+              React.createElement(Icon, {
+                name: "shield",
+                size: 15,
+                color: "var(--danger)",
+              }),
+              "الحد الأدنى للطلب من هذا المتجر " +
+                moneyStr(minAmt) +
+                " — أضِف منتجات للوصول إليه.",
+            ),
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: belowMin,
+              onClick: () => {
+                if (belowMin) return;
+                go("checkout", { vendor: k });
+              },
+            },
+            React.createElement("span", null, t.checkout_this),
+            React.createElement(Icon, {
+              name: lang === "ar" ? "back" : "fwd",
+              size: 18,
+              color: "#fff",
+            }),
+          ),
+        ),
+      );
+    }),
+  );
+}
+function Checkout({
+  t,
+  lang,
+  items,
+  vendor,
+  person,
+  onSaveAddress,
+  onBack,
+  onConfirm,
+  offers,
+  storesMap,
+}) {
+  const subtotal = items.reduce((a, it) => a + it.p.price * it.q, 0),
+    fee = feeFor(items, offers),
+    mo = storesMap && storesMap[vendor],
+    sname = (mo && mo.name) || "متجر",
+    minAmt =
+      mo && mo.minOrderEnabled && mo.minOrderAmount > 0 ? mo.minOrderAmount : 0,
+    belowMin = minAmt > 0 && subtotal < minAmt,
+    [city, setCity] = useStateB(
+      person && person.city ? person.city : lang === "ar" ? "صنعاء" : "Sanaa",
+    ),
+    [address, setAddress] = useStateB(
+      person && person.address
+        ? person.address
+        : lang === "ar"
+          ? "شارع الزبيري، حارة ٧"
+          : "Az-Zubairi St., Lane 7",
+    ),
+    [pinned, setPinned] = useStateB(!1),
+    [editOpen, setEditOpen] = useStateB(!1),
+    [pay, setPay] = useStateB("prepaid"),
+    [prepaidOpen, setPrepaidOpen] = useStateB(!1),
+    addrLine = [city, address].filter(Boolean).join("، "),
+    saveAddr = (c, a, p) => {
+      (setCity(c),
+        setAddress(a),
+        setPinned(p),
+        onSaveAddress && onSaveAddress({ city: c, address: a }),
+        setEditOpen(!1));
+    };
+  return React.createElement(
+    "div",
+    { className: "screen checkout" },
+    React.createElement(TopBar, { title: t.checkout_title, onBack, t }),
+    React.createElement(
+      "div",
+      { className: "co-scroll" },
+      vendor &&
+        React.createElement(
+          "div",
+          { className: "co-vendor" },
+          React.createElement(
+            "span",
+            { className: "co-vendor-ic" },
+            React.createElement(Icon, {
+              name: "store",
+              size: 16,
+              color: "#fff",
+            }),
+          ),
+          t.order_from,
+          " · ",
+          React.createElement("b", null, sname),
+        ),
+      React.createElement(
+        "div",
+        { className: "co-block" },
+        React.createElement("div", { className: "co-label" }, t.delivery_to),
+        React.createElement(
+          "div",
+          { className: "co-addr" },
+          React.createElement(
+            "span",
+            { className: "co-addr-ic" },
+            React.createElement(Icon, {
+              name: "location",
+              size: 18,
+              color: "var(--green-deep)",
+            }),
+          ),
+          React.createElement(
+            "div",
+            { className: "co-addr-txt" },
+            React.createElement(
+              "strong",
+              null,
+              lang === "ar" ? "المنزل" : "Home",
+            ),
+            React.createElement("span", null, addrLine),
+            pinned &&
+              React.createElement(
+                "span",
+                { className: "addr-pin-chip" },
+                React.createElement(Icon, {
+                  name: "location",
+                  size: 11,
+                  color: "var(--green-deep)",
+                }),
+                t.map_pinned_chip,
+              ),
+          ),
+          React.createElement(
+            "button",
+            { className: "co-edit", onClick: () => setEditOpen(!0) },
+            t.change_address,
+          ),
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "co-block" },
+        React.createElement("div", { className: "co-label" }, t.order_summary),
+        React.createElement(
+          "div",
+          { className: "co-items" },
+          items.map((it) =>
+            React.createElement(
+              "div",
+              { key: it.p.id, className: "co-item" },
+              React.createElement("span", { className: "co-q" }, it.q, "×"),
+              React.createElement(
+                "span",
+                { className: "co-nm" },
+                it.p.name[lang],
+              ),
+              React.createElement(
+                "span",
+                { className: "co-pr" },
+                moneyStr(it.p.price * it.q),
+              ),
+            ),
+          ),
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "co-block" },
+        React.createElement("div", { className: "co-label" }, t.payment),
+        React.createElement(
+          "div",
+          { className: "co-pays" },
+          React.createElement(
+            "button",
+            {
+              type: "button",
+              className: `co-pay ${pay === "prepaid" ? "on" : ""}`,
+              onClick: () => setPay("prepaid"),
+            },
+            React.createElement("span", { className: "co-pay-ic" }, "🏦"),
+            React.createElement(
+              "span",
+              { className: "co-pay-txt" },
+              React.createElement("strong", null, t.pay_prepaid),
+              React.createElement("span", null, t.pay_prepaid_sub),
+            ),
+            React.createElement("span", {
+              className: `radio ${pay === "prepaid" ? "on" : ""}`,
+            }),
+          ),
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "co-totals" },
+        React.createElement(
+          "div",
+          { className: "sum-row" },
+          React.createElement("span", null, t.subtotal),
+          React.createElement("b", null, moneyStr(subtotal)),
+        ),
+        React.createElement(
+          "div",
+          { className: "sum-row" },
+          React.createElement("span", null, t.delivery_fee),
+          React.createElement(
+            "b",
+            null,
+            fee == null
+              ? React.createElement(
+                  "span",
+                  { className: "free-deliv" },
+                  "يحدّدها المشرف",
+                )
+              : fee === 0
+                ? React.createElement(
+                    "span",
+                    { className: "free-deliv" },
+                    "توصيل مجاني",
+                  )
+                : moneyStr(fee),
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "sum-row total" },
+          React.createElement("span", null, t.total),
+          React.createElement("b", null, moneyStr(subtotal + (fee || 0))),
+        ),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "co-footer" },
+      belowMin &&
+        React.createElement(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              color: "var(--danger)",
+              fontWeight: 800,
+              fontSize: "13px",
+              lineHeight: 1.5,
+              marginBottom: "10px",
+            },
+          },
+          React.createElement(Icon, {
+            name: "shield",
+            size: 15,
+            color: "var(--danger)",
+          }),
+          "الحد الأدنى للطلب من هذا المتجر " + moneyStr(minAmt),
+        ),
+      React.createElement(
+        "button",
+        {
+          className: "btn btn-green",
+          disabled: belowMin,
+          onClick: () => {
+            if (belowMin) return;
+            setPrepaidOpen(!0);
+          },
+        },
+        React.createElement(Icon, {
+          name: "wallet",
+          size: 20,
+          color: "#fff",
+          stroke: 3,
+        }),
+        React.createElement("span", null, t.pay_prepaid),
+      ),
+    ),
+    editOpen &&
+      React.createElement(AddressSheet, {
+        t,
+        lang,
+        city,
+        address,
+        pinned,
+        onClose: () => setEditOpen(!1),
+        onSave: saveAddr,
+      }),
+    prepaidOpen &&
+      React.createElement(PrepaidSheet, {
+        t,
+        lang,
+        amount: subtotal + (fee || 0),
+        onClose: () => setPrepaidOpen(!1),
+        onSent: (file) => {
+          (setPrepaidOpen(!1), onConfirm("prepaid", file));
+        },
+      }),
+  );
+}
+function PrepaidSheet({ t, lang, amount, onClose, onSent }) {
+  const [copied, setCopied] = useStateB(-1),
+    [receipt, setReceipt] = useStateB(null),
+    copy = (txt, i) => {
+      try {
+        navigator.clipboard.writeText(txt);
+      } catch (e) {}
+      (setCopied(i), setTimeout(() => setCopied(-1), 1400));
+    },
+    pickReceipt = (e) => {
+      const f = e.target.files && e.target.files[0];
+      ((e.target.value = ""),
+        f &&
+          f.size <= 10 * 1024 * 1024 &&
+          setReceipt({ file: f, url: URL.createObjectURL(f) }));
+    };
+  return React.createElement(
+    "div",
+    { className: "modal-overlay", onClick: onClose },
+    React.createElement(
+      "div",
+      { className: "sheet", onClick: (e) => e.stopPropagation() },
+      React.createElement("div", { className: "sheet-handle" }),
+      React.createElement(
+        "div",
+        { className: "sheet-scroll" },
+        React.createElement(
+          "div",
+          { className: "sub-head" },
+          React.createElement(
+            "div",
+            { className: "sub-badge" },
+            React.createElement(Icon, {
+              name: "wallet",
+              size: 22,
+              color: "var(--brown)",
+            }),
+          ),
+          React.createElement("h2", null, t.prepaid_title),
+          React.createElement("p", null, t.prepaid_intro),
+          React.createElement(
+            "div",
+            { className: "wal-pay-amount" },
+            React.createElement("span", null, t.prepaid_amount),
+            React.createElement("strong", null, moneyStr(amount)),
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "sub-label" },
+          t.prepaid_accounts,
+        ),
+        React.createElement(
+          "div",
+          { className: "sub-accounts" },
+          LOZI_ACCOUNTS.map((a, i) =>
+            React.createElement(
+              "div",
+              {
+                key: i,
+                className: "acct",
+                style: { borderInlineStartColor: a.color },
+              },
+              React.createElement(
+                "span",
+                {
+                  className: "acct-brand",
+                  style: { background: a.gradient || a.color },
+                },
+                a.bank[lang].charAt(0),
+              ),
+              React.createElement(
+                "div",
+                { className: "acct-info" },
+                React.createElement(
+                  "strong",
+                  { style: { color: a.color } },
+                  a.bank[lang],
+                ),
+                React.createElement("span", { className: "acct-iban" }, a.iban),
+                React.createElement(
+                  "span",
+                  { className: "acct-name" },
+                  a.name[lang],
+                ),
+              ),
+              React.createElement(
+                "button",
+                {
+                  className: `acct-copy ${copied === i ? "ok" : ""}`,
+                  onClick: () => copy(a.iban, i),
+                },
+                React.createElement(Icon, {
+                  name: copied === i ? "check" : "copy",
+                  size: 15,
+                  color: copied === i ? "var(--green-deep)" : "var(--ink)",
+                  stroke: copied === i ? 3 : 2,
+                }),
+                copied === i ? t.copied : t.copy,
+              ),
+            ),
+          ),
+        ),
+        React.createElement("div", { className: "sub-label" }, t.sub_upload),
+        React.createElement(
+          "div",
+          { className: "sub-upload" },
+          receipt
+            ? React.createElement(
+                "div",
+                { style: { position: "relative" } },
+                React.createElement("img", {
+                  src: receipt.url,
+                  alt: "",
+                  style: {
+                    width: "100%",
+                    height: 160,
+                    objectFit: "cover",
+                    borderRadius: 16,
+                    display: "block",
+                  },
+                }),
+                React.createElement(
+                  "button",
+                  {
+                    onClick: () => setReceipt(null),
+                    style: {
+                      position: "absolute",
+                      insetInlineEnd: 8,
+                      top: 8,
+                      background: "rgba(0,0,0,.6)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 10,
+                      padding: "6px 10px",
+                      fontWeight: 800,
+                      fontSize: 12,
+                    },
+                  },
+                  "تغيير",
+                ),
+              )
+            : React.createElement(
+                "label",
+                {
+                  style: {
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    height: 160,
+                    border: "2px dashed var(--line)",
+                    borderRadius: 16,
+                    cursor: "pointer",
+                    color: "var(--muted)",
+                  },
+                },
+                React.createElement("input", {
+                  type: "file",
+                  accept: "image/*",
+                  onChange: pickReceipt,
+                  style: { display: "none" },
+                }),
+                React.createElement(Icon, {
+                  name: "upload",
+                  size: 26,
+                  color: "var(--green-deep)",
+                }),
+                React.createElement(
+                  "span",
+                  { style: { fontWeight: 800, fontSize: 13 } },
+                  t.sub_upload_hint,
+                ),
+              ),
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "sheet-foot" },
+        React.createElement(
+          "button",
+          {
+            className: "btn btn-green",
+            disabled: !receipt,
+            onClick: () => onSent(receipt && receipt.file),
+          },
+          React.createElement(Icon, {
+            name: "upload",
+            size: 18,
+            color: "#fff",
+          }),
+          React.createElement("span", null, t.prepaid_send),
+        ),
+      ),
+    ),
+  );
+}
+function AddressSheet({ t, lang, city, address, pinned, onClose, onSave }) {
+  const [view, setView] = useStateB("form"),
+    [c, setC] = useStateB(city),
+    [a, setA] = useStateB(address),
+    [isPinned, setIsPinned] = useStateB(pinned),
+    [pin, setPin] = useStateB({ x: 50, y: 47 }),
+    dragRef = React.useRef(!1),
+    movePin = (e) => {
+      const r = e.currentTarget.getBoundingClientRect(),
+        cx = e.clientX,
+        cy = e.clientY;
+      let x = ((cx - r.left) / r.width) * 100,
+        y = ((cy - r.top) / r.height) * 100;
+      ((x = Math.max(8, Math.min(92, x))),
+        (y = Math.max(12, Math.min(80, y))),
+        setPin({ x, y }));
+    };
+  return view === "map"
+    ? React.createElement(
+        "div",
+        { className: "modal-overlay", onClick: onClose },
+        React.createElement(
+          "div",
+          { className: "sheet", onClick: (e) => e.stopPropagation() },
+          React.createElement("div", { className: "sheet-handle" }),
+          React.createElement(
+            "div",
+            { className: "sheet-scroll" },
+            React.createElement(
+              "div",
+              { className: "addr-sheet-head" },
+              React.createElement("h2", null, t.map_title),
+              React.createElement("p", null, t.map_hint),
+            ),
+            React.createElement(
+              "div",
+              {
+                className: "map-pick",
+                onPointerDown: (e) => {
+                  ((dragRef.current = !0), movePin(e));
+                },
+                onPointerMove: (e) => {
+                  dragRef.current && movePin(e);
+                },
+                onPointerUp: () => {
+                  dragRef.current = !1;
+                },
+                onPointerLeave: () => {
+                  dragRef.current = !1;
+                },
+              },
+              React.createElement("div", { className: "map-grid" }),
+              React.createElement("div", { className: "map-road map-road-h" }),
+              React.createElement("div", { className: "map-road map-road-v" }),
+              React.createElement("div", { className: "map-road map-road-d" }),
+              React.createElement("div", { className: "map-block mb1" }),
+              React.createElement("div", { className: "map-block mb2" }),
+              React.createElement("div", { className: "map-block mb3" }),
+              React.createElement(
+                "div",
+                {
+                  className: "map-pin",
+                  style: { left: pin.x + "%", top: pin.y + "%" },
+                },
+                React.createElement("span", { className: "map-pin-ring" }),
+                React.createElement(Icon, {
+                  name: "location",
+                  size: 34,
+                  color: "var(--danger)",
+                  fill: !0,
+                }),
+              ),
+              React.createElement(
+                "button",
+                {
+                  className: "map-myloc",
+                  onClick: (e) => {
+                    (e.stopPropagation(), setPin({ x: 50, y: 47 }));
+                  },
+                },
+                React.createElement(Icon, {
+                  name: "location",
+                  size: 15,
+                  color: "var(--green-deep)",
+                }),
+                t.use_my_location,
+              ),
+            ),
+          ),
+          React.createElement(
+            "div",
+            { className: "sheet-foot" },
+            React.createElement(
+              "button",
+              {
+                className: "btn btn-green",
+                onClick: () => {
+                  (setIsPinned(!0), setView("form"));
+                },
+              },
+              React.createElement(Icon, {
+                name: "check",
+                size: 18,
+                color: "#fff",
+                stroke: 3,
+              }),
+              React.createElement("span", null, t.map_confirm),
+            ),
+          ),
+        ),
+      )
+    : React.createElement(
+        "div",
+        { className: "modal-overlay", onClick: onClose },
+        React.createElement(
+          "div",
+          { className: "sheet", onClick: (e) => e.stopPropagation() },
+          React.createElement("div", { className: "sheet-handle" }),
+          React.createElement(
+            "div",
+            { className: "sheet-scroll" },
+            React.createElement(
+              "div",
+              { className: "addr-sheet-head" },
+              React.createElement("h2", null, t.edit_address_title),
+              React.createElement("p", null, t.edit_address_note),
+            ),
+            React.createElement(
+              "button",
+              { className: "map-open-btn", onClick: () => setView("map") },
+              React.createElement(
+                "span",
+                { className: "map-thumb" },
+                React.createElement("div", { className: "map-thumb-grid" }),
+                React.createElement(Icon, {
+                  name: "location",
+                  size: 20,
+                  color: "var(--danger)",
+                  fill: !0,
+                }),
+              ),
+              React.createElement(
+                "span",
+                { className: "map-open-txt" },
+                React.createElement("strong", null, t.pick_on_map),
+                React.createElement(
+                  "span",
+                  null,
+                  isPinned ? t.map_located : t.map_hint,
+                ),
+              ),
+              React.createElement(Icon, {
+                name: t.dir === "rtl" ? "back" : "fwd",
+                size: 18,
+                color: "var(--muted)",
+              }),
+            ),
+            isPinned &&
+              React.createElement(
+                "div",
+                { className: "addr-pin-chip lg" },
+                React.createElement(Icon, {
+                  name: "location",
+                  size: 13,
+                  color: "var(--green-deep)",
+                }),
+                t.map_located,
+                " ✓",
+              ),
+            React.createElement(
+              "div",
+              { className: "form-fields" },
+              React.createElement(
+                "label",
+                { className: "field" },
+                React.createElement(
+                  "span",
+                  { className: "field-label" },
+                  t.city,
+                ),
+                React.createElement("input", {
+                  className: "field-input",
+                  value: c,
+                  onChange: (e) => setC(e.target.value),
+                  placeholder: t.city_ph,
+                }),
+              ),
+              React.createElement(
+                "label",
+                { className: "field" },
+                React.createElement(
+                  "span",
+                  { className: "field-label" },
+                  t.address,
+                ),
+                React.createElement("textarea", {
+                  className: "field-input area",
+                  value: a,
+                  onChange: (e) => setA(e.target.value),
+                  placeholder: t.address_ph,
+                  rows: 3,
+                }),
+              ),
+            ),
+          ),
+          React.createElement(
+            "div",
+            { className: "sheet-foot" },
+            React.createElement(
+              "button",
+              {
+                className: "btn btn-green",
+                disabled: !c.trim() || !a.trim(),
+                onClick: () => onSave(c.trim(), a.trim(), isPinned),
+              },
+              React.createElement(Icon, {
+                name: "check",
+                size: 18,
+                color: "#fff",
+                stroke: 3,
+              }),
+              React.createElement("span", null, t.save),
+            ),
+          ),
+        ),
+      );
+}
+function OrderSuccess({ t, go, review }) {
+  return React.createElement(
+    "div",
+    { className: "screen success" },
+    React.createElement(
+      "div",
+      { className: "success-ring" },
+      React.createElement(Icon, {
+        name: review ? "upload" : "check",
+        size: 48,
+        color: "#fff",
+        stroke: 3,
+      }),
+    ),
+    React.createElement("h2", null, t.order_placed),
+    React.createElement(
+      "p",
+      null,
+      review ? t.success_review_sub : t.order_placed_sub,
+    ),
+    React.createElement(
+      "div",
+      { className: "success-actions" },
+      React.createElement(
+        PrimaryBtn,
+        { icon: "cart", onClick: () => go("orders") },
+        t.track_order,
+      ),
+      React.createElement(
+        "button",
+        { className: "skip-link", onClick: () => go("home") },
+        t.nav_home,
+      ),
+    ),
+  );
+}
+const ORDER_STEPS = ["received", "preparing", "delivering", "delivered"];
+function Orders({
+  t,
+  lang,
+  orders,
+  onBack,
+  reorder,
+  cancel,
+  reportOrder,
+  go,
+  isSeller,
+  role,
+  onReview,
+}) {
+  if (!orders.length)
+    return React.createElement(
+      "div",
+      { className: "screen orders empty-screen" },
+      React.createElement(TopBar, { title: t.orders_title, onBack, t }),
+      React.createElement(
+        "div",
+        { className: "empty" },
+        React.createElement(
+          "div",
+          { className: "empty-ic" },
+          React.createElement(Icon, {
+            name: "cart",
+            size: 40,
+            color: "var(--gold-deep)",
+          }),
+        ),
+        React.createElement("h3", null, t.no_orders),
+        React.createElement(
+          PrimaryBtn,
+          { icon: "store", onClick: () => go("sections") },
+          t.browse,
+        ),
+      ),
+    );
+  const statusKey = {
+      received: "st_received",
+      payreview: "st_payreview",
+      preparing: "st_preparing",
+      delivering: "st_delivering",
+      delivered: "st_delivered",
+      rejected: "st_rejected",
+      cancelled: "st_rejected",
+    },
+    buyHint = isSeller
+      ? role === "wholesale"
+        ? t.orders_hint_wholesale
+        : t.orders_hint_seller
+      : null;
+  return React.createElement(
+    "div",
+    { className: "screen orders" },
+    React.createElement(TopBar, { title: t.orders_title, onBack, t }),
+    buyHint &&
+      React.createElement(
+        "div",
+        { className: "orders-hint" },
+        React.createElement(Icon, {
+          name: "store",
+          size: 16,
+          color: "var(--green-deep)",
+        }),
+        React.createElement("span", null, buyHint),
+      ),
+    React.createElement(
+      "div",
+      { className: "orders-list" },
+      orders.map((o) => {
+        const stepIdx = ORDER_STEPS.indexOf(o.status),
+          canCancel = o.status === "received" || o.status === "payreview",
+          isReview = o.status === "payreview";
+        return React.createElement(
+          "div",
+          { key: o.id, className: "order-card" },
+          React.createElement(
+            "div",
+            { className: "order-top" },
+            React.createElement(
+              "div",
+              null,
+              React.createElement(
+                "div",
+                { className: "order-no" },
+                t.order_no,
+                " #",
+                o.id,
+              ),
+              React.createElement(
+                "div",
+                { className: "order-date" },
+                o.date[lang],
+                " · ",
+                o.items.reduce((a, i) => a + i.q, 0),
+                " ",
+                t.items_count,
+              ),
+            ),
+            React.createElement(
+              "span",
+              { className: `order-status st-${o.status}` },
+              t[statusKey[o.status]],
+            ),
+          ),
+          isReview
+            ? React.createElement(
+                "div",
+                { className: "order-review" },
+                React.createElement(Icon, {
+                  name: "upload",
+                  size: 15,
+                  color: "#B8821F",
+                }),
+                React.createElement("span", null, t.order_review_note),
+              )
+            : React.createElement(
+                "div",
+                { className: "order-track" },
+                ORDER_STEPS.map((st, i) =>
+                  React.createElement(
+                    React.Fragment,
+                    { key: st },
+                    React.createElement(
+                      "span",
+                      { className: `tdot ${i <= stepIdx ? "on" : ""}` },
+                      i < stepIdx &&
+                        React.createElement(Icon, {
+                          name: "check",
+                          size: 10,
+                          color: "#fff",
+                          stroke: 3,
+                        }),
+                    ),
+                    i < ORDER_STEPS.length - 1 &&
+                      React.createElement("span", {
+                        className: `tline ${i < stepIdx ? "on" : ""}`,
+                      }),
+                  ),
+                ),
+              ),
+          o.status === "delivering" &&
+            o.courier &&
+            React.createElement(
+              "div",
+              { className: "courier-card" },
+              React.createElement(
+                "span",
+                { className: "courier-av" },
+                React.createElement(Icon, {
+                  name: "truck",
+                  size: 20,
+                  color: "#fff",
+                }),
+              ),
+              React.createElement(
+                "div",
+                { className: "courier-info" },
+                React.createElement("strong", null, o.courier.name[lang]),
+                React.createElement(
+                  "span",
+                  { className: "courier-meta" },
+                  React.createElement(Icon, {
+                    name: "star",
+                    size: 12,
+                    color: "var(--gold-deep)",
+                  }),
+                  o.courier.rating,
+                  " · ",
+                  o.courier.plate[lang],
+                ),
+                React.createElement(
+                  "span",
+                  { className: "courier-eta" },
+                  React.createElement("span", { className: "eta-dot" }),
+                  o.courier.eta[lang],
+                ),
+              ),
+              React.createElement(
+                "div",
+                { className: "courier-actions" },
+                React.createElement(
+                  "a",
+                  {
+                    className: "courier-btn call",
+                    href: `tel:${o.courier.phone}`,
+                    "aria-label": t.courier_call,
+                  },
+                  React.createElement(Icon, {
+                    name: "phone",
+                    size: 18,
+                    color: "var(--green-deep)",
+                  }),
+                ),
+                React.createElement(
+                  "a",
+                  {
+                    className: "courier-btn wa",
+                    href: `https://wa.me/${o.courier.phone.replace(/[^0-9]/g, "")}`,
+                    target: "_blank",
+                    rel: "noopener",
+                    "aria-label": t.courier_chat,
+                  },
+                  React.createElement(Icon, {
+                    name: "whatsapp",
+                    size: 18,
+                    color: "#fff",
+                  }),
+                ),
+              ),
+            ),
+          (o.delivery_fee != null || o.wholesale) &&
+            React.createElement(
+              "div",
+              {
+                className: "order-deliv-row",
+                style: {
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  fontSize: 13,
+                  color: "var(--muted)",
+                  padding: "6px 0",
+                },
+              },
+              React.createElement("span", null, t.delivery_fee),
+              React.createElement(
+                "b",
+                null,
+                o.delivery_fee == null
+                  ? "يحدّدها المشرف"
+                  : o.delivery_fee === 0
+                    ? "مجاني"
+                    : moneyStr(o.delivery_fee),
+              ),
+            ),
+          React.createElement(
+            "div",
+            { className: "order-foot" },
+            React.createElement(
+              "span",
+              { className: "order-total" },
+              moneyStr(o.total),
+            ),
+            React.createElement(
+              "div",
+              { className: "order-btns" },
+              canCancel &&
+                React.createElement(
+                  "button",
+                  { className: "obtn danger", onClick: () => cancel(o.id) },
+                  t.cancel_order,
+                ),
+              !isSeller &&
+                o.seller &&
+                React.createElement(
+                  "button",
+                  {
+                    className: "obtn",
+                    onClick: () =>
+                      window.LoziChat &&
+                      window.LoziChat.open({
+                        vendorId: o.seller,
+                        orderId: o.rid,
+                        orderNo: o.id,
+                        storeName: o.vendor,
+                      }),
+                    title: "مراسلة حول الطلب",
+                  },
+                  React.createElement(Icon, {
+                    name: "chat",
+                    size: 14,
+                    color: "var(--green-deep)",
+                  }),
+                  "مراسلة المتجر",
+                ),
+              React.createElement(
+                "button",
+                {
+                  className: "obtn warn",
+                  onClick: () => reportOrder && reportOrder(o),
+                },
+                React.createElement(Icon, {
+                  name: "flag",
+                  size: 14,
+                  color: "var(--gold-deep)",
+                }),
+                t.rep_report_issue,
+              ),
+              !isSeller &&
+                React.createElement(
+                  "button",
+                  { className: "obtn", onClick: () => reorder(o) },
+                  React.createElement(Icon, {
+                    name: "cart",
+                    size: 14,
+                    color: "var(--green-deep)",
+                  }),
+                  t.reorder,
+                ),
+              !isSeller &&
+                React.createElement(
+                  "button",
+                  { className: "obtn", onClick: () => onReview && onReview(o) },
+                  React.createElement(Icon, {
+                    name: "star",
+                    size: 14,
+                    color: "var(--gold-deep)",
+                  }),
+                  "قيّم المتجر",
+                ),
+            ),
+          ),
+        );
+      }),
+    ),
+  );
+}
+function Savings({
+  t,
+  lang,
+  products,
+  openProduct,
+  addToCart,
+  favs,
+  toggleFav,
+  onVip,
+}) {
+  const list = products && products.length ? products : LOZI_SAVINGS;
+  return React.createElement(
+    "div",
+    { className: "screen savings-screen" },
+    React.createElement(
+      "div",
+      { className: "sv-hero-row" },
+      React.createElement(
+        "div",
+        { className: "sv-hero" },
+        React.createElement("div", { className: "sv-hero-bg" }),
+        React.createElement(
+          "div",
+          { className: "sv-hero-content" },
+          React.createElement(
+            "span",
+            { className: "sv-kicker" },
+            React.createElement(Icon, {
+              name: "bolt",
+              size: 14,
+              color: "var(--gold)",
+            }),
+            t.savings_title,
+          ),
+          React.createElement("h1", null, t.savings_title),
+          React.createElement("p", null, t.savings_desc),
+          React.createElement(
+            "button",
+            {
+              className: "sv-chat-btn",
+              onClick: () =>
+                window.LoziChat &&
+                window.LoziChat.openAdmin({ storeName: t.savings_title }),
+              style: {
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "7px",
+                marginTop: "4px",
+                padding: "11px 18px",
+                border: "none",
+                borderRadius: "14px",
+                background: "var(--gold,#E6C088)",
+                color: "#3a2a12",
+                fontWeight: 800,
+                fontSize: "14px",
+                fontFamily: "inherit",
+                cursor: "pointer",
+              },
+            },
+            React.createElement(Icon, {
+              name: "chat",
+              size: 17,
+              color: "#3a2a12",
+            }),
+            "تواصل مع لوزي",
+          ),
+        ),
+      ),
+      React.createElement(
+        "button",
+        { className: "vip-entry", onClick: onVip, "aria-label": "سوق VIP" },
+        React.createElement("span", { className: "vip-crown" }, "👑"),
+        React.createElement("span", { className: "vip-vtext" }, "سوق VIP"),
+        React.createElement("span", { className: "vip-arrow" }, "←"),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "sv-grid-wrap" },
+      React.createElement(SecHead, { title: t.savings_title }),
+      list.length
+        ? React.createElement(
+            "div",
+            { className: "prod-grid pad" },
+            list.map((p) =>
+              React.createElement(ProductCard, {
+                key: p.id,
+                p,
+                t,
+                lang,
+                onOpen: openProduct,
+                onAdd: addToCart,
+                fav: favs.includes(p.id),
+                onFav: toggleFav,
+              }),
+            ),
+          )
+        : React.createElement(
+            "div",
+            {
+              className: "empty-note",
+              style: {
+                textAlign: "center",
+                color: "var(--muted)",
+                padding: "40px 16px",
+              },
+            },
+            "لا توجد منتجات توفير حالياً.",
+          ),
+    ),
+  );
+}
+function Vip({
+  t,
+  lang,
+  products,
+  openProduct,
+  addToCart,
+  favs,
+  toggleFav,
+  onBack,
+}) {
+  const list = products || [];
+  return React.createElement(
+    "div",
+    { className: "screen vip-screen" },
+    React.createElement(TopBar, { title: "سوق VIP", onBack, t }),
+    React.createElement(
+      "div",
+      { className: "vip-hero" },
+      React.createElement("div", { className: "vip-hero-bg" }),
+      React.createElement(
+        "div",
+        { className: "vip-hero-content" },
+        React.createElement("span", { className: "vip-kicker" }, "👑 سوق VIP"),
+        React.createElement("h1", null, "سوق VIP"),
+        React.createElement(
+          "p",
+          null,
+          "تشكيلة فاخرة منتقاة بعناية — منتجات نادرة وكميات محدودة، تديرها لوزي مباشرة.",
+        ),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "vip-grid-wrap" },
+      React.createElement(SecHead, { title: "منتجات VIP" }),
+      list.length
+        ? React.createElement(
+            "div",
+            { className: "prod-grid pad" },
+            list.map((p) =>
+              React.createElement(ProductCard, {
+                key: p.id,
+                p,
+                t,
+                lang,
+                onOpen: openProduct,
+                onAdd: addToCart,
+                fav: favs.includes(p.id),
+                onFav: toggleFav,
+              }),
+            ),
+          )
+        : React.createElement(
+            "div",
+            { className: "vip-empty" },
+            React.createElement("div", { className: "vip-empty-ic" }, "👑"),
+            React.createElement("p", null, "لا توجد منتجات VIP حالياً."),
+          ),
+    ),
+  );
+}
+function SubModal({ t, lang, onClose, onSubmitted }) {
+  const [copied, setCopied] = useStateB(-1),
+    [hasReceipt, setHasReceipt] = useStateB(!1),
+    copy = (txt, i) => {
+      try {
+        navigator.clipboard.writeText(txt);
+      } catch (e) {}
+      (setCopied(i), setTimeout(() => setCopied(-1), 1400));
+    };
+  return (
+    React.useEffect(() => {
+      const el = document.getElementById("sub-receipt");
+      if (!el) return;
+      const iv = setInterval(() => {
+        const filled = (
+          el.shadowRoot ? [...el.shadowRoot.querySelectorAll("img")] : []
+        ).some(
+          (i) =>
+            (i.getAttribute("src") || "").length > 5 &&
+            !i.classList.contains("ghost"),
+        );
+        setHasReceipt(filled);
+      }, 600);
+      return () => clearInterval(iv);
+    }, []),
+    React.createElement(
+      "div",
+      { className: "modal-overlay", onClick: onClose },
+      React.createElement(
+        "div",
+        { className: "sheet", onClick: (e) => e.stopPropagation() },
+        React.createElement("div", { className: "sheet-handle" }),
+        React.createElement(
+          "div",
+          { className: "sheet-scroll" },
+          React.createElement(
+            "div",
+            { className: "sub-head" },
+            React.createElement(
+              "div",
+              { className: "sub-badge" },
+              React.createElement(Icon, {
+                name: "bolt",
+                size: 22,
+                color: "var(--brown)",
+              }),
+            ),
+            React.createElement("h2", null, t.sub_title),
+            React.createElement("p", null, t.sub_intro),
+            React.createElement(
+              "div",
+              { className: "sub-price-tag" },
+              moneyStr(LOZI_SUB.yer),
+              perYear(lang),
+            ),
+            React.createElement(
+              "div",
+              { className: "sub-duration-note" },
+              React.createElement(Icon, {
+                name: "calendar",
+                size: 13,
+                color: "var(--ink-soft)",
+              }),
+              t.sub_duration_label,
+              ": ",
+              t.sub_duration_val,
+            ),
+          ),
+          React.createElement(
+            "div",
+            { className: "sub-label" },
+            t.sub_accounts,
+          ),
+          React.createElement(
+            "div",
+            { className: "sub-accounts" },
+            LOZI_ACCOUNTS.map((a, i) =>
+              React.createElement(
+                "div",
+                {
+                  key: i,
+                  className: "acct",
+                  style: { borderInlineStartColor: a.color },
+                },
+                React.createElement(
+                  "span",
+                  {
+                    className: "acct-brand",
+                    style: { background: a.gradient || a.color },
+                  },
+                  a.bank[lang].charAt(0),
+                ),
+                React.createElement(
+                  "div",
+                  { className: "acct-info" },
+                  React.createElement(
+                    "strong",
+                    { style: { color: a.color } },
+                    a.bank[lang],
+                  ),
+                  React.createElement(
+                    "span",
+                    { className: "acct-iban" },
+                    a.iban,
+                  ),
+                  React.createElement(
+                    "span",
+                    { className: "acct-name" },
+                    a.name[lang],
+                  ),
+                ),
+                React.createElement(
+                  "button",
+                  {
+                    className: `acct-copy ${copied === i ? "ok" : ""}`,
+                    onClick: () => copy(a.iban, i),
+                  },
+                  React.createElement(Icon, {
+                    name: copied === i ? "check" : "copy",
+                    size: 15,
+                    color: copied === i ? "var(--green-deep)" : "var(--ink)",
+                    stroke: copied === i ? 3 : 2,
+                  }),
+                  copied === i ? t.copied : t.copy,
+                ),
+              ),
+            ),
+          ),
+          React.createElement("div", { className: "sub-label" }, t.sub_upload),
+          React.createElement(
+            "div",
+            { className: "sub-upload" },
+            React.createElement(Img, {
+              id: "sub-receipt",
+              ph: t.sub_upload_hint,
+              radius: 16,
+              shape: "rounded",
+              style: { width: "100%", height: 160, display: "block" },
+            }),
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "sheet-foot" },
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: !hasReceipt,
+              onClick: onSubmitted,
+            },
+            React.createElement(Icon, {
+              name: "upload",
+              size: 18,
+              color: "#fff",
+            }),
+            React.createElement("span", null, t.sub_submit),
+          ),
+        ),
+      ),
+    )
+  );
+}
+const TERMS_AR = {
+  intro: [
+    "مرحباً بكم في تطبيق لوزي. تعد هذه الشروط والأحكام بمثابة اتفاقية قانونية ملزمة بين إدارة تطبيق «لوزي» (المشار إليها بـ «الإدارة» أو «التطبيق» أو «مجموعة لوزي») وبين أي شخص يقوم باستخدام التطبيق أو التسجيل فيه (المشار إليه بـ «المستخدم» سواء كان عميلاً، تاجر تجزئة، تاجر جملة، أو مزارعاً).",
+    "استخدامك للتطبيق أو تسجيلك فيه يعني موافقتك الكاملة والخالية من الجهالة على هذه الشروط، وإذا كنت لا توافق عليها، يرجى عدم استخدام التطبيق.",
+  ],
+  sections: [
+    {
+      n: "1",
+      h: "شروط عامة ونطاق الخدمة",
+      items: [
+        {
+          lead: "النطاق الجغرافي:",
+          b: "يقدم تطبيق «لوزي» خدماته حالياً داخل النطاق الجغرافي لـ «العاصمة صنعاء» فقط. ولا يتحمل التطبيق مسؤولية أي طلبات أو شحنات خارج هذا النطاق.",
+        },
+        {
+          lead: "آلية الدفع:",
+          b: "وسيلة الدفع المعتمدة في التطبيق لخدمات التجزئة والتوفير هي الدفع عند الاستلام نقداً (COD) فقط.",
+        },
+        {
+          lead: "التعديل والتحديث:",
+          b: "تحتفظ إدارة التطبيق بالحق المطلق في تعديل أو تحديث هذه الشروط والأحكام في أي وقت، وتصبح التعديلات سارية وفورية بمجرد نشرها على التطبيق.",
+        },
+      ],
+    },
+    {
+      n: "2",
+      h: "أحكام وشروط خاصة بالعملاء (المشترين)",
+      items: [
+        {
+          lead: "دقة البيانات ومسؤوليتها:",
+          b: "يلتزم العميل بتقديم معلومات صحيحة ودقيقة عند التسجيل (رقم الهاتف للتفعيل عبر واتساب، والموقع الجغرافي الدقيق عبر GPS)، ويتحمل العميل وحده مسؤولية أي خطأ في العناوين ينتج عنه تأخر أو إلغاء الطلب.",
+        },
+        {
+          lead: "سياسة الطلبات المتعددة:",
+          b: "نظراً لأن لكل متجر سلة مستقلة، فإن اختيار منتجات من متاجر متعددة سينتج عنه إنشاء طلبات منفصلة تلقائياً، ويتحمل العميل رسوم التوصيل الخاصة بكل متجر على حدة.",
+        },
+        {
+          lead: "إلغاء الطلب:",
+          b: "يحق للعميل إلغاء الطلب فقط قبل البدء في مرحلة التجهيز من قبل المتجر أو الإدارة. بمجرد تحول حالة الطلب في النظام إلى «قيد التجهيز» أو «قيد التوصيل»، لا يمكن إلغاؤه بأي حال من الأحوال.",
+        },
+        {
+          tag: "🔄",
+          lead: "سياسة الإرجاع (خلال 24 ساعة):",
+          b: "يحق للعميل طلب إرجاع مشترياته خلال 24 ساعة فقط من وقت استلام الطلب، وذلك في حال كانت البضاعة تالفة، أو ناقصة الوزن الصافي، أو مختلفة تماماً عن الصور والمواصفات المعروضة في التطبيق. ولا يحق له المطالبة بالإرجاع أو استرداد الأموال نهائياً بعد مرور 24 ساعة على الاستلام.",
+        },
+        {
+          tag: "🚨",
+          lead: "شرط الحظر الصارم وعقوبة التلاعب:",
+          b: "يُحظر تماماً على العميل إغلاق هاتفه، أو تجاهل اتصالات مندوب التوصيل عمداً عند وصول الطلب لموقعه. وفي حال تكرار هذا التصرف لأكثر من مرتين، سيتم حظر حساب العميل نهائياً وبشكل تلقائي من المنصة.",
+        },
+        {
+          tag: "🌰",
+          lead: "إرجاع اللوز ال«شحطي» غير المُفصح عنه:",
+          b: "يُتاح للعميل حق إرجاع منتج اللوز في حال تبيّن أنه من نوع (شحطي) ولم يتم الإفصاح عن ذلك صراحةً وواضحاً ضمن اسم المنتج أو وصفه عند العرض. وفي حال تم الإفصاح عن ذلك بشكل واضح، يُعدّ العميل على علم مسبق بذلك ولا يحق له المطالبة بالإرجاع لهذا السبب. وفي حال ثبت أن الخطأ ناتج عن المزارع (عدم الإفصاح أو إدخال وصف غير صحيح)، فإن المزارع يتحمل تكاليف التوصيل.",
+        },
+        {
+          lead: "التقييمات:",
+          b: "يلتزم العميل بكتابة تقييمات صادقة وواقعية للمتاجر والمزارعين. يحظر استخدام الألفاظ النابية أو المسيئة، وللإدارة الحق الكامل في حذف أي تقييم يخالف ذلك دون الرجوع للعميل.",
+        },
+      ],
+    },
+    {
+      n: "3",
+      h: "أحكام وشروط خاصة بمتاجر التجزئة وجملة المكسرات (التجار)",
+      items: [
+        {
+          tag: "🏅",
+          lead: "خيارات منح «شارة التوثيق»:",
+          b: "لإضفاء الطابع الرسمي وحماية المنصة من الكيانات الوهمية، تتيح إدارة التطبيق لتاجر التجزئة وتاجر الجملة خيارين مستقلين للحصول على «شارة التوثيق» داخل التطبيق:",
+        },
+        {
+          sub: !0,
+          lead: "الخيار الأول (التوثيق المستندي):",
+          b: "قيام التاجر برفع صورة واضحة وصالحة من ترخيص المحل الرسمي، أو سجله التجاري، أو بطاقة عضويته في الغرفة التجارية والصناعية بصنعاء عبر النظام.",
+        },
+        {
+          sub: !0,
+          lead: "الخيار الثاني (التوثيق الميداني):",
+          b: "في حال عدم توفر الأوراق الرسمية، يطلب التاجر «نزولاً ميدانياً»، وتتولى إدارة التطبيق إرسال مندوب لمعاينة المحل على الطبيعة والتحقق من جودة ومطابقة معروضاته للمقاييس المطلوبة قبل تفعيل الشارة.",
+        },
+        {
+          lead: "صلاحيات النشر وحظر التعدي:",
+          b: "يُسمح للمتجر بنشر منتجات المكسرات داخل صفحته الخاصة فقط. يُمنع منعاً باتاً على المتاجر النشر في أقسام «اللوز البلدي» أو «الزبيب» المخصصة حصرياً للمزارعين، ويحق للإدارة حذف أي منشور مخالف فوراً.",
+        },
+        {
+          lead: "الالتزام بالأسعار والعروض:",
+          b: "يتعهد المتجر بتقديم أسعار حقيقية ومحدثة، وفي حال إنشاء «عروض مخفضة»، يجب إرسالها للإدارة مسبقاً للموافقة عليها للتأكد من جديتها.",
+        },
+        {
+          tag: "🛵",
+          lead: "حصرية اختيار الموصل وإخلاء المسؤولية المطلقة:",
+          b: "يقر ويلتزم متجر التجزئة التزاماً قاطعاً بأن اختيار، وتعيين، والتعاقد مع مناديب التوصيل أو السائقين أو الناقلين هو مسؤولية حصرية ومباشرة على عاتق المتجر وحده، ولا تتدخل إدارة تطبيق «لوزي» في اختيار الموصلين بأي شكل من الأشكال. وبناءً على ذلك، فإن عملية توصيل بضائع التجزئة للعملاء تقع على مسؤولية المتجر المالية والمدنية الكاملة، ويضمن المتجر سلامة البضاعة من أي تلف، ضياع، أو نقص أثناء الطريق. وفي حال حدوث أي ضرر للبضاعة، أو وقوع أي نزاع أو خلاف مع المندوب المختار من قبل المتجر، أو ارتكاب المندوب لأي خطأ تشغيلي أو قانوني، يتحمل المتجر الخسارة والمسؤولية الكاملة بمفرده دون أدنى مسؤولية، أو التزام مالي، أو تضامن قانوني من قِبل تطبيق لوزي أو إدارته.",
+        },
+        {
+          tag: "🔒",
+          lead: "قطعية تسعيرة التوصيل ومنع الابتزاز:",
+          b: "يلتزم المتجر برمجياً وقانونياً بتسعيرة التوصيل الظاهرة والمعتمدة في التطبيق وقت تأكيد الطلب من قبل العميل. ويُحظر على مندوب التوصيل التابع للمتجر مطالبة العميل بأي مبالغ إضافية أو بقشيش أو تعديل في قيمة المشوار تحت أي مسمى (مثل بعد المسافة، الازدحام المروري، أو أزمات المشتقات النفطية). وفي حال خالف المندوب ذلك وطالب بزيادة مالية، يحق للعميل رفض استلام البضاعة فوراً، ويتحمل المتجر كلفة مشوار سائقه كاملاً ونفقة الرحلة، مع حق الإدارة في اتخاذ عقوبات تصل لحظر الحساب.",
+        },
+        {
+          tag: "⚠️",
+          lead: "تحمل تكاليف التوصيل المرتجعة للعميل:",
+          b: "يتحمل المتجر تكاليف ورسوم التوصيل بالكامل لسائقه/مندوبه في حال قام العميل بإلغاء طلبه (بعد خروج المندوب)، أو في حال تجاهل العميل اتصال المندوب، أو قام بإغلاق هاتفه وتسبب في إرجاع الطلب.",
+        },
+        {
+          tag: "💸",
+          lead: "آلية الإرجاع الإلزامية وعقوبة البضاعة المخالفة:",
+          b: "في حال قبول إدارة التطبيق لبلاغ العميل بالإرجاع خلال الـ 24 ساعة المسموحة (بسبب تلف، أو غش، أو نقص وزن البضاعة)، يلتزم المتجر مجبراً برد كامل المبلغ المالي للعميل، كما يتحمل المتجر منفرداً كلفة إرسال سائقه/مندوبه مجدداً إلى موقع العميل لاستلام البضاعة وإعادة الأموال كاش له، وذلك كإجراء تعويضي للعميل وعقوبة للمتجر على إرسال بضاعة مخالفة.",
+        },
+        {
+          tag: "🔒",
+          lead: "الملكية الفكرية والأسماء التجارية:",
+          b: "يتعهد ويضمن المتجر بأن الاسم التجاري، والشعار، والعلامة التي يرفعها على المنصة هي ملك خالص له أو يمتلك ترخيصاً قانونياً باستخدامها. ويتحمل المتجر منفرداً المسؤولية القانونية والقضائية الكاملة في حال وجود أي نزاع على الاسم أو انتحال للشخصية التجارية أو انتهاك للملكية الفكرية. وتحتفظ إدارة «لوزي» بالحق الكامل في إيقاف أو حظر أي متجر فوراً ودون أي تعويض في حال ثبت انتحاله لاسم تاجر آخر.",
+        },
+        {
+          tag: "🚫",
+          lead: "حظر التهرب التجاري والبيع الخلفي:",
+          b: "يُمنع منعاً باتاً وقاطعاً على المتاجر محاولة تحويل العملاء خارج المنصة، أو مشاركة أرقام التواصل المباشر (الواتساب أو الاتصال)، أو توزيع كروت المحلات الخاصة بهم داخل شحنات الطلبات بغرض حث العميل على الشراء الخارجي والتهرب من المنصة. وفي حال إثبات ذلك، يحق لإدارة «لوزي» فرض غرامة مالية قاسية، وسحب شارة التوثيق، وحظر حساب المتجر نهائياً.",
+        },
+        {
+          lead: "مراقبة المحادثات داخل التطبيق:",
+          b: "يوفّر التطبيق نظام مراسلة داخلي لحظي بين أطرافه. وحمايةً للمستخدمين ومنعاً للبيع خارج التطبيق، فإن جميع المحادثات داخل التطبيق تخضع لمراجعة الإدارة. وقد ينبّه النظام تلقائياً عند رصد أرقام هواتف أو روابط تواصل خارجية (واتساب/تلغرام) أو بريد إلكتروني، مع بقاء الرسالة ظاهرة للطرفين. باستخدامك للمراسلة فإنك توافق على هذه المراجعة، ويُمنع منعاً باتاً مشاركة أرقام التواصل أو محاولة إتمام الصفقات خارج المنصة.",
+        },
+        {
+          tag: "⚖️",
+          lead: "شرط الوزن الصافي (Net Weight):",
+          b: "يتعهد المتجر تعهداً قانونياً قاطعاً بأن جميع الأوزان المعروضة للمنتجات داخل التطبيق هي أوزان صافية وخالصة للمنتج الغذائي نفسه دون احتساب وزن مواد التغليف، أو الأكياس، أو الصناديق الكرتونية. ويُعد أي نقص «غشاً تجارياً وتطفيفاً» يمنح العميل حق الإرجاع الفوري، ويتحمل البائع وحده المسؤولية أمام الجهات المختصة.",
+        },
+        {
+          lead: "قسم تجار الجملة:",
+          b: "هذا القسم هو ميزة خاصة وحصرية تظهر للمتاجر فقط للتزود بالبضائع، ويحظر على المتاجر تسريب أسعار الجملة أو مشاركتها مع الجمهور العادي.",
+        },
+      ],
+    },
+    {
+      n: "4",
+      h: "أحكام وشروط خاصة بالمزارعين",
+      items: [
+        {
+          lead: "حصرية الأقسام:",
+          b: "تمنح المنصة أقسام «اللوز البلدي» و«الزبيب» كحق حصري للمزارعين الحقيقيين فقط.",
+        },
+        {
+          lead: "شرط التواجد الجغرافي للبضاعة:",
+          b: "يلتزم المزارع برمجياً وتشغيلياً بأن تكون البضاعة المعروضة للبيع متواجدة داخل نطاق العاصمة صنعاء عند عرضها، لضمان سرعة نقلها وتوصيلها وتفادي تكاليف الشحن الطويل بين المحافظات.",
+        },
+        {
+          lead: "سياسة تسعير المنتجات وحق الحذف:",
+          b: "المزارع هو المسؤول الأول عن تحديد سعر منتجاته، ولكن تحتفظ إدارة التطبيق بالحق الكامل في تعطيل أو حذف أي منشور منتج إذا رأت الإدارة أن السعر غير منطقي أو مبالغ فيه مقارنة بأسعار السوق السائدة، مع إرسال تنبيه للمزارع.",
+        },
+        {
+          tag: "🌰",
+          lead: "الإفصاح عن اللوز «الشحطي» وحق الإرجاع:",
+          b: "يُتاح للعميل حق إرجاع منتج اللوز في حال تبيّن أنه من نوع (شحطي) ولم يتم الإفصاح عن ذلك صراحةً وواضحاً ضمن اسم المنتج أو وصفه عند العرض. وفي حال تم الإفصاح عن ذلك بشكل واضح، يُعدّ العميل على علم مسبق بذلك ولا يحق له المطالبة بالإرجاع لهذا السبب. وفي حال ثبت أن الخطأ ناتج عن المزارع (عدم الإفصاح أو إدخال وصف غير صحيح)، فإن المزارع يتحمل تكاليف التوصيل.",
+        },
+        {
+          tag: "⚖️",
+          lead: "شرط الوزن الصافي والالتزام بالتسعيرة:",
+          b: "ينطبق على المزارعين ما ينطبق على المتاجر بخصوص الالتزام بالوزن الصافي الخالص للمنتج دون التغليف، والالتزام القاطع بتسعيرة التوصيل المعتمدة في النظام وقت الطلب دون المطالبة بأي مبالغ إضافية عند باب العميل.",
+        },
+        {
+          tag: "🚫",
+          lead: "حظر التهرب التجاري:",
+          b: "يُحظر تماماً على المزارعين توزيع أرقامهم أو كروت تواصلهم مع المناديب لسرقة عملاء المنصة والبيع من خلف التطبيق، ويُعاقب المخالف بالحظر النهائي والغرامة.",
+        },
+        {
+          tag: "📦",
+          lead: "التوصيل الخاص بالمزارعين وإخلاء المسؤولية:",
+          b: "المزارع هو المسؤول الأول والأخير عن تأمين وتدبير مندوب لتوصيل بضاعته إلى العميل في صنعاء على نفقته ومسؤوليته الكاملة. وفي حال تعذر على المزارع ذلك، وتدخلت إدارة «لوزي» لتوفير مندوب من طرفها كخدمة تسهيلية، فإن هذا المندوب يُعد وكيلاً عن المزارع في هذه الرحلة. وتخلي إدارة «لوزي» مسؤوليتها القانونية والمالية التامة عن أي تلف، نقص، ضياع للبضاعة أو الكاش أثناء الطريق، كما يتحمل المزارع وحده كلفة المشوار المرتجع وإعادة الأموال للعميل إذا تبين أن بضاعته تالفة أو مخالفة خلال الـ 24 ساعة الأولى.",
+        },
+      ],
+    },
+    {
+      n: "5",
+      h: "قسم تجار الجملة وإخلاء المسؤولية التامة",
+      items: [
+        {
+          lead: "نطاق الخدمة:",
+          b: "يقتصر دور قسم «تجار الجملة» (المخفي عن الجمهور) على عرض أسعار الجملة وربط المتاجر بتجار الجملة لإتمام الطلب فيما بينهم فقط، بمثابة لوحة معلومات وعرض، دون أي تدخل من المنصة في النقل أو الشحن أو التحصيل.",
+        },
+        {
+          tag: "🚚",
+          lead: "حظر التدخل ومسؤولية الناقل الكاملة:",
+          b: "يقر ويلتزم تاجر الجملة والمحل المشتري بأن إدارة تطبيق «لوزي» لا تتدخل بأي شكل من الأشكال في عمليات نقل، أو شحن، أو تنسيق طلبات الجملة. ويعد اختيار الموصل، أو السائق، أو جهة النقل والناقل مسؤولية حصرية وكاملة ومباشرة على عاتق تجار الجملة والمحلات (خارج نطاق المنصة التقنية). وبناءً عليه، يقع عبء وتكاليف ومخاطر الشحن والتوصيل، وضمان سلامة البضاعة من أي تلف، أو نقص، أو ضياع أثناء الطريق على عاتق أطراف عملية النقل المختارين من قِبلهم، دون أدنى مسؤولية أو تبعة تضامنية على التطبيق.",
+        },
+        {
+          tag: "🔒",
+          lead: "الحماية من الاحتيال وتبرئة الذمة من المندوبين الوهميين:",
+          b: "تخلي إدارة تطبيق «لوزي» مسؤوليتها القانونية والمالية التامة والمطلقة في حال تعرض تاجر الجملة لأي عملية تلاعب أو احتيال. وإذا تقدم إلى تاجر الجملة أي سائق، أو مندوب توصيل، أو أي شخص يدّعي أو يزعم زوراً أنه مرسل من قِبل إدارة تطبيق «لوزي» أو «مجموعة لوزي»، وقام بطلب بضائع، أو سحب أموال، أو طلب مبالغ مالية تحت أي مسمى؛ فإن إدارة التطبيق لا تتحمل أدنى مسؤولية عن تصرفاته. ويتحمل تاجر الجملة وحده كامل المسؤولية المدنية والجنائية الناتجة عن تسليم أمواله أو بضائعه لأي شخص دون التحقق الرسمي والاتصال المباشر بإدارة المنصة لاعتماد الهوية، ويُعد تسليمه للبضائع أو الكاش تقصيراً منه يسقط معه حقه في أي مطالبة مستقبلية.",
+        },
+        {
+          tag: "❌",
+          lead: "إخلاء المسؤولية المالية للجملة والديون:",
+          b: "لا يحق لتاجر الجملة نهائياً مطالبة «مجموعة لوزي» بقيمة أي بضاعة تم توصيلها لأحد المتاجر ولم يقم المتجر بدفع ثمنها، سواء كان ذلك بسبب إهمال مندوب التوصيل التابع لتاجر الجملة في تحصيل المبلغ، أو بسبب امتناع المتجر عن السداد أو أي سبب آخر. العلاقة المالية والتحصيل والديون هي مسؤولية مباشرة وحصرية بين تاجر الجملة والمتجر المشتري خارج نطاق المنصة.",
+        },
+      ],
+    },
+    {
+      n: "6",
+      h: "قسم التوفير والاشتراكات (الملكية الفكرية والحماية التجارية)",
+      items: [
+        {
+          lead: "ملكية القسم:",
+          b: "«قسم التوفير» هو قسم تجاري وحصري مملوك بالكامل لإدارة تطبيق «لوزي» (مجموعة لوزي)، ولا يحق لأي متجر أو مزارع خارجي عرض منتجاته فيه.",
+        },
+        {
+          lead: "رسوم الاشتراك والتفعيل:",
+          b: "قيمة الاشتراك السنوي في قسم التوفير هي 500 ريال يمني سنوياً (أو ما يعادلها بحسب ما تحدده الإدارة). يتم تفعيل الاشتراك يدوياً بعد قيام العميل برفع صورة واضحة لسند دفع الرسوم المعتمد.",
+        },
+        {
+          tag: "🚫",
+          lead: "حظر الاستغلال التجاري وقيد الكميات:",
+          b: "منتجات قسم التوفير مخصصة للاستهلاك الشخصي والمنزلي للعملاء الحقيقيين فقط. ويُمنع منعاً باتاً استخدام القسم لأغراض تجارية، أو إعادة البيع، أو تصريف البضائع للمحلات. وتحتفظ إدارة «لوزي» بالحق المطلق في تحديد حد أقصى للكميات المتاحة للشراء لكل عميل برمجياً، كما يحق للإدارة إلغاء أي طلبية وإيقاف وحظر حساب المشتري نهائياً ودون رد رسوم الاشتراك إذا تبين أنه «تاجر» أو يقوم بشراء الكميات بغرض إعادة البيع والمنافسة غير المشروعة.",
+        },
+        {
+          lead: "انتهاء الاشتراك:",
+          b: "عند انتهاء مدة الاشتراك السنوي، يحق للتطبيق حجب ميزة الشراء والوصول لقسم التوفير فوراً، وتظل الأسعار المخفضة ظاهرة فقط كعرض تشجيعي للمستخدم حتى يقوم بالتجديد.",
+        },
+      ],
+    },
+    {
+      n: "7",
+      h: "نظام البلاغات والقرارات الإدارية القاطعة",
+      items: [
+        {
+          lead: "آلية بلاغات الإرجاع وشكاوى الجودة:",
+          b: "لتقديم طلب إرجاع خلال الـ 24 ساعة المسموحة، يجب على العميل رفع بلاغ رسمي موجه للإدارة عبر التطبيق، يلتزم فيه بـ: رفع صور واضحة وقاطعة تثبت تلف البضاعة أو نقص وزنها أو اختلافها، وكتابة وصف تفصيلي للمشكلة، وتحديد اسم المتجر أو المزارع المشترى منه.",
+        },
+        {
+          lead: "السرية والاطلاع:",
+          b: "يُرسل البلاغ للإدارة وللمتجر معاً بشكل سري ولا يظهر للعامة. يرى المتجر البلاغ بالكامل وتفاصيله لمراجعة جودة عمله، لكن لا يمكنه الرد عليه أو حذفه داخل التطبيق.",
+        },
+        {
+          lead: "القرار النهائي الصارم:",
+          b: "لإدارة التطبيق الصلاحية المطلقة والكاملة في اتخاذ القرار النهائي بشأن قبول طلب الإرجاع أو رفضه، أو التعامل مع أي مخالفة للشروط (بما يشمل إيقاف وحظر حسابات المتاجر، المزارعين، أو العملاء). جميع قرارات الإدارة نهائية وقاطعة ولا تقبل الاستئناف، أو المراجعة، أو الطعن بأي شكل من الأشكال قضائياً أو إدارياً.",
+        },
+      ],
+    },
+    {
+      n: "8",
+      h: "مرجعية الغرفة التجارية والتحكيم",
+      items: [
+        {
+          tag: "⚖️",
+          lead: "الغرفة التجارية كجهة تحكيم حصرية:",
+          b: "في حال حدوث أي نزاع تجاري أو قانوني بين المتجر (تجزئة أو جملة) أو المزارع وبين إدارة التطبيق، ويتعذر حله ودياً، يتعهد الطرفان التزاماً قاطعاً وقبل اللجوء إلى القضاء والجهات الحكومية بإحالة النزاع رسمياً إلى «مركز التحكيم في الغرفة التجارية والصناعية بصنعاء» للفصل فيه وفقاً لأعراف سوق المكسرات واللوز والزبيب المعتمدة في أمانة العاصمة. وتظل كافة قرارات إدارة «لوزي» الإدارية (من حظر حسابات، أو إلغاء توثيق، أو حذف منتجات) سارية ونافذة وفورية طوال فترة التحكيم وحتى صدور قرار رسمي من الغرفة.",
+        },
+      ],
+    },
+    {
+      n: "9",
+      h: "مطابقة الصور للواقع وحظر التضليل البصري (ضمان الجودة)",
+      items: [
+        {
+          tag: "📸",
+          lead: "شرط حقيقية ومطابقة الصور:",
+          b: "يتعهد ويقر المتجر والمزارع التزاماً قاطعاً بأن جميع الصور والوسائط المرئية المرفوعة للمنتجات داخل التطبيق هي صور حقيقية ومطابقة بنسبة 100% للمنتج الفعلي الذي سيتم شحنه وتوصيله للعميل من حيث: (النوع، المنشأ كاللوز البلدي أو الخارجي، الحجم، اللون، ودرجة الجودة ونظافة المنتج). ويُحظر تماماً استخدام صور عامة من الإنترنت أو صور مضللة تفوق جودة المنتج الحقيقي المعروض.",
+        },
+        {
+          tag: "🚨",
+          lead: "عقوبة الغش والتضليل البصري:",
+          b: "في حال تبين لإدارة التطبيق (بناءً على بلاغ مصور من العميل ومقارنته بالصورة المعروضة في المنصة) أن المنتج المرسل أقل جودة، أو مختلف النوع والمنشأ، أو مجرد تضليل بصري؛ يُصنف هذا التصرف قانونياً وتشغيلياً كـ «تزوير وغش تجاري معتمد».",
+        },
+        {
+          lead: "التبعات القانونية والإدارية:",
+          b: "يمنح هذا المخالفُ العميلَ الحقَ المطلق في رفض الاستلام أو إرجاع البضاعة واسترداد ماله كاملاً كاش، ويتحمل البائع وحده كلفة مشوار المندوب ذهاباً وإياباً. وتحتفظ إدارة «لوزي» بالحق الكامل والفوري في شطب المنتج المخالف، وفرض غرامة مالية على الحساب، وفي حال التكرار يتم حظر حساب المتجر أو المزارع نهائياً من المنصة مع إخلاء مسؤولية التطبيق أمام جهات الرقابة وحماية المستهلك.",
+        },
+      ],
+    },
+    {
+      n: "10",
+      h: "سلامة التخزين وجودة المذاق",
+      items: [
+        {
+          tag: "🛡️",
+          lead: "تعهد جودة المنتج وطزاجته:",
+          b: "يتعهد المتجر والمزارع بأن جميع المنتجات المعروضة هي بضائع طازجة، سليمة، وخالية تماماً من الرطوبة، أو السوس، أو طعم «الزرنخة» الناتج عن سوء أو طول فترة التخزين.",
+        },
+        {
+          lead: "حق الإرجاع عند ظهور العيب:",
+          b: "إذا تبين للعميل بعد فتح المنتج وتذوقه خلال الـ 24 ساعة الأولى وجود هذا العيب، يُعتبر المنتج تالفاً، ويحق للعميل إرجاعه فوراً واستعادة ماله، ويتحمل البائع المسؤولية الكاملة عن تعويض العميل وتكاليف المندوب، مع حق الإدارة في إنذار البائع أو حظره.",
+        },
+      ],
+    },
+    {
+      n: "11",
+      h: "حظر التنازل عن الحساب أو التصرف به",
+      items: [
+        {
+          tag: "🪪",
+          lead: "حصرية ملكية الحساب الموثق:",
+          b: "تعتبر حسابات المتاجر والمزارعين في تطبيق «لوزي»، وبخاصة الحسابات الموثقة، حسابات شخصية وحصرية لأصحابها القانونيين الذين تم التحقق منهم مستندياً أو ميدانياً.",
+        },
+        {
+          lead: "حظر البيع أو النقل دون موافقة:",
+          b: "يُمنع منعاً باتاً وقاطعاً بيع الحساب، أو تأجيره، أو التنازل عنه، أو نقل ملكيته للغير دون أخذ موافقة خطية مسبقة من إدارة التطبيق. وفي حال اكتشاف أي عملية نقل ملكية أو تصرف بالحساب من وراء الإدارة، يحق لإدارة «لوزي» سحب شارة التوثيق فوراً، وحظر الحساب نهائياً، مع تحميل صاحب الحساب الأصلي كافة التبعات القانونية والتجارية لأي عمليات غش أو احتيال تتم عبر حسابه.",
+        },
+      ],
+    },
+    {
+      n: "12",
+      h: "الحصانة القانونية وإخلاء المسؤولية المطلقة لـ «لوزي»",
+      items: [
+        {
+          tag: "⚠️",
+          lead: "المسؤولية الجنائية والطبية عن سلامة المنتجات:",
+          b: "إن المواد المعروضة هي مواد غذائية تخضع لرقابة بائعيها. يضمن المتجر والمزارع بشكل مطلق وصارم سلامة بضائعهما صحياً وخلوها من التلف، التعفن، أو المواد المغشوشة وفقاً للقوانين النافذة والمقاييس الرسمية. ويتحملان منفردين وبشكل كامل ومباشر أي مسؤولية جنائية، مدنية، أو تعويضات طبية وعلاجية أمام القضاء والنيابة والجهات الحكومية في حال حدوث تسمم أو ضرر صحي لأي مستخدم، دون أدنى مسؤولية أو تضامن أو تبعية قانونية على تطبيق «لوزي» أو إدارته.",
+        },
+        {
+          b: "تطبيق «لوزي» هو منصة تقنية وسيطة تربط بين المتاجر والمزارعين والعملاء لتسهيل البيع والتجزئة. وبالتالي، لا يتحمل التطبيق المسؤولية القانونية المباشرة عن جودة البضائع التي توفرها المتاجر الخارجية، وينحصر دور التطبيق في الإجراءات التأديبية الإدارية (مثل إلزام المتجر بالإرجاع، أو حظر الحساب، أو إلغاء التوثيق) في حال ثبوت المخالفة خلال الـ 24 ساعة الأولى.",
+        },
+        {
+          tag: "🔒",
+          lead: "أمن البيانات والخصوصية الرقمية:",
+          b: "تلتزم إدارة تطبيق «لوزي» ببذل أقصى الجهود الممكنة لتأمين وحماية بيانات المستخدمين (أرقام الهواتف، سجلات البيع، المواقع الجغرافية GPS) والوقوف على أحدث معايير الحماية البرمجية. ومع ذلك، فإن المستخدم يقر بأن شبكة الإنترنت والأنظمة الرقمية ليست آمنة بنسبة 100%، ويوافق على رفع بياناته وموقعه على مسؤوليته الخاصة. وتخلي إدارة التطبيق مسؤوليتها القانونية أو المدنية عن أي اختراق سيبراني، أو تسريب بيانات ناتج عن قوى قاهرة، أو هجمات إلكترونية مستهدفة خارجة عن السيطرة البرمجية المعتادة.",
+        },
+        {
+          b: "لا يتحمل التطبيق مسؤولية أي تأخير في التوصيل أو تراجع الأداء ناتج عن ظروف قاهرة، أو أزمات مشتقات نفطية، أو قطوعات شوارع، أو اضطرابات أمنية خارجة عن إرادة مناديب المتاجر والمزارعين.",
+        },
+      ],
+    },
+    {
+      n: "13",
+      h: "نظام عمولة المنصة (محفظة البائع) وآلية التعديل المستقبلي",
+      items: [
+        {
+          tag: "📊",
+          lead: "النسبة الثابتة لعمولة التجزئة والجملة:",
+          b: "يقر ويلتزم كل متجر (تجزئة أو جملة) ومزارع مسجل في التطبيق بدفع عمولة اقتطاعية ثابتة لصالح إدارة تطبيق «لوزي» عن كل صفقة بيع يتم إتمامها بنجاح وتحويل حالتها إلى «مكتمل»، وتُحتسب النسب كالتالي:",
+        },
+        {
+          sub: !0,
+          lead: "مبيعات التجزئة:",
+          b: "نسبة ثابتة وقدرها 0.005% من إجمالي قيمة الطلب المكتمل.",
+        },
+        {
+          sub: !0,
+          lead: "مبيعات الجملة:",
+          b: "نسبة ثابتة وقدرها 0.001% من إجمالي قيمة صفقة الجملة المكتملة.",
+        },
+        {
+          tag: "🔒",
+          lead: "التسجيل الآلي والدين المستحق:",
+          b: "تُقيد هذه العمولات تلقائياً في ذمة البائع عبر «نظام محفظة البائع» داخل لوحة التحكم بمجرد تسليم الطلب للعميل، وتعتبر ديناً مستحق الأداء لصالح المنصة يجب تصفيتها وتوريدها بانتظام لتجنب تعليق الحساب.",
+        },
+        {
+          tag: "✅",
+          lead: "استثناء الطلبات المدفوعة مسبقاً:",
+          b: "الطلبات التي يتم سدادها من العميل عبر خيار «الدفع المسبق» (التحويل البنكي) ويتم اعتماد تحويلها لا تُحتسب على البائع كعمولة آجلة في محفظته، إذ تُسوّى عمولتها مباشرةً من قِبل إدارة المنصة عند تحصيل قيمة الطلب، فلا يترتب على البائع أي دين مؤجل عنها.",
+        },
+      ],
+    },
+  ],
+};
+function TermsSheet({ t, lang, onClose }) {
+  return React.createElement(
+    "div",
+    { className: "modal-overlay", onClick: onClose },
+    React.createElement(
+      "div",
+      { className: "sheet", onClick: (e) => e.stopPropagation() },
+      React.createElement("div", { className: "sheet-handle" }),
+      React.createElement(
+        "div",
+        { className: "terms-top" },
+        React.createElement("h2", null, t.terms_title),
+        React.createElement(
+          "span",
+          { className: "terms-sub-tag" },
+          React.createElement(Icon, {
+            name: "location",
+            size: 12,
+            color: "var(--green-deep)",
+          }),
+          lang === "ar" ? "العاصمة صنعاء" : "Sanaa",
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "sheet-scroll terms-scroll" },
+        TERMS_AR.intro.map((p, i) =>
+          React.createElement(
+            "p",
+            { key: "in" + i, className: "terms-intro" },
+            p,
+          ),
+        ),
+        TERMS_AR.sections.map((s) =>
+          React.createElement(
+            "div",
+            { key: s.n, className: "terms-block" },
+            React.createElement(
+              "div",
+              { className: "terms-head" },
+              React.createElement("span", { className: "terms-num" }, s.n),
+              React.createElement("h4", null, s.h),
+            ),
+            React.createElement(
+              "div",
+              { className: "terms-items" },
+              s.items.map((it, j) =>
+                React.createElement(
+                  "div",
+                  { key: j, className: `terms-item ${it.sub ? "sub" : ""}` },
+                  it.tag
+                    ? React.createElement(
+                        "span",
+                        { className: "terms-emoji" },
+                        it.tag,
+                      )
+                    : React.createElement("span", {
+                        className: "terms-bullet",
+                      }),
+                  React.createElement(
+                    "p",
+                    null,
+                    it.lead && React.createElement("b", null, it.lead, " "),
+                    it.b,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "sheet-foot" },
+        React.createElement(
+          "button",
+          { className: "btn btn-green", onClick: onClose },
+          React.createElement(Icon, {
+            name: "check",
+            size: 18,
+            color: "#fff",
+            stroke: 3,
+          }),
+          React.createElement("span", null, t.terms_agree),
+        ),
+      ),
+    ),
+  );
+}
+function AddProductSheet({
+  t,
+  lang,
+  section,
+  role,
+  onClose,
+  onPublish,
+  initial,
+}) {
+  const editing = !!initial,
+    isAlmond = section === "almond",
+    isRaisin = section === "raisin",
+    isFarmer = section === "almond" || section === "raisin",
+    initWeightRaw =
+      (initial && (initial.weight[lang] || initial.weight.ar)) || "",
+    initIsQadah = isRaisin && initWeightRaw.indexOf(t.qadah_label) === 0,
+    [name, setName] = useStateB(
+      (initial && (initial.name[lang] || initial.name.ar)) || "",
+    ),
+    [variety, setVariety] = useStateB(
+      initial && initial.variety
+        ? initial.variety
+        : isAlmond
+          ? "jabri"
+          : isRaisin
+            ? "razqi"
+            : "",
+    ),
+    [weight, setWeight] = useStateB(
+      initial ? (initIsQadah ? "" : initWeightRaw) : "",
+    ),
+    [useQadah, setUseQadah] = useStateB(initIsQadah),
+    [qadahKg, setQadahKg] = useStateB(
+      initIsQadah ? initWeightRaw.split("·").pop().trim() : "٣٤ك",
+    ),
+    [price, setPrice] = useStateB(
+      initial
+        ? String(
+            initial.unit === "ratl" && initial.ratlPrice
+              ? initial.ratlPrice
+              : initial.price,
+          )
+        : "",
+    ),
+    [wantShahti, setWantShahti] = useStateB(initial ? !!initial.shahti : !1),
+    [copied, setCopied] = useStateB(!1),
+    RATL_PER_KILO = 1.75,
+    [priceUnit, setPriceUnit] = useStateB(
+      isAlmond && initial && initial.unit === "ratl" ? "ratl" : "kilo",
+    ),
+    [ratls, setRatls] = useStateB(
+      initial && initial.availRatls ? String(initial.availRatls) : "",
+    ),
+    [confirmKilo, setConfirmKilo] = useStateB(!1),
+    [roundNote, setRoundNote] = useStateB(""),
+    cleanDec = (v) => {
+      v = String(v).replace(/[^0-9.]/g, "");
+      const i = v.indexOf(".");
+      return i < 0 ? v : v.slice(0, i + 1) + v.slice(i + 1).replace(/\./g, "");
+    },
+    onQtyBlur = (v, setV) => {
+      const n = parseFloat(String(v).replace(/[^0-9.]/g, ""));
+      if (!isFinite(n)) return;
+      const r = Math.floor(n * 20 + 1e-9) / 20,
+        rs = String(r);
+      setV(rs);
+      if (n - r > 1e-9) {
+        setRoundNote("تم التقريب إلى " + rs);
+        setTimeout(() => setRoundNote(""), 2600);
+      }
+    },
+    [inSanaa, setInSanaa] = useStateB(!!initial),
+    WH_UNITS = ["كيس", "كرتون", "قطمة", "قدح"],
+    [whUnit, setWhUnit] = useStateB(
+      initial && WH_UNITS.indexOf(initial.stockUnit) >= 0
+        ? initial.stockUnit
+        : "كيس",
+    ),
+    [stockQty, setStockQty] = useStateB(
+      initial && initial.stockInput != null ? String(initial.stockInput) : "",
+    ),
+    isRatl = isAlmond && priceUnit === "ratl",
+    ratlPrice = Number(price) || 0,
+    pricePerKilo = Math.round(ratlPrice * RATL_PER_KILO),
+    ratlCount = Number(ratls) || 0,
+    availKg = ratlCount ? ratlCount / RATL_PER_KILO : 0,
+    isWholesale = section === "wholesale",
+    canChoose = isWholesale || isFarmer,
+    initTarget = initial
+      ? initial.sale === "wholesale"
+        ? "wholesale"
+        : initial.cat || section
+      : isWholesale
+        ? "wholesale"
+        : section,
+    [target, setTarget] = useStateB(initTarget),
+    effSection = canChoose ? target : section,
+    qadahWeights = ["٣٢ك", "٣٣ك", "٣٤ك", "٣٥ك"],
+    isQadah = isRaisin && useQadah,
+    isWhSeller = section === "wholesale",
+    needsQadahStock = isRaisin && target === "wholesale",
+    needsWhUnit = isWhSeller && target === "wholesale",
+    usesRatlStock = isAlmond && isRatl,
+    stockUnitLabel = isAlmond
+      ? "كجم"
+      : needsQadahStock
+        ? "قدح"
+        : needsWhUnit
+          ? whUnit
+          : "كجم",
+    qtyNum = Number(stockQty) || 0,
+    stockVal = isAlmond && isRatl ? Math.round(availKg * 10) / 10 : qtyNum,
+    finalWeight = isRatl
+      ? "١ كجم"
+      : isQadah
+        ? `${t.qadah_label} · ${qadahKg}`
+        : weight.trim(),
+    secLabel = {
+      almond: t.sec_almond,
+      raisin: t.sec_raisin,
+      retail: t.sec_retail,
+      wholesale: t.sec_wholesale,
+    }[effSection],
+    secIcon = {
+      almond: "leaf",
+      raisin: "leaf",
+      retail: "store",
+      wholesale: "warehouse",
+    }[effSection],
+    copyPhone = () => {
+      try {
+        navigator.clipboard.writeText(t.shahti_phone);
+      } catch (e) {}
+      (setCopied(!0), setTimeout(() => setCopied(!1), 1400));
+    },
+    [photos, setPhotos] = useStateB(() =>
+      ((initial && initial.images) || []).map((u, i) => ({
+        url: u,
+        thumb: (initial.thumbs || [])[i],
+      })),
+    ),
+    onPickPhotos = (e) => {
+      const add = [];
+      (Array.from(e.target.files || []).forEach((f) => {
+        (f.type && f.type.indexOf("image/") !== 0) ||
+          f.size > 10 * 1024 * 1024 ||
+          add.push({ file: f, url: URL.createObjectURL(f) });
+      }),
+        setPhotos((ps) => [...ps, ...add].slice(0, 6)),
+        (e.target.value = ""));
+    },
+    removePhoto = (i) => setPhotos((ps) => ps.filter((_, x) => x !== i)),
+    ready =
+      name.trim() &&
+      price &&
+      Number(price) > 0 &&
+      (isRatl ? ratlCount > 0 : finalWeight) &&
+      (!isFarmer || inSanaa) &&
+      (usesRatlStock ? !0 : qtyNum > 0),
+    publish = () => {
+      if (!ready) return;
+      const id = editing ? initial.id : "mine-" + Date.now(),
+        outCat = isFarmer ? section : effSection,
+        outSale = canChoose && target === "wholesale" ? "wholesale" : void 0;
+      onPublish(
+        {
+          id,
+          img: editing ? initial.img : id,
+          store: editing ? initial.store : "mine-" + effSection,
+          cat: outCat,
+          sale: outSale,
+          sanaa: isFarmer ? !0 : void 0,
+          stock: stockVal,
+          stockUnit: stockUnitLabel,
+          stockInput: usesRatlStock ? ratlCount : qtyNum,
+          qadahWeight: needsQadahStock ? qadahKg : void 0,
+          photoItems: photos.map((p) =>
+            p.file ? { file: p.file } : { url: p.url, thumb: p.thumb },
+          ),
+          variety: isAlmond || isRaisin ? variety : void 0,
+          baladi: isAlmond ? !0 : void 0,
+          shahti: isAlmond && wantShahti ? !0 : void 0,
+          shahtiStatus:
+            isAlmond && wantShahti
+              ? initial && initial.shahtiStatus === "approved"
+                ? "approved"
+                : "pending"
+              : null,
+          inspect:
+            isAlmond && wantShahti
+              ? {
+                  ar: t.shahti_loc_name + " · " + t.shahti_loc_addr,
+                  en: t.shahti_loc_name + " · " + t.shahti_loc_addr,
+                }
+              : void 0,
+          price: isRatl ? pricePerKilo : Number(price),
+          weight: { ar: finalWeight, en: finalWeight },
+          unit: isRatl ? "ratl" : void 0,
+          ratlPrice: isRatl ? ratlPrice : void 0,
+          availRatls: isRatl ? ratlCount : void 0,
+          availKg: isRatl ? Math.round(availKg * 10) / 10 : void 0,
+          name: { ar: name, en: name },
+          desc:
+            editing && initial.desc
+              ? initial.desc
+              : {
+                  ar: "منتج طازج منشور عبر لوزي.",
+                  en: "Fresh product published via LOZI.",
+                },
+        },
+        editing,
+      );
+    },
+    needKiloConfirm = isAlmond && priceUnit === "kilo",
+    onPublishClick = () => {
+      if (ready) {
+        if (needKiloConfirm) {
+          setConfirmKilo(!0);
+          return;
+        }
+        publish();
+      }
+    };
+  return React.createElement(
+    "div",
+    { className: "modal-overlay", onClick: onClose },
+    React.createElement(
+      "div",
+      { className: "sheet", onClick: (e) => e.stopPropagation() },
+      React.createElement("div", { className: "sheet-handle" }),
+      React.createElement(
+        "div",
+        { className: "sheet-scroll" },
+        React.createElement(
+          "div",
+          { className: "sub-head" },
+          React.createElement(
+            "div",
+            { className: "sub-badge", style: { background: "var(--green)" } },
+            React.createElement(Icon, {
+              name: editing ? "idcard" : secIcon,
+              size: 22,
+              color: "#fff",
+            }),
+          ),
+          React.createElement(
+            "h2",
+            null,
+            editing ? t.edit_product : isFarmer ? t.add_crop : t.add_product,
+          ),
+        ),
+        !editing &&
+          canChoose &&
+          React.createElement(
+            "div",
+            { className: "field", style: { marginBottom: 4 } },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              "وجهة النشر",
+            ),
+            React.createElement(
+              "div",
+              { className: "seg seg-2" },
+              isFarmer
+                ? React.createElement(
+                    React.Fragment,
+                    null,
+                    React.createElement(
+                      "button",
+                      {
+                        className: target === section ? "on" : "",
+                        onClick: () => setTarget(section),
+                      },
+                      section === "almond" ? t.sec_almond : t.sec_raisin,
+                    ),
+                    React.createElement(
+                      "button",
+                      {
+                        className: target === "wholesale" ? "on" : "",
+                        onClick: () => setTarget("wholesale"),
+                      },
+                      "سوق الجملة",
+                    ),
+                  )
+                : React.createElement(
+                    React.Fragment,
+                    null,
+                    React.createElement(
+                      "button",
+                      {
+                        className: target === "wholesale" ? "on" : "",
+                        onClick: () => setTarget("wholesale"),
+                      },
+                      "سوق الجملة",
+                    ),
+                    React.createElement(
+                      "button",
+                      {
+                        className: target === "retail" ? "on" : "",
+                        onClick: () => setTarget("retail"),
+                      },
+                      "التجزئة",
+                    ),
+                  ),
+            ),
+            target === "wholesale" &&
+              React.createElement(
+                "span",
+                { className: "pl-note" },
+                React.createElement(Icon, {
+                  name: "shield",
+                  size: 13,
+                  color: "var(--green-deep)",
+                }),
+                "في سوق الجملة: التسعير بالكيس، ووزن الكيس ثابت.",
+              ),
+            isFarmer &&
+              target === section &&
+              React.createElement(
+                "span",
+                { className: "pl-note" },
+                React.createElement(Icon, {
+                  name: "shield",
+                  size: 13,
+                  color: "var(--green-deep)",
+                }),
+                "يُنشر في قسم ",
+                section === "almond" ? t.sec_almond : t.sec_raisin,
+                " ويظهر للعملاء مباشرةً · التسعير بالكيلو.",
+              ),
+            !isFarmer &&
+              target === "retail" &&
+              React.createElement(
+                "span",
+                { className: "pl-note" },
+                React.createElement(Icon, {
+                  name: "shield",
+                  size: 13,
+                  color: "var(--green-deep)",
+                }),
+                "في التجزئة: التسعير بالكيلو، والطلب بالجرام أو بالمبلغ.",
+              ),
+          ),
+        !editing &&
+          !canChoose &&
+          React.createElement(
+            "div",
+            { className: "publish-lock" },
+            React.createElement(
+              "span",
+              { className: "pl-sec" },
+              React.createElement(Icon, {
+                name: secIcon,
+                size: 15,
+                color: "#fff",
+              }),
+              t.publish_to,
+              ": ",
+              React.createElement("b", null, secLabel),
+            ),
+            React.createElement(
+              "span",
+              { className: "pl-note" },
+              React.createElement(Icon, {
+                name: "shield",
+                size: 13,
+                color: "var(--green-deep)",
+              }),
+              t.publish_locked_note,
+            ),
+          ),
+        React.createElement(
+          "div",
+          { className: "form-fields" },
+          React.createElement(
+            "div",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              "صور المنتج",
+            ),
+            React.createElement(
+              "div",
+              { className: "photo-grid" },
+              photos.map((p, i) =>
+                React.createElement(
+                  "div",
+                  { className: "photo-thumb", key: i },
+                  React.createElement("img", { src: p.url, alt: "" }),
+                  React.createElement(
+                    "button",
+                    { className: "photo-del", onClick: () => removePhoto(i) },
+                    React.createElement(Icon, {
+                      name: "close",
+                      size: 13,
+                      color: "#fff",
+                      stroke: 3,
+                    }),
+                  ),
+                ),
+              ),
+              photos.length < 6 &&
+                React.createElement(
+                  "label",
+                  { className: "photo-add" },
+                  React.createElement("input", {
+                    type: "file",
+                    accept: "image/*",
+                    multiple: !0,
+                    onChange: onPickPhotos,
+                    style: { display: "none" },
+                  }),
+                  React.createElement(Icon, {
+                    name: "upload",
+                    size: 20,
+                    color: "var(--green-deep)",
+                  }),
+                  React.createElement("span", null, "إضافة صورة"),
+                ),
+            ),
+            React.createElement(
+              "span",
+              { className: "pl-note" },
+              React.createElement(Icon, {
+                name: "shield",
+                size: 13,
+                color: "var(--green-deep)",
+              }),
+              "يمكنك إضافة حتى ٦ صور. تظهر للمشترين في صفحة المنتج.",
+            ),
+          ),
+          React.createElement(
+            "label",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              t.crop_name,
+            ),
+            React.createElement("input", {
+              className: "field-input",
+              value: name,
+              onChange: (e) => setName(e.target.value),
+              placeholder: t.crop_name_ph,
+            }),
+          ),
+          isAlmond &&
+            React.createElement(
+              "div",
+              { className: "field" },
+              React.createElement(
+                "span",
+                { className: "field-label" },
+                t.almond_type,
+              ),
+              React.createElement(
+                "div",
+                { className: "seg" },
+                ALMOND_TYPES.map((a) =>
+                  React.createElement(
+                    "button",
+                    {
+                      key: a.id,
+                      className: variety === a.id ? "on" : "",
+                      onClick: () => setVariety(a.id),
+                    },
+                    a.label[lang],
+                  ),
+                ),
+              ),
+            ),
+          isRaisin &&
+            React.createElement(
+              "div",
+              { className: "field" },
+              React.createElement(
+                "span",
+                { className: "field-label" },
+                t.raisin_type,
+              ),
+              React.createElement(
+                "div",
+                { className: "seg" },
+                RAISIN_TYPES.map((a) =>
+                  React.createElement(
+                    "button",
+                    {
+                      key: a.id,
+                      className: variety === a.id ? "on" : "",
+                      onClick: () => setVariety(a.id),
+                    },
+                    a.label[lang],
+                  ),
+                ),
+              ),
+            ),
+          isAlmond &&
+            React.createElement(
+              "div",
+              { className: "field" },
+              React.createElement(
+                "span",
+                { className: "field-label" },
+                "وحدة التسعير",
+              ),
+              React.createElement(
+                "div",
+                { className: "seg seg-2" },
+                React.createElement(
+                  "button",
+                  {
+                    className: priceUnit === "kilo" ? "on" : "",
+                    onClick: () => setPriceUnit("kilo"),
+                  },
+                  "بالكيلو",
+                ),
+                React.createElement(
+                  "button",
+                  {
+                    className: priceUnit === "ratl" ? "on" : "",
+                    onClick: () => setPriceUnit("ratl"),
+                  },
+                  "بالرطل",
+                ),
+              ),
+              isRatl &&
+                React.createElement(
+                  "span",
+                  { className: "pl-note ratl-warn" },
+                  React.createElement(Icon, {
+                    name: "shield",
+                    size: 13,
+                    color: "var(--gold-deep)",
+                  }),
+                  "تُدخِل السعر ",
+                  React.createElement("b", null, "بالرطل"),
+                  "، والمشتري يشتري ",
+                  React.createElement("b", null, "بالكيلو"),
+                  ". سعر الكيلو = سعر الرطل × ١٫٧٥.",
+                ),
+            ),
+          !isRatl &&
+            React.createElement(
+              "div",
+              { className: "field" },
+              React.createElement(
+                "span",
+                { className: "field-label" },
+                effSection === "wholesale" ? "وزن الكيس" : t.crop_weight,
+              ),
+              isRaisin &&
+                React.createElement(
+                  "div",
+                  { className: "seg seg-weight" },
+                  React.createElement(
+                    "button",
+                    {
+                      className: useQadah ? "" : "on",
+                      onClick: () => setUseQadah(!1),
+                    },
+                    t.weight_custom,
+                  ),
+                  React.createElement(
+                    "button",
+                    {
+                      className: useQadah ? "on" : "",
+                      onClick: () => setUseQadah(!0),
+                    },
+                    t.qadah_label,
+                  ),
+                ),
+              !isQadah &&
+                React.createElement("input", {
+                  className: "field-input",
+                  value: weight,
+                  onChange: (e) => setWeight(e.target.value),
+                  placeholder:
+                    effSection === "wholesale"
+                      ? "مثال: كيس ٥٠ كجم"
+                      : t.crop_weight_ph,
+                }),
+              isQadah &&
+                React.createElement(
+                  "div",
+                  { className: "qadah-field" },
+                  React.createElement(
+                    "div",
+                    { className: "qadah-head" },
+                    React.createElement(
+                      "span",
+                      { className: "qadah-label" },
+                      t.qadah_weight_label,
+                    ),
+                    React.createElement(
+                      "span",
+                      { className: "qadah-hint" },
+                      t.qadah_hint,
+                    ),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "chip-wrap" },
+                    qadahWeights.map((q) =>
+                      React.createElement(
+                        "button",
+                        {
+                          key: q,
+                          className: `chip ${qadahKg === q ? "on" : ""}`,
+                          onClick: () => setQadahKg(q),
+                        },
+                        q,
+                      ),
+                    ),
+                  ),
+                ),
+            ),
+          isRatl &&
+            React.createElement(
+              "label",
+              { className: "field" },
+              React.createElement(
+                "span",
+                { className: "field-label" },
+                "عدد الأرطال المتوفرة",
+              ),
+              React.createElement("input", {
+                className: "field-input",
+                value: ratls,
+                onChange: (e) => setRatls(cleanDec(e.target.value)),
+                onBlur: () => onQtyBlur(ratls, setRatls),
+                placeholder: "مثال: ١٠ أرطال",
+                inputMode: "decimal",
+              }),
+              roundNote &&
+                React.createElement(
+                  "span",
+                  {
+                    className: "pl-note",
+                    style: { color: "var(--gold-deep)" },
+                  },
+                  React.createElement(Icon, {
+                    name: "check",
+                    size: 13,
+                    color: "var(--gold-deep)",
+                  }),
+                  roundNote,
+                ),
+              ratlCount > 0 &&
+                React.createElement(
+                  "span",
+                  { className: "pl-note" },
+                  React.createElement(Icon, {
+                    name: "shield",
+                    size: 13,
+                    color: "var(--green-deep)",
+                  }),
+                  "≈ ",
+                  availKg.toFixed(1),
+                  " كجم متاحة للبيع.",
+                ),
+            ),
+          React.createElement(
+            "label",
+            { className: "field" },
+            React.createElement(
+              "span",
+              { className: "field-label" },
+              isRatl
+                ? "سعر الرطل الواحد (ريال يمني)"
+                : effSection === "wholesale"
+                  ? "سعر الكيس (ريال يمني)"
+                  : effSection === "retail"
+                    ? "سعر الكيلو (ريال يمني)"
+                    : t.crop_price,
+            ),
+            React.createElement("input", {
+              className: "field-input",
+              value: price,
+              onChange: (e) => setPrice(e.target.value.replace(/[^0-9]/g, "")),
+              placeholder: isRatl ? "سعر الرطل الواحد" : t.crop_price_ph,
+              inputMode: "numeric",
+            }),
+          ),
+          isRatl &&
+            ratlPrice > 0 &&
+            React.createElement(
+              "div",
+              { className: "ratl-convert" },
+              React.createElement(
+                "div",
+                { className: "rc-row" },
+                React.createElement("span", null, "سعر الرطل"),
+                React.createElement("b", null, moneyStr(ratlPrice)),
+              ),
+              React.createElement("div", { className: "rc-eq" }, "× ١٫٧٥ ="),
+              React.createElement(
+                "div",
+                { className: "rc-row big" },
+                React.createElement("span", null, "سعر الكيلو للمشتري"),
+                React.createElement("b", null, moneyStr(pricePerKilo)),
+              ),
+            ),
+          !usesRatlStock &&
+            React.createElement(
+              "div",
+              { className: "field" },
+              React.createElement(
+                "span",
+                { className: "field-label" },
+                "الكمية المتوفرة",
+                needsWhUnit || needsQadahStock
+                  ? ""
+                  : " (" + stockUnitLabel + ")",
+              ),
+              needsWhUnit &&
+                React.createElement(
+                  "div",
+                  { className: "chip-wrap", style: { marginBottom: 8 } },
+                  WH_UNITS.map((u) =>
+                    React.createElement(
+                      "button",
+                      {
+                        key: u,
+                        className: `chip ${whUnit === u ? "on" : ""}`,
+                        onClick: () => setWhUnit(u),
+                      },
+                      u,
+                    ),
+                  ),
+                ),
+              needsQadahStock &&
+                React.createElement(
+                  "div",
+                  { className: "chip-wrap", style: { marginBottom: 8 } },
+                  qadahWeights.map((q) =>
+                    React.createElement(
+                      "button",
+                      {
+                        key: q,
+                        className: `chip ${qadahKg === q ? "on" : ""}`,
+                        onClick: () => setQadahKg(q),
+                      },
+                      q,
+                    ),
+                  ),
+                ),
+              React.createElement("input", {
+                className: "field-input",
+                value: stockQty,
+                onChange: (e) =>
+                  setStockQty(
+                    isAlmond
+                      ? cleanDec(e.target.value)
+                      : e.target.value.replace(/[^0-9]/g, ""),
+                  ),
+                onBlur: isAlmond
+                  ? () => onQtyBlur(stockQty, setStockQty)
+                  : void 0,
+                placeholder: needsQadahStock
+                  ? "عدد الأقداح"
+                  : needsWhUnit
+                    ? "عدد الـ" + whUnit
+                    : "الكمية بالكيلو",
+                inputMode: isAlmond ? "decimal" : "numeric",
+              }),
+              isAlmond &&
+                roundNote &&
+                React.createElement(
+                  "span",
+                  {
+                    className: "pl-note",
+                    style: { color: "var(--gold-deep)" },
+                  },
+                  React.createElement(Icon, {
+                    name: "check",
+                    size: 13,
+                    color: "var(--gold-deep)",
+                  }),
+                  roundNote,
+                ),
+              needsQadahStock &&
+                React.createElement(
+                  "span",
+                  { className: "pl-note" },
+                  React.createElement(Icon, {
+                    name: "shield",
+                    size: 13,
+                    color: "var(--green-deep)",
+                  }),
+                  "وزن القدح ",
+                  qadahKg,
+                  " · المشتري يشتري بالقدح.",
+                ),
+              needsWhUnit &&
+                React.createElement(
+                  "span",
+                  { className: "pl-note" },
+                  React.createElement(Icon, {
+                    name: "shield",
+                    size: 13,
+                    color: "var(--green-deep)",
+                  }),
+                  "المشتري يشتري بوحدة «",
+                  whUnit,
+                  "».",
+                ),
+            ),
+          isAlmond &&
+            React.createElement(
+              "div",
+              { className: "shahti-request" },
+              React.createElement(
+                "button",
+                {
+                  className: "shahti-toggle",
+                  onClick: () => setWantShahti((v) => !v),
+                },
+                React.createElement(
+                  "span",
+                  { className: "shahti-seal sm" },
+                  React.createElement(ShahtiGlyph, { size: 18 }),
+                ),
+                React.createElement(
+                  "span",
+                  { className: "shahti-toggle-txt" },
+                  React.createElement("strong", null, t.shahti_request),
+                  React.createElement(
+                    "span",
+                    null,
+                    t.shahti_for_baladi,
+                    " · تظهر الشارة بعد موافقة الإدارة",
+                  ),
+                ),
+                React.createElement(
+                  "span",
+                  { className: `switch ${wantShahti ? "on" : ""}` },
+                  React.createElement("i", null),
+                ),
+              ),
+              wantShahti &&
+                React.createElement(
+                  "div",
+                  { className: "shahti-conds" },
+                  React.createElement(
+                    "div",
+                    { className: "shahti-cond" },
+                    React.createElement("span", { className: "sc-n" }, "1"),
+                    t.shahti_cond_sample,
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "shahti-cond" },
+                    React.createElement("span", { className: "sc-n" }, "2"),
+                    t.shahti_cond_inspect,
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "shahti-loc" },
+                    React.createElement(
+                      "div",
+                      { className: "shahti-loc-head" },
+                      React.createElement(Icon, {
+                        name: "location",
+                        size: 15,
+                        color: "var(--green-deep)",
+                      }),
+                      t.shahti_loc_label,
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "shahti-loc-name" },
+                      t.shahti_loc_name,
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "shahti-loc-addr" },
+                      t.shahti_loc_addr,
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "shahti-loc-actions" },
+                      React.createElement(
+                        "button",
+                        {
+                          className: `shahti-phone ${copied ? "ok" : ""}`,
+                          onClick: copyPhone,
+                        },
+                        React.createElement(Icon, {
+                          name: copied ? "check" : "copy",
+                          size: 14,
+                          color: copied ? "var(--green-deep)" : "var(--ink)",
+                          stroke: copied ? 3 : 2,
+                        }),
+                        React.createElement(
+                          "span",
+                          { className: "sp-num" },
+                          t.shahti_phone,
+                        ),
+                        React.createElement(
+                          "span",
+                          { className: "sp-act" },
+                          copied ? t.copied : t.copy,
+                        ),
+                      ),
+                      React.createElement(
+                        "a",
+                        {
+                          className: "shahti-wa",
+                          href: `https://wa.me/967${t.shahti_phone}`,
+                          target: "_blank",
+                          rel: "noreferrer",
+                        },
+                        React.createElement(Icon, {
+                          name: "whatsapp",
+                          size: 16,
+                          color: "#fff",
+                        }),
+                        t.call_wa,
+                      ),
+                    ),
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "shahti-only-note" },
+                    React.createElement(Icon, {
+                      name: "shield",
+                      size: 13,
+                      color: "var(--gold-deep)",
+                    }),
+                    t.shahti_only_baladi_note,
+                  ),
+                ),
+            ),
+          isFarmer &&
+            React.createElement(
+              "label",
+              { className: "terms-check sanaa-check" },
+              React.createElement("input", {
+                type: "checkbox",
+                checked: inSanaa,
+                onChange: (e) => setInSanaa(e.target.checked),
+              }),
+              React.createElement(
+                "span",
+                null,
+                "أؤكّد أن الكمية متوفّرة داخل مدينة صنعاء، لتسريع عملية التوصيل للعميل",
+              ),
+            ),
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "sheet-foot" },
+        React.createElement(
+          "button",
+          {
+            className: "btn btn-green",
+            disabled: !ready,
+            onClick: onPublishClick,
+          },
+          React.createElement(Icon, {
+            name: "check",
+            size: 18,
+            color: "#fff",
+            stroke: 3,
+          }),
+          React.createElement(
+            "span",
+            null,
+            needKiloConfirm
+              ? "مراجعة وتأكيد"
+              : editing
+                ? t.save_edits
+                : t.publish_crop,
+          ),
+        ),
+      ),
+      confirmKilo &&
+        React.createElement(
+          "div",
+          {
+            className: "ratl-confirm-overlay",
+            onClick: () => setConfirmKilo(!1),
+          },
+          React.createElement(
+            "div",
+            { className: "ratl-confirm", onClick: (e) => e.stopPropagation() },
+            React.createElement(
+              "div",
+              { className: "rcf-icon" },
+              React.createElement(Icon, {
+                name: "shield",
+                size: 26,
+                color: "var(--gold-deep)",
+              }),
+            ),
+            React.createElement("h3", null, "تأكيد السعر بالكيلو"),
+            React.createElement(
+              "p",
+              { className: "rcf-lead" },
+              "تأكّد أن هذا السعر ",
+              React.createElement("b", null, "للكيلو"),
+              " وليس للرطل — الخلط بينهما قد يكلّفك خسارة كبيرة.",
+            ),
+            React.createElement(
+              "div",
+              { className: "rcf-box" },
+              React.createElement(
+                "div",
+                { className: "rcf-row big" },
+                React.createElement(
+                  "span",
+                  null,
+                  "أدخلتَ سعر ",
+                  React.createElement("b", null, "الكيلو"),
+                ),
+                React.createElement("b", null, moneyStr(Number(price) || 0)),
+              ),
+            ),
+            React.createElement(
+              "p",
+              { className: "rcf-note" },
+              "إن كنت تقصد سعر ",
+              React.createElement("b", null, "الرطل"),
+              "، ارجع وبدّل وحدة التسعير إلى «بالرطل».",
+            ),
+            React.createElement(
+              "div",
+              { className: "rcf-actions" },
+              React.createElement(
+                "button",
+                {
+                  className: "btn btn-ghost flex1",
+                  onClick: () => setConfirmKilo(!1),
+                },
+                "رجوع للتعديل",
+              ),
+              React.createElement(
+                "button",
+                {
+                  className: "btn btn-green flex1",
+                  onClick: () => {
+                    (setConfirmKilo(!1), publish());
+                  },
+                },
+                React.createElement(Icon, {
+                  name: "check",
+                  size: 18,
+                  color: "#fff",
+                  stroke: 3,
+                }),
+                React.createElement("span", null, "تأكيد ونشر"),
+              ),
+            ),
+          ),
+        ),
+    ),
+  );
+}
+function greetFor(fullName) {
+  const first = (fullName || "").trim().split(/\s+/)[0],
+    who = first ? " يا " + first : "",
+    h = new Date().getHours();
+  return h >= 6 && h < 11
+    ? "صباح الخير" + who
+    : h >= 17 && h < 23
+      ? "مساء الخير" + who
+      : "أهلاً" + who;
+}
+const ROLE_KEY = {
+  customer: "role_customer",
+  farmer_almond: "role_farmer",
+  farmer_raisin: "role_farmer",
+  retail: "role_retail",
+  wholesale: "role_wholesale",
+};
+function Profile({
+  t,
+  lang,
+  go,
+  favCount,
+  subscribed,
+  subPending,
+  role,
+  person,
+  isSeller,
+  dashCount = 0,
+}) {
+  const roleLabel =
+      t[ROLE_KEY[role] || "role_customer"] +
+      (role === "farmer_almond"
+        ? " · " + t.farmer_almond
+        : role === "farmer_raisin"
+          ? " · " + t.farmer_raisin
+          : ""),
+    rows = [
+      {
+        id: "personal",
+        icon: "idcard",
+        label: t.p_personal,
+        go: () => go("personal"),
+      },
+      isSeller
+        ? {
+            id: "dashboard",
+            icon: "truck",
+            label: t.nav_dashboard,
+            badge: dashCount || null,
+            go: () => go("dashboard"),
+          }
+        : null,
+      { id: "orders", icon: "cart", label: t.p_orders, go: () => go("orders") },
+      {
+        id: "fav",
+        icon: "heart",
+        label: t.p_fav,
+        badge: favCount,
+        go: () => go("favorites"),
+      },
+      {
+        id: "reports",
+        icon: "flag",
+        label: t.p_reports,
+        go: () => go("reports"),
+      },
+      {
+        id: "settings",
+        icon: "settings",
+        label: t.p_settings,
+        go: () => go("settings"),
+      },
+    ].filter(Boolean);
+  return React.createElement(
+    "div",
+    { className: "screen profile" },
+    React.createElement(
+      "h2",
+      { className: "screen-title prof-greet" },
+      greetFor(person && person.name),
+    ),
+    React.createElement(
+      "div",
+      { className: "prof-card" },
+      React.createElement(
+        "div",
+        { className: "prof-av" },
+        React.createElement(Icon, {
+          name: "user",
+          size: 30,
+          color: "var(--green-deep)",
+        }),
+      ),
+      React.createElement(
+        "div",
+        { className: "prof-meta" },
+        React.createElement(
+          "strong",
+          null,
+          person && person.name ? person.name : t.guest,
+        ),
+        React.createElement(
+          "span",
+          null,
+          person && person.phone ? fmtPhone(person.phone) : "+967 7• ••• ••••",
+        ),
+        React.createElement(
+          "span",
+          { className: "prof-role" },
+          React.createElement(Icon, {
+            name: "shield",
+            size: 11,
+            color: "var(--green-deep)",
+          }),
+          t.acct_type,
+          ": ",
+          roleLabel,
+        ),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "prof-list" },
+      rows.map((r) =>
+        React.createElement(
+          "button",
+          { key: r.id, className: "prof-row", onClick: r.go },
+          React.createElement(
+            "span",
+            { className: "prow-ic" },
+            React.createElement(Icon, {
+              name: r.icon,
+              size: 20,
+              color: "var(--green-deep)",
+              fill: r.id === "sub",
+            }),
+          ),
+          React.createElement("span", { className: "prow-label" }, r.label),
+          r.badge
+            ? React.createElement("span", { className: "prow-badge" }, r.badge)
+            : null,
+          r.tag
+            ? React.createElement("span", { className: "prow-tag" }, r.tag)
+            : null,
+          React.createElement(Icon, {
+            name: t.dir === "rtl" ? "back" : "fwd",
+            size: 16,
+            color: "var(--muted)",
+          }),
+        ),
+      ),
+    ),
+  );
+}
+function PersonalInfo({ t, lang, role, onBack, person, onSave }) {
+  const isVendor = !!role && role !== "customer";
+  const [name, setName] = useStateB(person.name || ""),
+    [phone, setPhone] = useStateB(person.phone || ""),
+    [city, setCity] = useStateB(person.city || ""),
+    [address, setAddress] = useStateB(person.address || "");
+  const phoneLocal = String(phone || "")
+    .replace(/^\+?967/, "")
+    .replace(/^0+/, "");
+  return React.createElement(
+    "div",
+    { className: "screen personal" },
+    React.createElement(TopBar, { title: t.pinfo_title, onBack, t }),
+    React.createElement(
+      "div",
+      { className: "set-scroll" },
+      React.createElement(
+        "div",
+        { className: "pinfo-hint-card" },
+        React.createElement(Icon, {
+          name: "idcard",
+          size: 18,
+          color: "var(--green-deep)",
+        }),
+        isVendor ? t.pinfo_edit_hint_vendor : t.pinfo_edit_hint,
+      ),
+      React.createElement(
+        "div",
+        { className: "form-fields" },
+        React.createElement(
+          "label",
+          { className: "field" },
+          React.createElement(
+            "span",
+            { className: "field-label" },
+            t.full_name,
+          ),
+          isVendor
+            ? React.createElement(
+                "div",
+                { className: "field-input static locked" },
+                React.createElement(
+                  "span",
+                  { style: { flex: 1 } },
+                  name || "—",
+                ),
+                React.createElement(Icon, {
+                  name: "lock",
+                  size: 15,
+                  color: "var(--muted)",
+                }),
+              )
+            : React.createElement("input", {
+                className: "field-input",
+                value: name,
+                onChange: (e) => setName(e.target.value),
+                placeholder: t.full_name_ph,
+              }),
+        ),
+        React.createElement(
+          "label",
+          { className: "field" },
+          React.createElement("span", { className: "field-label" }, t.phone),
+          React.createElement(
+            "div",
+            { className: "phone-input" },
+            React.createElement("span", { className: "phone-cc" }, "+967"),
+            isVendor
+              ? React.createElement(
+                  "div",
+                  { className: "field-input static locked" },
+                  React.createElement(
+                    "span",
+                    {
+                      style: { flex: 1, direction: "ltr", textAlign: "start" },
+                    },
+                    phoneLocal || "—",
+                  ),
+                  React.createElement(Icon, {
+                    name: "lock",
+                    size: 15,
+                    color: "var(--muted)",
+                  }),
+                )
+              : React.createElement("input", {
+                  className: "field-input",
+                  value: phoneLocal,
+                  onChange: (e) => setPhone(e.target.value),
+                  placeholder: t.phone_ph,
+                  inputMode: "tel",
+                }),
+          ),
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "pinfo-sec-head" },
+        React.createElement(Icon, {
+          name: "location",
+          size: 16,
+          color: "var(--green-deep)",
+        }),
+        React.createElement("span", null, t.my_location),
+      ),
+      React.createElement(
+        "div",
+        { className: "form-fields" },
+        React.createElement(
+          "label",
+          { className: "field" },
+          React.createElement("span", { className: "field-label" }, t.country),
+          React.createElement(
+            "div",
+            { className: "field-input static" },
+            React.createElement("span", { className: "cf-flag sm" }, "🇾🇪"),
+            t.yemen,
+          ),
+        ),
+        React.createElement(
+          "label",
+          { className: "field" },
+          React.createElement("span", { className: "field-label" }, t.city),
+          React.createElement("input", {
+            className: "field-input",
+            value: city,
+            onChange: (e) => setCity(e.target.value),
+            placeholder: t.city_ph,
+          }),
+        ),
+        React.createElement(
+          "label",
+          { className: "field" },
+          React.createElement("span", { className: "field-label" }, t.address),
+          React.createElement("textarea", {
+            className: "field-input area",
+            value: address,
+            onChange: (e) => setAddress(e.target.value),
+            placeholder: t.address_ph,
+            rows: 3,
+          }),
+        ),
+      ),
+      React.createElement(
+        "button",
+        {
+          className: "btn btn-green",
+          disabled: !isVendor && (!name.trim() || phoneLocal.length < 7),
+          onClick: () =>
+            onSave({
+              name,
+              phone: phoneLocal ? "+967" + phoneLocal : "",
+              city,
+              address,
+            }),
+          style: { marginTop: 6 },
+        },
+        React.createElement(Icon, {
+          name: "check",
+          size: 18,
+          color: "#fff",
+          stroke: 3,
+        }),
+        React.createElement("span", null, t.save),
+      ),
+    ),
+  );
+}
+function SubscriptionDetails({
+  t,
+  lang,
+  onBack,
+  subscribed,
+  subPending,
+  sub,
+  onSubscribe,
+  fmtDate,
+}) {
+  return React.createElement(
+    "div",
+    { className: "screen subdetails" },
+    React.createElement(TopBar, { title: t.sub_details, onBack, t }),
+    React.createElement(
+      "div",
+      { className: "set-scroll" },
+      React.createElement(
+        "div",
+        {
+          className: `subd-status ${subscribed ? "active" : subPending ? "pending" : "none"}`,
+        },
+        React.createElement(
+          "span",
+          { className: "subd-ic" },
+          React.createElement(Icon, {
+            name: subscribed ? "check" : "bolt",
+            size: 22,
+            color: "#fff",
+            stroke: subscribed ? 3 : 2,
+          }),
+        ),
+        React.createElement(
+          "div",
+          null,
+          React.createElement(
+            "strong",
+            null,
+            subscribed
+              ? t.sub_active
+              : subPending
+                ? t.sub_pending
+                : t.sub_not_member,
+          ),
+          React.createElement(
+            "span",
+            null,
+            subscribed
+              ? t.savings_hero
+              : subPending
+                ? t.sub_pending_sub
+                : t.savings_desc,
+          ),
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "subd-card" },
+        React.createElement(
+          "div",
+          { className: "subd-row" },
+          React.createElement("span", null, t.sub_price_label),
+          React.createElement("b", null, moneyStr(LOZI_SUB.yer), perYear(lang)),
+        ),
+        React.createElement(
+          "div",
+          { className: "subd-row" },
+          React.createElement("span", null, t.sub_duration_label),
+          React.createElement("b", null, t.sub_duration_val),
+        ),
+        subscribed &&
+          React.createElement(
+            "div",
+            { className: "subd-row" },
+            React.createElement("span", null, t.sub_start),
+            React.createElement("b", null, fmtDate(sub.start, lang)),
+          ),
+        subscribed &&
+          React.createElement(
+            "div",
+            { className: "subd-row highlight" },
+            React.createElement(
+              "span",
+              null,
+              React.createElement(Icon, {
+                name: "calendar",
+                size: 15,
+                color: "var(--gold-deep)",
+              }),
+              t.sub_expiry,
+            ),
+            React.createElement("b", null, fmtDate(sub.expiry, lang)),
+          ),
+      ),
+      !subscribed &&
+        !subPending &&
+        React.createElement(
+          "button",
+          { className: "btn btn-gold", onClick: onSubscribe },
+          React.createElement(Icon, {
+            name: "bolt",
+            size: 18,
+            color: "var(--brown)",
+          }),
+          React.createElement("span", null, t.subscribe_now),
+        ),
+      subscribed &&
+        React.createElement(
+          "button",
+          { className: "btn btn-ghost", onClick: onSubscribe },
+          React.createElement(Icon, {
+            name: "bolt",
+            size: 18,
+            color: "var(--ink)",
+          }),
+          React.createElement("span", null, t.sub_renew),
+        ),
+    ),
+  );
+}
+function Favorites({
+  t,
+  lang,
+  favs,
+  catalog,
+  onBack,
+  openProduct,
+  addToCart,
+  toggleFav,
+  go,
+}) {
+  const list = (catalog || []).filter((p) => favs.includes(p.id));
+  return React.createElement(
+    "div",
+    { className: "screen favorites" },
+    React.createElement(TopBar, { title: t.fav_title, onBack, t }),
+    list.length
+      ? React.createElement(
+          "div",
+          { className: "prod-grid pad" },
+          list.map((p) =>
+            React.createElement(ProductCard, {
+              key: p.id,
+              p,
+              t,
+              lang,
+              onOpen: openProduct,
+              onAdd: addToCart,
+              fav: !0,
+              onFav: toggleFav,
+            }),
+          ),
+        )
+      : React.createElement(
+          "div",
+          { className: "empty" },
+          React.createElement(
+            "div",
+            { className: "empty-ic" },
+            React.createElement(Icon, {
+              name: "heart",
+              size: 38,
+              color: "var(--gold-deep)",
+            }),
+          ),
+          React.createElement("h3", null, t.no_fav),
+          React.createElement(
+            PrimaryBtn,
+            { icon: "store", onClick: () => go("sections") },
+            t.browse,
+          ),
+        ),
+  );
+}
+const REPORT_TYPES = [
+    {
+      id: "retail",
+      icon: "store",
+      cls: "rt-retail",
+      titleKey: "rep_retail",
+      descKey: "rep_retail_desc",
+      targetKey: "rep_target_store",
+    },
+    {
+      id: "farmer",
+      icon: "leaf",
+      cls: "rt-farmer",
+      titleKey: "rep_farmer",
+      descKey: "rep_farmer_desc",
+      targetKey: "rep_target_farmer",
+    },
+    {
+      id: "general",
+      icon: "flag",
+      cls: "rt-general",
+      titleKey: "rep_general",
+      descKey: "rep_general_desc",
+      targetKey: null,
+    },
+  ],
+  REPORT_STATUS = {
+    review: { key: "rep_st_review", cls: "rep-st-review", icon: "flag" },
+    resolved: { key: "rep_st_resolved", cls: "rep-st-resolved", icon: "check" },
+    rejected: { key: "rep_st_rejected", cls: "rep-st-rejected", icon: "minus" },
+  };
+function repTypeOf(id) {
+  return REPORT_TYPES.find((x) => x.id === id) || REPORT_TYPES[2];
+}
+function locVal(v, lang) {
+  return v == null ? "" : typeof v == "string" ? v : v[lang] || v.ar || "";
+}
+function Reports({
+  t,
+  lang,
+  onBack,
+  reports = [],
+  onSubmit,
+  prefill,
+  showToast,
+}) {
+  const [view, setView] = useStateB(prefill ? "form" : "list"),
+    [type, setType] = useStateB(prefill ? repTypeOf(prefill.typeId) : null),
+    [target, setTarget] = useStateB((prefill && prefill.target) || ""),
+    [orderId] = useStateB((prefill && prefill.orderId) || null),
+    [subject, setSubject] = useStateB(""),
+    [desc, setDesc] = useStateB(""),
+    [open, setOpen] = useStateB(null),
+    resetForm = () => {
+      (setView("list"),
+        setType(null),
+        setTarget(""),
+        setSubject(""),
+        setDesc(""));
+    },
+    valid =
+      subject.trim() &&
+      desc.trim() &&
+      (!type || !type.targetKey || target.trim()),
+    submit = () => {
+      (onSubmit &&
+        onSubmit({
+          typeId: type.id,
+          target: type.targetKey ? target.trim() : null,
+          subject: subject.trim(),
+          desc: desc.trim(),
+          orderId,
+        }),
+        resetForm());
+    };
+  return view === "list"
+    ? React.createElement(
+        "div",
+        { className: "screen reports" },
+        React.createElement(TopBar, {
+          title: t.reports_title,
+          onBack,
+          t,
+          right: React.createElement(
+            "button",
+            {
+              className: "tb-action",
+              onClick: () => setView("choose"),
+              "aria-label": t.new_report,
+            },
+            React.createElement(Icon, {
+              name: "plus",
+              size: 18,
+              color: "var(--green-deep)",
+            }),
+          ),
+        }),
+        React.createElement(
+          "div",
+          { className: "set-scroll" },
+          reports.length === 0
+            ? React.createElement(
+                "div",
+                { className: "empty" },
+                React.createElement(
+                  "div",
+                  { className: "empty-ic" },
+                  React.createElement(Icon, {
+                    name: "flag",
+                    size: 36,
+                    color: "var(--gold-deep)",
+                  }),
+                ),
+                React.createElement("h3", null, t.rep_empty),
+                React.createElement("p", null, t.rep_empty_sub),
+                React.createElement(
+                  PrimaryBtn,
+                  { icon: "plus", onClick: () => setView("choose") },
+                  t.new_report,
+                ),
+              )
+            : React.createElement(
+                React.Fragment,
+                null,
+                React.createElement(
+                  "button",
+                  {
+                    className: "btn btn-green",
+                    onClick: () => setView("choose"),
+                    style: { marginBottom: 14 },
+                  },
+                  React.createElement(Icon, {
+                    name: "plus",
+                    size: 18,
+                    color: "#fff",
+                    stroke: 2.5,
+                  }),
+                  React.createElement("span", null, t.new_report),
+                ),
+                React.createElement(
+                  "div",
+                  { className: "rep-cards" },
+                  reports.map((r) => {
+                    const rt = repTypeOf(r.typeId),
+                      st = REPORT_STATUS[r.status] || REPORT_STATUS.review,
+                      isOpen = open === r.id;
+                    return React.createElement(
+                      "div",
+                      {
+                        key: r.id,
+                        className: `rep-card ${isOpen ? "open" : ""}`,
+                      },
+                      React.createElement(
+                        "button",
+                        {
+                          className: "rep-card-head",
+                          onClick: () => setOpen(isOpen ? null : r.id),
+                        },
+                        React.createElement(
+                          "span",
+                          { className: `rt-ic ${rt.cls}` },
+                          React.createElement(Icon, {
+                            name: rt.icon,
+                            size: 18,
+                            color: "#fff",
+                            fill: rt.icon === "leaf",
+                          }),
+                        ),
+                        React.createElement(
+                          "span",
+                          { className: "rep-card-mid" },
+                          React.createElement(
+                            "strong",
+                            null,
+                            locVal(r.subject, lang),
+                          ),
+                          React.createElement(
+                            "span",
+                            { className: "rep-card-meta" },
+                            "#",
+                            r.id,
+                            " · ",
+                            locVal(r.date, lang),
+                            r.target ? " · " + locVal(r.target, lang) : "",
+                          ),
+                        ),
+                        React.createElement(
+                          "span",
+                          { className: `rep-status ${st.cls}` },
+                          t[st.key],
+                        ),
+                      ),
+                      isOpen &&
+                        React.createElement(
+                          "div",
+                          { className: "rep-card-body" },
+                          React.createElement(
+                            "div",
+                            { className: "rep-type-line" },
+                            React.createElement(Icon, {
+                              name: rt.icon,
+                              size: 13,
+                              color: "var(--ink-soft)",
+                              fill: rt.icon === "leaf",
+                            }),
+                            t[rt.titleKey],
+                            r.orderId
+                              ? " · " + t.rep_about_order + " #" + r.orderId
+                              : "",
+                          ),
+                          React.createElement(
+                            "p",
+                            { className: "rep-desc-txt" },
+                            locVal(r.desc, lang),
+                          ),
+                          r.reply &&
+                            React.createElement(
+                              "div",
+                              { className: "rep-reply" },
+                              React.createElement(
+                                "div",
+                                { className: "rep-reply-head" },
+                                React.createElement(Icon, {
+                                  name: "shield",
+                                  size: 13,
+                                  color: "var(--green-deep)",
+                                }),
+                                t.rep_admin_reply,
+                              ),
+                              React.createElement(
+                                "p",
+                                null,
+                                locVal(r.reply, lang),
+                              ),
+                            ),
+                        ),
+                    );
+                  }),
+                ),
+                React.createElement(
+                  "div",
+                  { className: "rep-confid" },
+                  React.createElement(Icon, {
+                    name: "shield",
+                    size: 15,
+                    color: "var(--green-deep)",
+                  }),
+                  t.rep_confidential,
+                ),
+              ),
+        ),
+      )
+    : view === "choose"
+      ? React.createElement(
+          "div",
+          { className: "screen reports" },
+          React.createElement(TopBar, {
+            title: t.new_report,
+            onBack: () => setView("list"),
+            t,
+          }),
+          React.createElement(
+            "div",
+            { className: "set-scroll" },
+            React.createElement(
+              "div",
+              { className: "rep-intro" },
+              React.createElement("h3", null, t.report_pick_type),
+              React.createElement("p", null, t.report_pick_sub),
+            ),
+            React.createElement(
+              "div",
+              { className: "rep-types" },
+              REPORT_TYPES.map((rt) =>
+                React.createElement(
+                  "button",
+                  {
+                    key: rt.id,
+                    className: `rep-type ${rt.cls}`,
+                    onClick: () => {
+                      (setType(rt), setView("form"));
+                    },
+                  },
+                  React.createElement(
+                    "span",
+                    { className: "rt-ic" },
+                    React.createElement(Icon, {
+                      name: rt.icon,
+                      size: 22,
+                      color: "#fff",
+                      fill: rt.icon === "leaf",
+                    }),
+                  ),
+                  React.createElement(
+                    "span",
+                    { className: "rt-txt" },
+                    React.createElement("strong", null, t[rt.titleKey]),
+                    React.createElement("span", null, t[rt.descKey]),
+                  ),
+                  React.createElement(Icon, {
+                    name: t.dir === "rtl" ? "back" : "fwd",
+                    size: 18,
+                    color: "var(--muted)",
+                  }),
+                ),
+              ),
+            ),
+            React.createElement(
+              "div",
+              { className: "rep-confid" },
+              React.createElement(Icon, {
+                name: "shield",
+                size: 15,
+                color: "var(--green-deep)",
+              }),
+              t.rep_confidential,
+            ),
+          ),
+        )
+      : React.createElement(
+          "div",
+          { className: "screen reports" },
+          React.createElement(TopBar, {
+            title: t[type.titleKey],
+            onBack: () => (prefill ? onBack() : setView("choose")),
+            t,
+          }),
+          React.createElement(
+            "div",
+            { className: "set-scroll" },
+            React.createElement(
+              "div",
+              { className: `rep-form-head ${type.cls}` },
+              React.createElement(
+                "span",
+                { className: "rt-ic" },
+                React.createElement(Icon, {
+                  name: type.icon,
+                  size: 20,
+                  color: "#fff",
+                  fill: type.icon === "leaf",
+                }),
+              ),
+              React.createElement("span", null, t[type.descKey]),
+            ),
+            orderId &&
+              React.createElement(
+                "div",
+                { className: "rep-order-ref" },
+                React.createElement(Icon, {
+                  name: "cart",
+                  size: 15,
+                  color: "var(--green-deep)",
+                }),
+                t.rep_about_order,
+                " ",
+                React.createElement("b", null, "#", orderId),
+              ),
+            React.createElement(
+              "div",
+              { className: "form-fields" },
+              type.targetKey &&
+                React.createElement(
+                  "label",
+                  { className: "field" },
+                  React.createElement(
+                    "span",
+                    { className: "field-label" },
+                    t[type.targetKey],
+                  ),
+                  React.createElement("input", {
+                    className: "field-input",
+                    value: target,
+                    onChange: (e) => setTarget(e.target.value),
+                    placeholder: t.rep_target_ph,
+                  }),
+                ),
+              React.createElement(
+                "label",
+                { className: "field" },
+                React.createElement(
+                  "span",
+                  { className: "field-label" },
+                  t.rep_subject,
+                ),
+                React.createElement("input", {
+                  className: "field-input",
+                  value: subject,
+                  onChange: (e) => setSubject(e.target.value),
+                  placeholder: t.rep_subject_ph,
+                }),
+              ),
+              React.createElement(
+                "label",
+                { className: "field" },
+                React.createElement(
+                  "span",
+                  { className: "field-label" },
+                  t.rep_desc,
+                ),
+                React.createElement("textarea", {
+                  className: "field-input area lg",
+                  value: desc,
+                  onChange: (e) => setDesc(e.target.value),
+                  placeholder: t.rep_desc_ph,
+                  rows: 5,
+                }),
+              ),
+              React.createElement(
+                "label",
+                { className: "field" },
+                React.createElement(
+                  "span",
+                  { className: "field-label" },
+                  t.rep_attach,
+                ),
+                React.createElement(Img, {
+                  id: "report-photo",
+                  ph: t.rep_attach,
+                  radius: 14,
+                  style: { width: "100%", height: 96 },
+                }),
+              ),
+            ),
+            React.createElement(
+              "div",
+              { className: "rep-confid" },
+              React.createElement(Icon, {
+                name: "shield",
+                size: 15,
+                color: "var(--green-deep)",
+              }),
+              t.rep_confidential,
+            ),
+            React.createElement(
+              "button",
+              {
+                className: "btn btn-green",
+                disabled: !valid,
+                onClick: submit,
+                style: { marginTop: 6 },
+              },
+              React.createElement(Icon, {
+                name: "flag",
+                size: 18,
+                color: "#fff",
+              }),
+              React.createElement("span", null, t.rep_submit),
+            ),
+          ),
+        );
+}
+function Settings({
+  t,
+  lang,
+  onBack,
+  toggleLang,
+  currency,
+  setCurrencyState,
+  themeMode,
+  setThemeMode,
+  openTerms,
+  go,
+  person,
+  onLogout,
+  openSupport,
+  onRequestDelete,
+}) {
+  const [del, setDel] = useStateB(""),
+    [delErr, setDelErr] = useStateB(""),
+    submitDelete = async () => {
+      (setDel("sending"), setDelErr(""));
+      const r = await onRequestDelete();
+      if (r && r.ok) return setDel("sent");
+      (setDelErr((r && r.error) || "تعذّر الإرسال"), setDel("confirm"));
+    },
+    addr =
+      person && (person.city || person.address)
+        ? [person.city, person.address].filter(Boolean).join("، ")
+        : t.no_location,
+    themes = [
+      { id: "light", icon: "sun", label: t.theme_light },
+      { id: "dark", icon: "moon", label: t.theme_dark },
+      { id: "auto", icon: "auto", label: t.theme_auto },
+    ];
+  return React.createElement(
+    "div",
+    { className: "screen settings" },
+    React.createElement(TopBar, { title: t.settings_title, onBack, t }),
+    React.createElement(
+      "div",
+      { className: "set-group" },
+      React.createElement(
+        "div",
+        { className: "set-row col" },
+        React.createElement(
+          "div",
+          { className: "set-row-main" },
+          React.createElement(
+            "span",
+            { className: "set-ic" },
+            React.createElement(Icon, {
+              name: "tag",
+              size: 19,
+              color: "var(--green-deep)",
+            }),
+          ),
+          React.createElement(
+            "span",
+            { className: "set-label" },
+            t.currency_label,
+          ),
+          React.createElement(
+            "div",
+            { className: "lang-switch" },
+            React.createElement(
+              "button",
+              {
+                className: currency === "YER" ? "on" : "",
+                onClick: () => setCurrencyState("YER"),
+              },
+              t.currency_yer,
+            ),
+            React.createElement(
+              "button",
+              {
+                className: currency === "SAR" ? "on" : "",
+                onClick: () => setCurrencyState("SAR"),
+              },
+              t.currency_sar,
+            ),
+          ),
+        ),
+        React.createElement("div", { className: "set-note" }, t.currency_note),
+      ),
+      React.createElement(
+        "div",
+        { className: "set-row col" },
+        React.createElement(
+          "div",
+          { className: "set-row-main" },
+          React.createElement(
+            "span",
+            { className: "set-ic" },
+            React.createElement(Icon, {
+              name: "moon",
+              size: 18,
+              color: "var(--green-deep)",
+            }),
+          ),
+          React.createElement(
+            "span",
+            { className: "set-label" },
+            t.theme_label,
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "theme-seg" },
+          themes.map((m) =>
+            React.createElement(
+              "button",
+              {
+                key: m.id,
+                className: `theme-opt ${themeMode === m.id ? "on" : ""}`,
+                onClick: () => setThemeMode(m.id),
+              },
+              React.createElement(Icon, {
+                name: m.icon,
+                size: 18,
+                color: themeMode === m.id ? "#fff" : "var(--ink-soft)",
+              }),
+              React.createElement("span", null, m.label),
+            ),
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "set-note" },
+          themeMode === "auto" ? t.theme_auto_note : "",
+        ),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "set-group" },
+      React.createElement(
+        "button",
+        { className: "set-row tap", onClick: () => go && go("personal") },
+        React.createElement(
+          "span",
+          { className: "set-ic" },
+          React.createElement(Icon, {
+            name: "location",
+            size: 19,
+            color: "var(--green-deep)",
+          }),
+        ),
+        React.createElement("span", { className: "set-label" }, t.my_location),
+        React.createElement("span", { className: "set-val ellip" }, addr),
+        React.createElement(Icon, {
+          name: t.dir === "rtl" ? "back" : "fwd",
+          size: 16,
+          color: "var(--muted)",
+        }),
+      ),
+      React.createElement(
+        "button",
+        { className: "set-row tap", onClick: openTerms },
+        React.createElement(
+          "span",
+          { className: "set-ic" },
+          React.createElement(Icon, {
+            name: "flag",
+            size: 19,
+            color: "var(--green-deep)",
+          }),
+        ),
+        React.createElement("span", { className: "set-label" }, t.terms_title),
+        React.createElement(Icon, {
+          name: t.dir === "rtl" ? "back" : "fwd",
+          size: 16,
+          color: "var(--muted)",
+        }),
+      ),
+      React.createElement(
+        "button",
+        { className: "set-row tap", onClick: openSupport },
+        React.createElement(
+          "span",
+          { className: "set-ic" },
+          React.createElement(Icon, {
+            name: "whatsapp",
+            size: 19,
+            color: "var(--green-deep)",
+          }),
+        ),
+        React.createElement("span", { className: "set-label" }, t.wa_support),
+        React.createElement(Icon, {
+          name: t.dir === "rtl" ? "back" : "fwd",
+          size: 16,
+          color: "var(--muted)",
+        }),
+      ),
+    ),
+    React.createElement(
+      "button",
+      { className: "logout-btn", onClick: onLogout },
+      React.createElement(Icon, {
+        name: "logout",
+        size: 19,
+        color: "var(--muted)",
+      }),
+      t.logout,
+    ),
+    React.createElement(
+      "div",
+      { className: "danger-zone" },
+      del === "sent"
+        ? React.createElement(
+            "div",
+            { className: "del-sent" },
+            React.createElement(Icon, {
+              name: "check",
+              size: 16,
+              color: "var(--green-deep)",
+              stroke: 3,
+            }),
+            "تم إرسال طلب حذف حسابك إلى الإدارة. ستتم مراجعته قريباً.",
+          )
+        : del === "confirm" || del === "sending"
+          ? React.createElement(
+              "div",
+              { className: "del-confirm" },
+              React.createElement(
+                "p",
+                null,
+                "سيُرسَل طلب حذف حسابك إلى الإدارة لمراجعته ثم حذفه نهائياً. هل أنت متأكد؟",
+              ),
+              delErr &&
+                React.createElement("span", { className: "verif-err" }, delErr),
+              React.createElement(
+                "div",
+                { className: "del-actions" },
+                React.createElement(
+                  "button",
+                  {
+                    className: "btn btn-ghost flex1",
+                    disabled: del === "sending",
+                    onClick: () => setDel(""),
+                  },
+                  "إلغاء",
+                ),
+                React.createElement(
+                  "button",
+                  {
+                    className: "btn btn-danger flex1",
+                    disabled: del === "sending",
+                    onClick: submitDelete,
+                  },
+                  del === "sending" ? "جارٍ الإرسال…" : "تأكيد الطلب",
+                ),
+              ),
+            )
+          : React.createElement(
+              "button",
+              {
+                className: "del-account-link",
+                onClick: () => setDel("confirm"),
+                style: {
+                  background: "none",
+                  border: "none",
+                  color: "var(--muted)",
+                  fontSize: "12px",
+                  textDecoration: "underline",
+                  cursor: "pointer",
+                  padding: "6px 0",
+                  fontFamily: "inherit",
+                  opacity: 0.7,
+                },
+              },
+              "حذف الحساب",
+            ),
+    ),
+    React.createElement("div", { className: "set-version" }, "LOZI · v1.2"),
+  );
+}
+function waLink(phone) {
+  let d = String(phone).replace(/[^0-9]/g, "");
+  return (
+    d.indexOf("967") !== 0 &&
+      (d.charAt(0) === "0" && (d = d.slice(1)), (d = "967" + d)),
+    "https://wa.me/" + d
+  );
+}
+function supLabel(n, lang) {
+  return typeof n.label == "string"
+    ? n.label
+    : n.label[lang] || n.label.ar || "";
+}
+function SupportSheet({ t, lang, numbers, onClose }) {
+  const ordered = [...numbers].sort(
+    (a, b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0),
+  );
+  return React.createElement(
+    "div",
+    { className: "modal-overlay", onClick: onClose },
+    React.createElement(
+      "div",
+      { className: "sheet", onClick: (e) => e.stopPropagation() },
+      React.createElement("div", { className: "sheet-handle" }),
+      React.createElement(
+        "div",
+        { className: "sheet-scroll" },
+        React.createElement(
+          "div",
+          { className: "sup-head" },
+          React.createElement(
+            "div",
+            { className: "sup-badge" },
+            React.createElement(Icon, {
+              name: "whatsapp",
+              size: 28,
+              color: "#fff",
+            }),
+          ),
+          React.createElement("h2", null, t.sup_title),
+          React.createElement("p", null, t.sup_intro),
+        ),
+        React.createElement(
+          "div",
+          { className: "sup-list" },
+          ordered.map((n) =>
+            React.createElement(
+              "a",
+              {
+                key: n.id,
+                className: "sup-card",
+                href: waLink(n.phone),
+                target: "_blank",
+                rel: "noopener",
+              },
+              React.createElement(
+                "span",
+                { className: "sup-ic" },
+                React.createElement(Icon, {
+                  name: "whatsapp",
+                  size: 23,
+                  color: "#fff",
+                }),
+              ),
+              React.createElement(
+                "span",
+                { className: "sup-info" },
+                React.createElement(
+                  "strong",
+                  null,
+                  supLabel(n, lang),
+                  n.primary &&
+                    React.createElement(
+                      "i",
+                      { className: "sup-tag" },
+                      t.sup_primary,
+                    ),
+                ),
+                React.createElement(
+                  "span",
+                  { className: "sup-num", dir: "ltr" },
+                  "+967 ",
+                  n.phone,
+                ),
+              ),
+              React.createElement(
+                "span",
+                { className: "sup-go" },
+                React.createElement(Icon, {
+                  name: "whatsapp",
+                  size: 15,
+                  color: "#fff",
+                }),
+                React.createElement("span", null, t.contact_wa),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+const NOTIF_ICON = {
+  order: "cart",
+  status: "truck",
+  report: "flag",
+  offer: "tag",
+  info: "bell",
+};
+function Notifications({ t, lang, notifs = [], onBack, go }) {
+  return React.createElement(
+    "div",
+    { className: "screen notifs" },
+    React.createElement(TopBar, { title: t.notif_title, onBack, t }),
+    React.createElement(
+      "div",
+      { className: "set-scroll" },
+      notifs.length === 0
+        ? React.createElement(
+            "div",
+            { className: "empty" },
+            React.createElement(
+              "div",
+              { className: "empty-ic" },
+              React.createElement(Icon, {
+                name: "bell",
+                size: 36,
+                color: "var(--gold-deep)",
+              }),
+            ),
+            React.createElement("h3", null, t.notif_empty),
+            React.createElement("p", null, t.notif_empty_sub),
+          )
+        : React.createElement(
+            "div",
+            { className: "notif-list" },
+            notifs.map((n) =>
+              React.createElement(
+                "button",
+                {
+                  key: n.id,
+                  className: `notif-row nt-${n.type} ${n.read ? "" : "unread"}`,
+                  onClick: () => n.link && go(n.link),
+                },
+                React.createElement(
+                  "span",
+                  { className: "notif-ic" },
+                  React.createElement(Icon, {
+                    name: NOTIF_ICON[n.type] || "bell",
+                    size: 18,
+                    color: "#fff",
+                  }),
+                ),
+                React.createElement(
+                  "span",
+                  { className: "notif-mid" },
+                  React.createElement("strong", null, n.title[lang]),
+                  React.createElement(
+                    "span",
+                    { className: "notif-body" },
+                    n.body[lang],
+                  ),
+                  React.createElement(
+                    "span",
+                    { className: "notif-time" },
+                    n.time[lang],
+                  ),
+                ),
+                !n.read &&
+                  React.createElement("i", { className: "notif-unread-dot" }),
+              ),
+            ),
+          ),
+    ),
+  );
+}
+Object.assign(window, {
+  Product,
+  Cart,
+  Checkout,
+  OrderSuccess,
+  Orders,
+  Savings,
+  SubModal,
+  TermsSheet,
+  AddProductSheet,
+  Profile,
+  PersonalInfo,
+  SubscriptionDetails,
+  Favorites,
+  Reports,
+  Settings,
+  SupportSheet,
+  Notifications,
+});
 
+const { useState: useStateS } = React,
+  SELLER_STEPS = ["new", "preparing", "delivering", "delivered"],
+  SELLER_NEXT = {
+    new: "preparing",
+    preparing: "delivering",
+    delivering: "delivered",
+  },
+  SELLER_ACTION = {
+    new: "act_start_prep",
+    preparing: "act_out_delivery",
+    delivering: "act_mark_delivered",
+  },
+  SELLER_STATUS_KEY = {
+    new: "st_new",
+    preparing: "st_preparing",
+    delivering: "st_delivering",
+    delivered: "st_delivered",
+    rejected: "st_rejected",
+  },
+  LOZI_SELLER_ORDERS_SEED = [],
+  SELLER_TITLE = {
+    retail: "dash_retail",
+    wholesale: "dash_wholesale",
+    farmer_almond: "dash_farm",
+    farmer_raisin: "dash_farm",
+  },
+  SELLER_GLYPH = {
+    retail: "store",
+    wholesale: "warehouse",
+    farmer_almond: "leaf",
+    farmer_raisin: "leaf",
+  },
+  LOZI_MY_PRODUCTS_SEED = {};
+function mapsHref(addr) {
+  return (
+    "https://www.google.com/maps/search/?api=1&query=" +
+    encodeURIComponent(addr)
+  );
+}
+function SellerOrderCard({
+  o,
+  t,
+  lang,
+  onAdvance,
+  onAssign,
+  onReject,
+  allowLozi = !0,
+}) {
+  const [rejecting, setRejecting] = useStateS(!1),
+    txt = (v) =>
+      v == null ? "" : typeof v == "string" ? v : v[lang] || v.ar || "",
+    stepIdx = SELLER_STEPS.indexOf(o.status),
+    c = o.customer || {},
+    itemCount = o.items.reduce((a, it) => a + it.q, 0),
+    rejected = o.status === "rejected",
+    showDelivery = o.status === "new" || o.status === "preparing",
+    canReject = o.status === "new" || o.status === "preparing",
+    nextAction = SELLER_NEXT[o.status],
+    canAdvance = !!nextAction;
+  return React.createElement(
+    "div",
+    { className: `sodr-card st-${o.status}` },
+    React.createElement(
+      "div",
+      { className: "sodr-top" },
+      React.createElement(
+        "div",
+        { className: "sodr-head" },
+        React.createElement(
+          "span",
+          { className: "sodr-no" },
+          t.order_no,
+          " #",
+          o.id,
+        ),
+        React.createElement(
+          "span",
+          { className: "sodr-when" },
+          o.placed[lang],
+          " · ",
+          itemCount,
+          " ",
+          t.items_count,
+        ),
+      ),
+      React.createElement(
+        "span",
+        { className: `sodr-badge st-${o.status}` },
+        t[SELLER_STATUS_KEY[o.status]],
+      ),
+    ),
+    !rejected &&
+      React.createElement(
+        "div",
+        { className: "sodr-track" },
+        SELLER_STEPS.map((st, i) =>
+          React.createElement(
+            React.Fragment,
+            { key: st },
+            React.createElement(
+              "span",
+              { className: `sdot ${i <= stepIdx ? "on" : ""}` },
+              i < stepIdx &&
+                React.createElement(Icon, {
+                  name: "check",
+                  size: 9,
+                  color: "#fff",
+                  stroke: 3,
+                }),
+            ),
+            i < SELLER_STEPS.length - 1 &&
+              React.createElement("span", {
+                className: `sline ${i < stepIdx ? "on" : ""}`,
+              }),
+          ),
+        ),
+      ),
+    rejected &&
+      React.createElement(
+        "div",
+        { className: "sodr-rejected" },
+        React.createElement(Icon, {
+          name: "close",
+          size: 14,
+          color: "var(--danger)",
+          stroke: 2.5,
+        }),
+        t.rej_reason_label,
+        ": ",
+        o.rejectReason || t.rej_out_of_stock,
+      ),
+    React.createElement(
+      "div",
+      { className: "sodr-cust" },
+      React.createElement(
+        "div",
+        { className: "sodr-cust-row" },
+        React.createElement(
+          "span",
+          { className: "sodr-cust-ic" },
+          React.createElement(Icon, {
+            name: "user",
+            size: 16,
+            color: "var(--green-deep)",
+          }),
+        ),
+        React.createElement("span", { className: "sodr-cust-name" }, c.name),
+        React.createElement(
+          "span",
+          { className: "sodr-cust-area" },
+          c.area,
+          " · ",
+          c.city,
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "sodr-addr" },
+        React.createElement(Icon, {
+          name: "location",
+          size: 15,
+          color: "var(--gold-deep)",
+        }),
+        React.createElement("span", null, c.address),
+      ),
+      c.note &&
+        React.createElement(
+          "div",
+          { className: "sodr-note" },
+          React.createElement(Icon, {
+            name: "bell",
+            size: 13,
+            color: "var(--muted)",
+          }),
+          React.createElement("span", null, c.note),
+        ),
+    ),
+    React.createElement(
+      "div",
+      { className: "sodr-items" },
+      o.items.map((it, i) =>
+        React.createElement(
+          "div",
+          { key: i, className: "sodr-item" },
+          React.createElement("span", { className: "sodr-item-q" }, it.q, "×"),
+          React.createElement(
+            "span",
+            { className: "sodr-item-name" },
+            txt(it.name),
+          ),
+          React.createElement(
+            "span",
+            { className: "sodr-item-wt" },
+            txt(it.weight),
+          ),
+          React.createElement(
+            "span",
+            { className: "sodr-item-pr" },
+            moneyStr((it.price || 0) * it.q),
+          ),
+        ),
+      ),
+    ),
+    showDelivery &&
+      React.createElement(
+        "div",
+        { className: "sodr-deliver" },
+        React.createElement(
+          "span",
+          { className: "sodr-deliver-lbl" },
+          React.createElement(Icon, {
+            name: "truck",
+            size: 14,
+            color: "var(--green-deep)",
+          }),
+          "التوصيل عبر منصة لوزي",
+        ),
+      ),
+    rejecting &&
+      React.createElement(
+        "div",
+        { className: "sodr-reject" },
+        React.createElement(
+          "span",
+          { className: "sodr-reject-q" },
+          t.rej_confirm_q,
+        ),
+        React.createElement(
+          "div",
+          { className: "sodr-reject-acts" },
+          React.createElement(
+            "button",
+            {
+              className: "sodr-reject-yes",
+              onClick: () => {
+                (onReject(o.id, t.rej_out_of_stock), setRejecting(!1));
+              },
+            },
+            t.rej_out_of_stock,
+          ),
+          React.createElement(
+            "button",
+            { className: "sodr-reject-no", onClick: () => setRejecting(!1) },
+            t.rej_cancel,
+          ),
+        ),
+      ),
+    React.createElement(
+      "div",
+      { className: "sodr-foot" },
+      React.createElement(
+        "div",
+        { className: "sodr-total" },
+        React.createElement("span", null, t.order_total),
+        React.createElement("strong", null, moneyStr(o.total)),
+      ),
+      React.createElement(
+        "div",
+        { className: "sodr-foot-acts" },
+        !rejected &&
+          canReject &&
+          !rejecting &&
+          React.createElement(
+            "button",
+            { className: "sodr-rejectbtn", onClick: () => setRejecting(!0) },
+            React.createElement(Icon, {
+              name: "close",
+              size: 14,
+              color: "var(--danger)",
+              stroke: 2.5,
+            }),
+            t.rej_reject,
+          ),
+        nextAction &&
+          !rejected &&
+          React.createElement(
+            "button",
+            {
+              className: `sodr-action ${canAdvance ? "" : "disabled"}`,
+              disabled: !canAdvance,
+              onClick: () => canAdvance && onAdvance(o.id),
+            },
+            o.status === "delivering"
+              ? React.createElement(Icon, {
+                  name: "check",
+                  size: 16,
+                  color: "#fff",
+                  stroke: 3,
+                })
+              : React.createElement(Icon, {
+                  name: "truck",
+                  size: 16,
+                  color: "#fff",
+                }),
+            t[SELLER_ACTION[o.status]],
+          ),
+        o.status === "delivered" &&
+          React.createElement(
+            "span",
+            { className: "sodr-done" },
+            React.createElement(Icon, {
+              name: "check",
+              size: 14,
+              color: "var(--green-deep)",
+              stroke: 3,
+            }),
+            t.st_delivered,
+          ),
+        rejected &&
+          React.createElement(
+            "span",
+            { className: "sodr-done rej" },
+            React.createElement(Icon, {
+              name: "close",
+              size: 14,
+              color: "var(--danger)",
+              stroke: 2.5,
+            }),
+            t.st_rejected,
+          ),
+      ),
+    ),
+  );
+}
+function SellerDashboard({
+  t,
+  lang,
+  role,
+  person,
+  storeName,
+  rating,
+  orders,
+  onAdvance,
+  onAssign,
+  onReject,
+  productCount = 0,
+  go,
+  onAddProduct,
+  onMyProducts,
+  onStore,
+  onOffers,
+  onReviews,
+  onBundles,
+  showBundles,
+  verifStatus = "approved",
+  onVerify,
+}) {
+  const [filter, setFilter] = useStateS("all"),
+    title = "لوحة التحكم",
+    allowLozi = role !== "wholesale",
+    newCount = orders.filter((o) => o.status === "new").length,
+    prepCount = orders.filter((o) => o.status === "preparing").length,
+    delivCount = orders.filter((o) => o.status === "delivering").length,
+    doneCount = orders.filter((o) => o.status === "delivered").length,
+    rejCount = orders.filter((o) => o.status === "rejected").length,
+    activeCount = prepCount + delivCount,
+    totalSales = orders
+      .filter(
+        (o) =>
+          o.status === "preparing" ||
+          o.status === "delivering" ||
+          o.status === "delivered",
+      )
+      .reduce((a, o) => a + o.total, 0),
+    FILTERS = [
+      { id: "all", label: t.flt_all, n: orders.length },
+      { id: "new", label: t.flt_new, n: newCount, alert: !0 },
+      { id: "preparing", label: t.flt_preparing, n: prepCount },
+      { id: "delivering", label: t.flt_delivering, n: delivCount },
+      { id: "delivered", label: t.flt_done, n: doneCount },
+      { id: "rejected", label: t.flt_rejected, n: rejCount },
+    ],
+    list =
+      filter === "all" ? orders : orders.filter((o) => o.status === filter);
+  return React.createElement(
+    "div",
+    { className: "screen seller-dash" },
+    React.createElement(
+      "div",
+      { className: "sdash-hero" },
+      React.createElement(
+        "div",
+        { className: "sdash-hero-top" },
+        React.createElement(
+          "span",
+          { className: "sdash-glyph" },
+          React.createElement(Icon, {
+            name: SELLER_GLYPH[role] || "store",
+            size: 22,
+            color: "#fff",
+          }),
+        ),
+        React.createElement(
+          "div",
+          { className: "sdash-hero-txt" },
+          React.createElement("h1", null, title),
+          React.createElement(
+            "span",
+            null,
+            (person && person.name) || storeName || t.guest,
+          ),
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "sdash-stats" },
+        React.createElement(
+          "div",
+          { className: "sdash-stat" },
+          React.createElement("strong", null, newCount),
+          React.createElement("span", null, t.dash_new_orders),
+        ),
+        React.createElement(
+          "div",
+          { className: "sdash-stat" },
+          React.createElement("strong", null, activeCount),
+          React.createElement("span", null, t.dash_active),
+        ),
+        React.createElement(
+          "div",
+          { className: "sdash-stat" },
+          React.createElement(
+            "strong",
+            null,
+            fmtMoney(totalSales).value,
+            React.createElement(
+              "i",
+              { className: "sdash-unit" },
+              fmtMoney(totalSales).unit,
+            ),
+          ),
+          React.createElement("span", null, t.dash_total_sales),
+        ),
+      ),
+    ),
+    verifStatus !== "approved" &&
+      React.createElement(
+        "button",
+        { className: `verif-banner ${verifStatus}`, onClick: onVerify },
+        React.createElement(Icon, {
+          name: "shield",
+          size: 18,
+          color: verifStatus === "pending" ? "var(--gold-deep)" : "#fff",
+        }),
+        React.createElement(
+          "span",
+          null,
+          verifStatus === "pending"
+            ? "حسابك قيد المراجعة من الإدارة"
+            : verifStatus === "rejected"
+              ? "تم رفض التوثيق — أعد الإرسال"
+              : "وثّق حسابك لتتمكن من نشر المنتجات",
+        ),
+        verifStatus !== "pending" &&
+          React.createElement("i", { className: "vb-cta" }, "توثيق"),
+      ),
+    React.createElement(
+      "div",
+      { className: "sdash-actions" },
+      React.createElement(
+        "button",
+        { className: "sdash-act products", onClick: onMyProducts },
+        React.createElement(Icon, {
+          name: "store",
+          size: 18,
+          color: "var(--brown)",
+        }),
+        React.createElement("span", null, t.dash_my_products),
+        React.createElement(
+          "span",
+          { className: "sdash-act-count" },
+          productCount,
+        ),
+      ),
+      React.createElement(
+        "button",
+        { className: "sdash-act add", onClick: onAddProduct },
+        React.createElement(Icon, {
+          name: "plus",
+          size: 18,
+          color: "#fff",
+          stroke: 2.4,
+        }),
+        React.createElement("span", null, t.dash_add_short),
+      ),
+    ),
+    React.createElement(
+      "button",
+      { className: "sdash-store-link", onClick: onStore },
+      React.createElement(
+        "span",
+        { className: "ssl-ic" },
+        React.createElement(Icon, {
+          name: "store",
+          size: 18,
+          color: "var(--green-deep)",
+        }),
+      ),
+      React.createElement(
+        "span",
+        { className: "ssl-txt" },
+        "الملف التجاري",
+        React.createElement(
+          "i",
+          null,
+          "صورة المتجر · الاسم · الوصف · ساعات العمل",
+        ),
+      ),
+      React.createElement(Icon, {
+        name: t.dir === "rtl" ? "back" : "fwd",
+        size: 16,
+        color: "var(--muted)",
+      }),
+    ),
+    React.createElement(
+      "button",
+      { className: "sdash-store-link", onClick: onOffers },
+      React.createElement(
+        "span",
+        { className: "ssl-ic" },
+        React.createElement(Icon, {
+          name: "tag",
+          size: 18,
+          color: "var(--green-deep)",
+        }),
+      ),
+      React.createElement(
+        "span",
+        { className: "ssl-txt" },
+        "العروض والتقييمات",
+        React.createElement(
+          "i",
+          null,
+          rating && rating.count
+            ? "الخصومات والتوصيل · ⭐ " +
+                rating.avg.toFixed(1) +
+                " (" +
+                rating.count +
+                " تقييم)"
+            : "الخصومات والتوصيل · الردّ على التقييمات",
+        ),
+      ),
+      React.createElement(Icon, {
+        name: t.dir === "rtl" ? "back" : "fwd",
+        size: 16,
+        color: "var(--muted)",
+      }),
+    ),
+    React.createElement(
+      "div",
+      { className: "sdash-filters" },
+      FILTERS.map((f) =>
+        React.createElement(
+          "button",
+          {
+            key: f.id,
+            className: `sdash-flt ${filter === f.id ? "on" : ""}`,
+            onClick: () => setFilter(f.id),
+          },
+          f.label,
+          React.createElement(
+            "span",
+            { className: `sdash-flt-n ${f.alert && f.n ? "alert" : "muted"}` },
+            f.n,
+          ),
+        ),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "sdash-list" },
+      list.length
+        ? list.map((o) =>
+            React.createElement(SellerOrderCard, {
+              key: o.id,
+              o,
+              t,
+              lang,
+              onAdvance,
+              onAssign,
+              onReject,
+              allowLozi,
+            }),
+          )
+        : React.createElement(
+            "div",
+            { className: "sdash-empty" },
+            React.createElement(
+              "div",
+              { className: "sdash-empty-ic" },
+              React.createElement(Icon, {
+                name: "cart",
+                size: 34,
+                color: "var(--gold-deep)",
+              }),
+            ),
+            React.createElement("p", null, t.dash_no_orders),
+          ),
+    ),
+  );
+}
+function MyProductCard({ p, t, lang, onToggle, onDelete, onEdit, onPin }) {
+  const active = p.active !== !1;
+  return React.createElement(
+    "div",
+    { className: `myp-card ${active ? "" : "off"}` },
+    React.createElement(
+      "div",
+      { className: "myp-img" },
+      React.createElement(Img, {
+        id: p.img,
+        ph: lang === "ar" ? "صورة المنتج" : "Product",
+        radius: 13,
+        style: { width: 64, height: 64 },
+      }),
+    ),
+    React.createElement(
+      "div",
+      { className: "myp-body" },
+      React.createElement(
+        "div",
+        { className: "myp-name" },
+        p.pinned &&
+          React.createElement(
+            "span",
+            { className: "myp-pinned", title: "مثبّت" },
+            "📌",
+          ),
+        p.name[lang],
+        p.stock != null &&
+          p.stock <= 0 &&
+          React.createElement("span", { className: "myp-stock out" }, "نفد"),
+        p.stock != null &&
+          p.stock > 0 &&
+          p.stock <= 3 &&
+          React.createElement(
+            "span",
+            { className: "myp-stock low" },
+            "مخزون منخفض",
+          ),
+      ),
+      React.createElement(
+        "div",
+        { className: "myp-meta" },
+        React.createElement("span", { className: "myp-wt" }, p.weight[lang]),
+        React.createElement(
+          "span",
+          { className: "myp-price" },
+          moneyStr(p.price),
+        ),
+        p.stock != null &&
+          React.createElement(
+            "span",
+            { className: "myp-wt" },
+            "المتوفّر: ",
+            p.stock,
+            " ",
+            p.stockUnit || "",
+          ),
+      ),
+      React.createElement(
+        "div",
+        { className: "myp-row2" },
+        React.createElement(
+          "span",
+          { className: `myp-status ${active ? "on" : "off"}` },
+          React.createElement("i", null),
+          active ? t.myp_visible : t.myp_hidden,
+        ),
+        React.createElement(
+          "button",
+          { className: "myp-edit", onClick: () => onEdit(p.id) },
+          React.createElement(Icon, {
+            name: "idcard",
+            size: 13,
+            color: "var(--green-deep)",
+          }),
+          t.myp_edit,
+        ),
+        onPin &&
+          React.createElement(
+            "button",
+            {
+              className: "myp-pin " + (p.pinned ? "on" : ""),
+              onClick: () => onPin(p.id, !p.pinned),
+            },
+            "📌",
+            p.pinned ? "إلغاء التثبيت" : "تثبيت",
+          ),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "myp-actions" },
+      React.createElement(
+        "button",
+        {
+          className: `myp-toggle ${active ? "on" : ""}`,
+          onClick: () => onToggle(p.id),
+          "aria-label": t.myp_toggle,
+        },
+        React.createElement("i", null),
+      ),
+      React.createElement(
+        "button",
+        {
+          className: "myp-del",
+          onClick: () => onDelete(p.id),
+          "aria-label": t.myp_delete,
+        },
+        React.createElement(Icon, {
+          name: "trash",
+          size: 16,
+          color: "var(--danger)",
+        }),
+      ),
+    ),
+  );
+}
+function MyProducts({
+  t,
+  lang,
+  role,
+  products,
+  onBack,
+  onAdd,
+  onToggle,
+  onDelete,
+  onEdit,
+  onPin,
+}) {
+  const [query, setQuery] = useStateS(""),
+    [sort, setSort] = useStateS("newest"),
+    visible = products.filter((p) => p.active !== !1).length,
+    SORTS = [
+      { id: "newest", label: t.sort_newest },
+      { id: "price_hi", label: t.sort_price_hi },
+      { id: "price_lo", label: t.sort_price_lo },
+      { id: "name", label: t.sort_name },
+      { id: "visible", label: t.sort_visible },
+    ],
+    q = query.trim().toLowerCase();
+  let list = q
+    ? products.filter(
+        (p) => (p.name.ar + " " + p.name.en).toLowerCase().indexOf(q) !== -1,
+      )
+    : products.slice();
+  return (
+    sort === "price_hi"
+      ? list.sort((a, b) => b.price - a.price)
+      : sort === "price_lo"
+        ? list.sort((a, b) => a.price - b.price)
+        : sort === "name"
+          ? list.sort((a, b) => a.name[lang].localeCompare(b.name[lang], "ar"))
+          : sort === "visible" &&
+            list.sort((a, b) => (b.active !== !1) - (a.active !== !1)),
+    React.createElement(
+      "div",
+      { className: "screen myproducts" },
+      React.createElement(TopBar, { title: t.myp_title, onBack, t }),
+      React.createElement(
+        "div",
+        { className: "myp-sum" },
+        React.createElement(
+          "div",
+          { className: "myp-sum-stat" },
+          React.createElement("strong", null, products.length),
+          React.createElement("span", null, t.myp_total),
+        ),
+        React.createElement(
+          "div",
+          { className: "myp-sum-stat" },
+          React.createElement("strong", null, visible),
+          React.createElement("span", null, t.myp_visible_count),
+        ),
+        React.createElement(
+          "button",
+          { className: "myp-add", onClick: onAdd },
+          React.createElement(Icon, {
+            name: "plus",
+            size: 16,
+            color: "#fff",
+            stroke: 2.4,
+          }),
+          t.dash_add_short,
+        ),
+      ),
+      products.length > 0 &&
+        React.createElement(
+          "div",
+          { className: "myp-tools" },
+          React.createElement(
+            "div",
+            { className: "myp-search" },
+            React.createElement(Icon, {
+              name: "search",
+              size: 17,
+              color: "var(--muted)",
+            }),
+            React.createElement("input", {
+              value: query,
+              onChange: (e) => setQuery(e.target.value),
+              placeholder: t.myp_search_ph,
+            }),
+            query &&
+              React.createElement(
+                "button",
+                { className: "myp-clear", onClick: () => setQuery("") },
+                React.createElement(Icon, {
+                  name: "close",
+                  size: 15,
+                  color: "var(--muted)",
+                }),
+              ),
+          ),
+          React.createElement(
+            "div",
+            { className: "myp-sorts" },
+            SORTS.map((s) =>
+              React.createElement(
+                "button",
+                {
+                  key: s.id,
+                  className: `myp-sort ${sort === s.id ? "on" : ""}`,
+                  onClick: () => setSort(s.id),
+                },
+                s.label,
+              ),
+            ),
+          ),
+        ),
+      React.createElement(
+        "div",
+        { className: "myp-list" },
+        products.length
+          ? list.length
+            ? list.map((p) =>
+                React.createElement(MyProductCard, {
+                  key: p.id,
+                  p,
+                  t,
+                  lang,
+                  onToggle,
+                  onDelete,
+                  onEdit,
+                  onPin,
+                }),
+              )
+            : React.createElement(
+                "div",
+                { className: "sdash-empty" },
+                React.createElement(
+                  "div",
+                  { className: "sdash-empty-ic" },
+                  React.createElement(Icon, {
+                    name: "search",
+                    size: 32,
+                    color: "var(--gold-deep)",
+                  }),
+                ),
+                React.createElement("p", null, t.myp_no_match),
+              )
+          : React.createElement(
+              "div",
+              { className: "sdash-empty" },
+              React.createElement(
+                "div",
+                { className: "sdash-empty-ic" },
+                React.createElement(Icon, {
+                  name: "store",
+                  size: 34,
+                  color: "var(--gold-deep)",
+                }),
+              ),
+              React.createElement("p", null, t.myp_empty),
+              React.createElement(
+                "button",
+                { className: "myp-add solo", onClick: onAdd },
+                React.createElement(Icon, {
+                  name: "plus",
+                  size: 16,
+                  color: "#fff",
+                  stroke: 2.4,
+                }),
+                t.dash_add_short,
+              ),
+            ),
+      ),
+    )
+  );
+}
+const LOZI_COMMISSION_ORDERS = [],
+  LOZI_WALLET_DUE = 12500;
+function walStatusMeta(status, t) {
+  return status === "active"
+    ? {
+        color: "var(--green)",
+        soft: "var(--green-soft)",
+        icon: "check",
+        label: t.wal_st_active,
+        sub: t.wal_st_active_sub,
+      }
+    : status === "suspended"
+      ? {
+          color: "var(--danger)",
+          soft: "#F7E7E3",
+          icon: "close",
+          label: t.wal_st_suspended,
+          sub: t.wal_st_suspended_sub,
+        }
+      : {
+          color: "#C58A1F",
+          soft: "#FBEFD8",
+          icon: "bell",
+          label: t.wal_st_due,
+          sub: t.wal_st_due_sub,
+        };
+}
+function walPayBadge(s, t) {
+  return s === "approved"
+    ? { cls: "ok", label: t.wal_pay_approved, icon: "check" }
+    : s === "rejected"
+      ? { cls: "rej", label: t.wal_pay_rejected, icon: "close" }
+      : { cls: "rev", label: t.wal_pay_review, icon: "bell" };
+}
+function SellerWallet({
+  t,
+  lang,
+  person,
+  due,
+  deadline,
+  lastPay,
+  orders,
+  onPay,
+}) {
+  const [status, setStatus] = useStateS("due"),
+    m = walStatusMeta(status, t),
+    pb = walPayBadge(lastPay.status, t),
+    STATES = [
+      { id: "active", dot: "var(--green)", label: t.wal_c_green },
+      { id: "due", dot: "#C58A1F", label: t.wal_c_orange },
+      { id: "suspended", dot: "var(--danger)", label: t.wal_c_red },
+    ];
+  return React.createElement(
+    "div",
+    { className: "screen seller-wallet" },
+    React.createElement(
+      "div",
+      { className: "wal-hero", style: { "--wal-accent": m.color } },
+      React.createElement("div", { className: "wal-hero-bg" }),
+      React.createElement(
+        "div",
+        { className: "wal-hero-body" },
+        React.createElement(
+          "div",
+          { className: "wal-hero-top" },
+          React.createElement(
+            "span",
+            { className: "wal-due-label" },
+            React.createElement(Icon, {
+              name: "wallet",
+              size: 15,
+              color: "var(--gold)",
+            }),
+            t.wal_due_label,
+          ),
+          React.createElement(
+            "span",
+            { className: "wal-status-pill", style: { background: m.color } },
+            React.createElement("i", { style: { background: "#fff" } }),
+            m.label,
+          ),
+        ),
+        React.createElement("div", { className: "wal-amount" }, moneyStr(due)),
+        React.createElement("div", { className: "wal-due-sub" }, t.wal_due_sub),
+        React.createElement(
+          "div",
+          { className: "wal-deadline" },
+          React.createElement(Icon, {
+            name: "calendar",
+            size: 15,
+            color: "#fff",
+          }),
+          React.createElement(
+            "span",
+            null,
+            t.wal_deadline,
+            ": ",
+            React.createElement("b", null, deadline),
+          ),
+        ),
+        React.createElement(
+          "button",
+          { className: "wal-pay-btn", onClick: onPay },
+          React.createElement(Icon, {
+            name: "upload",
+            size: 18,
+            color: "var(--brown)",
+          }),
+          t.wal_pay,
+        ),
+      ),
+    ),
+    React.createElement(
+      "div",
+      {
+        className: "wal-status",
+        style: { background: m.soft, borderColor: m.color },
+      },
+      React.createElement(
+        "span",
+        { className: "wal-status-ic", style: { background: m.color } },
+        React.createElement(Icon, {
+          name: m.icon,
+          size: 17,
+          color: "#fff",
+          stroke: m.icon === "check" ? 3 : 2.4,
+        }),
+      ),
+      React.createElement(
+        "div",
+        { className: "wal-status-txt" },
+        React.createElement(
+          "strong",
+          { style: { color: m.color } },
+          t.wal_status_title,
+          ": ",
+          m.label,
+        ),
+        React.createElement("span", null, m.sub),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "wal-preview" },
+      React.createElement(
+        "span",
+        { className: "wal-preview-lbl" },
+        t.wal_preview,
+      ),
+      React.createElement(
+        "div",
+        { className: "wal-preview-seg" },
+        STATES.map((s) =>
+          React.createElement(
+            "button",
+            {
+              key: s.id,
+              className: `wal-seg ${status === s.id ? "on" : ""}`,
+              style:
+                status === s.id
+                  ? { background: s.dot, borderColor: s.dot, color: "#fff" }
+                  : null,
+              onClick: () => setStatus(s.id),
+            },
+            React.createElement("i", {
+              style: { background: status === s.id ? "#fff" : s.dot },
+            }),
+            s.label,
+          ),
+        ),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "wal-card wal-last" },
+      React.createElement(
+        "div",
+        { className: "wal-last-l" },
+        React.createElement(
+          "span",
+          { className: "wal-last-ic" },
+          React.createElement(Icon, {
+            name: "upload",
+            size: 16,
+            color: "var(--green-deep)",
+          }),
+        ),
+        React.createElement(
+          "div",
+          { className: "wal-last-txt" },
+          React.createElement("strong", null, t.wal_last_pay),
+          React.createElement(
+            "span",
+            null,
+            moneyStr(lastPay.amount),
+            " · ",
+            t.wal_last_pay_on,
+            " ",
+            lastPay.date[lang],
+          ),
+        ),
+      ),
+      React.createElement(
+        "span",
+        { className: `wal-pay-badge ${pb.cls}` },
+        React.createElement(Icon, {
+          name: pb.icon,
+          size: 12,
+          color: "currentColor",
+          stroke: pb.icon === "check" ? 3 : 2.4,
+        }),
+        pb.label,
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "wal-card wal-calc" },
+      React.createElement(
+        "div",
+        { className: "wal-calc-head" },
+        React.createElement(
+          "div",
+          { className: "wal-calc-title" },
+          React.createElement("strong", null, t.wal_calc_title),
+          React.createElement(
+            "span",
+            null,
+            orders.length,
+            " ",
+            t.wal_total_orders,
+          ),
+        ),
+        React.createElement(
+          "span",
+          { className: "wal-rate" },
+          React.createElement(Icon, {
+            name: "percent",
+            size: 12,
+            color: "var(--green-deep)",
+          }),
+          t.wal_rate_note,
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "wal-table" },
+        React.createElement(
+          "div",
+          { className: "wal-trow wal-thead" },
+          React.createElement(
+            "span",
+            { className: "wal-c-order" },
+            t.wal_col_order,
+          ),
+          React.createElement(
+            "span",
+            { className: "wal-c-val" },
+            t.wal_col_value,
+          ),
+          React.createElement(
+            "span",
+            { className: "wal-c-comm" },
+            t.wal_col_comm,
+          ),
+          React.createElement(
+            "span",
+            { className: "wal-c-date" },
+            t.wal_col_date,
+          ),
+        ),
+        orders.map((o) =>
+          React.createElement(
+            "div",
+            { key: o.id, className: "wal-trow" },
+            React.createElement(
+              "span",
+              { className: "wal-c-order" },
+              "#",
+              o.id,
+            ),
+            React.createElement(
+              "span",
+              { className: "wal-c-val" },
+              moneyStr(o.value),
+            ),
+            React.createElement(
+              "span",
+              { className: "wal-c-comm" },
+              moneyStr(o.comm),
+            ),
+            React.createElement(
+              "span",
+              { className: "wal-c-date" },
+              o.date[lang],
+            ),
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "wal-trow wal-tfoot" },
+          React.createElement(
+            "span",
+            { className: "wal-c-order" },
+            t.order_total,
+          ),
+          React.createElement("span", { className: "wal-c-val" }),
+          React.createElement(
+            "span",
+            { className: "wal-c-comm" },
+            moneyStr(orders.reduce((a, o) => a + o.comm, 0)),
+          ),
+          React.createElement("span", { className: "wal-c-date" }),
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "wal-prepaid-note" },
+        React.createElement(Icon, {
+          name: "check",
+          size: 14,
+          color: "var(--green-deep)",
+          stroke: 3,
+        }),
+        React.createElement("span", null, t.wal_prepaid_exempt),
+      ),
+    ),
+  );
+}
+function CommissionPaySheet({ t, lang, amount, onClose, onSubmitted }) {
+  const [copied, setCopied] = useStateS(-1),
+    [hasReceipt, setHasReceipt] = useStateS(!1),
+    copy = (txt, i) => {
+      try {
+        navigator.clipboard.writeText(txt);
+      } catch (e) {}
+      (setCopied(i), setTimeout(() => setCopied(-1), 1400));
+    };
+  return (
+    React.useEffect(() => {
+      const el = document.getElementById("wal-receipt");
+      if (!el) return;
+      const iv = setInterval(() => {
+        const imgs = el.shadowRoot
+          ? [...el.shadowRoot.querySelectorAll("img")]
+          : [];
+        setHasReceipt(
+          imgs.some(
+            (i) =>
+              (i.getAttribute("src") || "").length > 5 &&
+              !i.classList.contains("ghost"),
+          ),
+        );
+      }, 600);
+      return () => clearInterval(iv);
+    }, []),
+    React.createElement(
+      "div",
+      { className: "modal-overlay", onClick: onClose },
+      React.createElement(
+        "div",
+        { className: "sheet", onClick: (e) => e.stopPropagation() },
+        React.createElement("div", { className: "sheet-handle" }),
+        React.createElement(
+          "div",
+          { className: "sheet-scroll" },
+          React.createElement(
+            "div",
+            { className: "sub-head" },
+            React.createElement(
+              "div",
+              { className: "sub-badge" },
+              React.createElement(Icon, {
+                name: "wallet",
+                size: 22,
+                color: "var(--brown)",
+              }),
+            ),
+            React.createElement("h2", null, t.wal_pay_title),
+            React.createElement("p", null, t.wal_pay_intro),
+            React.createElement(
+              "div",
+              { className: "wal-pay-amount" },
+              React.createElement("span", null, t.wal_pay_amount),
+              React.createElement("strong", null, moneyStr(amount)),
+            ),
+          ),
+          React.createElement(
+            "div",
+            { className: "sub-label" },
+            t.wal_accounts,
+          ),
+          React.createElement(
+            "div",
+            { className: "sub-accounts" },
+            LOZI_ACCOUNTS.map((a, i) =>
+              React.createElement(
+                "div",
+                {
+                  key: i,
+                  className: "acct",
+                  style: { borderInlineStartColor: a.color },
+                },
+                React.createElement(
+                  "span",
+                  {
+                    className: "acct-brand",
+                    style: { background: a.gradient || a.color },
+                  },
+                  a.bank[lang].charAt(0),
+                ),
+                React.createElement(
+                  "div",
+                  { className: "acct-info" },
+                  React.createElement(
+                    "strong",
+                    { style: { color: a.color } },
+                    a.bank[lang],
+                  ),
+                  React.createElement(
+                    "span",
+                    { className: "acct-iban" },
+                    a.iban,
+                  ),
+                  React.createElement(
+                    "span",
+                    { className: "acct-name" },
+                    a.name[lang],
+                  ),
+                ),
+                React.createElement(
+                  "button",
+                  {
+                    className: `acct-copy ${copied === i ? "ok" : ""}`,
+                    onClick: () => copy(a.iban, i),
+                  },
+                  React.createElement(Icon, {
+                    name: copied === i ? "check" : "copy",
+                    size: 15,
+                    color: copied === i ? "var(--green-deep)" : "var(--ink)",
+                    stroke: copied === i ? 3 : 2,
+                  }),
+                  copied === i ? t.copied : t.copy,
+                ),
+              ),
+            ),
+          ),
+          React.createElement("div", { className: "sub-label" }, t.sub_upload),
+          React.createElement(
+            "div",
+            { className: "sub-upload" },
+            React.createElement(Img, {
+              id: "wal-receipt",
+              ph: t.sub_upload_hint,
+              radius: 16,
+              shape: "rounded",
+              style: { width: "100%", height: 160, display: "block" },
+            }),
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "sheet-foot" },
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: !hasReceipt,
+              onClick: onSubmitted,
+            },
+            React.createElement(Icon, {
+              name: "upload",
+              size: 18,
+              color: "#fff",
+            }),
+            React.createElement("span", null, t.sub_submit),
+          ),
+        ),
+      ),
+    )
+  );
+}
+function VerifySheet({ t, role, status, note, onClose, onSubmit }) {
+  const [address, setAddress] = useStateS(""),
+    [idFront, setIdFront] = useStateS(null),
+    [idBack, setIdBack] = useStateS(null),
+    [commercialFile, setCommercialFile] = useStateS(null),
+    [shopFile, setShopFile] = useStateS(null),
+    [busy, setBusy] = useStateS(!1),
+    [err, setErr] = useStateS(""),
+    pending = status === "pending",
+    approved = status === "approved",
+    rejected = status === "rejected",
+    isWholesale = role === "wholesale",
+    hasShop = role === "retail" || role === "wholesale",
+    pick = (setter) => (e) => {
+      const f = (e.target.files || [])[0];
+      if (f) {
+        if (f.size > 10 * 1024 * 1024) {
+          setErr("الحجم الأقصى ١٠ ميجابايت");
+          return;
+        }
+        (setErr(""), setter(f));
+      }
+    },
+    ready =
+      address.trim() && idFront && idBack && (!isWholesale || commercialFile),
+    submit = async () => {
+      if (!ready || busy) return;
+      (setBusy(!0), setErr(""));
+      const r = await onSubmit({
+        address: address.trim(),
+        idFront,
+        idBack,
+        commercialFile,
+        shopFile,
+      });
+      if ((setBusy(!1), !r || !r.ok)) {
+        setErr((r && r.error) || "تعذّر الإرسال");
+        return;
+      }
+    };
+  return React.createElement(
+    "div",
+    { className: "modal-overlay", onClick: onClose },
+    React.createElement(
+      "div",
+      { className: "sheet", onClick: (e) => e.stopPropagation() },
+      React.createElement("div", { className: "sheet-handle" }),
+      React.createElement(
+        "div",
+        { className: "sheet-scroll" },
+        React.createElement(
+          "div",
+          { className: "sub-head" },
+          React.createElement(
+            "div",
+            { className: "sub-badge", style: { background: "var(--green)" } },
+            React.createElement(Icon, {
+              name: "idcard",
+              size: 22,
+              color: "#fff",
+            }),
+          ),
+          React.createElement("h2", null, "توثيق الحساب"),
+        ),
+        pending &&
+          React.createElement(
+            "div",
+            { className: "verif-state" },
+            React.createElement(
+              "span",
+              { className: "verif-ic pending" },
+              React.createElement(Icon, {
+                name: "shield",
+                size: 28,
+                color: "var(--gold-deep)",
+              }),
+            ),
+            React.createElement("h3", null, "مستنداتك قيد المراجعة"),
+            React.createElement(
+              "p",
+              null,
+              "يراجع فريق لوزي مستنداتك ويُفعّل حسابك قريباً. ستتمكن من نشر المنتجات بعد الموافقة.",
+            ),
+          ),
+        approved &&
+          React.createElement(
+            "div",
+            { className: "verif-state" },
+            React.createElement(
+              "span",
+              { className: "verif-ic ok" },
+              React.createElement(Icon, {
+                name: "check",
+                size: 26,
+                color: "#fff",
+                stroke: 3,
+              }),
+            ),
+            React.createElement("h3", null, "حسابك موثّق"),
+            React.createElement("p", null, "يمكنك الآن نشر منتجاتك بحرية."),
+          ),
+        !pending &&
+          !approved &&
+          React.createElement(
+            "div",
+            { className: "verif-form" },
+            React.createElement(
+              "p",
+              { className: "verif-intro" },
+              "لنشر منتجاتك، أرفق المستندات التالية ويراجعها فريق لوزي ثم يُفعّل حسابك.",
+            ),
+            rejected &&
+              React.createElement(
+                "div",
+                { className: "verif-rejected" },
+                React.createElement(Icon, {
+                  name: "flag",
+                  size: 14,
+                  color: "var(--danger)",
+                }),
+                "تم رفض المستندات السابقة",
+                note ? " · " + note : "",
+                ". أعد الإرسال بمستندات واضحة.",
+              ),
+            React.createElement(
+              "div",
+              { className: "verif-field" },
+              React.createElement(
+                "span",
+                { className: "verif-label" },
+                "العنوان ",
+                React.createElement("em", null, "مطلوب"),
+              ),
+              React.createElement("input", {
+                className: "field-input",
+                value: address,
+                onChange: (e) => setAddress(e.target.value),
+                placeholder: "المدينة · الحي · أقرب معلم",
+              }),
+            ),
+            React.createElement(
+              "div",
+              { className: "verif-field" },
+              React.createElement(
+                "span",
+                { className: "verif-label" },
+                "البطاقة الشخصية ",
+                React.createElement("em", null, "مطلوب"),
+              ),
+              React.createElement(
+                "p",
+                { className: "verif-hint" },
+                "ارفق صورة البطاقة من الأمام والخلف.",
+              ),
+              React.createElement(
+                "div",
+                { className: "verif-duo" },
+                React.createElement(
+                  "label",
+                  { className: `verif-pick sm ${idFront ? "done" : ""}` },
+                  React.createElement("input", {
+                    type: "file",
+                    accept: "image/*",
+                    onChange: pick(setIdFront),
+                    style: { display: "none" },
+                  }),
+                  React.createElement(Icon, {
+                    name: idFront ? "check" : "upload",
+                    size: 18,
+                    color: "var(--green-deep)",
+                    stroke: idFront ? 3 : 2,
+                  }),
+                  React.createElement(
+                    "span",
+                    null,
+                    idFront ? "الأمام · تم" : "الوجه الأمامي",
+                  ),
+                ),
+                React.createElement(
+                  "label",
+                  { className: `verif-pick sm ${idBack ? "done" : ""}` },
+                  React.createElement("input", {
+                    type: "file",
+                    accept: "image/*",
+                    onChange: pick(setIdBack),
+                    style: { display: "none" },
+                  }),
+                  React.createElement(Icon, {
+                    name: idBack ? "check" : "upload",
+                    size: 18,
+                    color: "var(--green-deep)",
+                    stroke: idBack ? 3 : 2,
+                  }),
+                  React.createElement(
+                    "span",
+                    null,
+                    idBack ? "الخلف · تم" : "الوجه الخلفي",
+                  ),
+                ),
+              ),
+            ),
+            isWholesale &&
+              React.createElement(
+                "div",
+                { className: "verif-field" },
+                React.createElement(
+                  "span",
+                  { className: "verif-label" },
+                  "السجل التجاري ",
+                  React.createElement("em", null, "مطلوب"),
+                ),
+                React.createElement(
+                  "label",
+                  { className: "verif-pick" },
+                  React.createElement("input", {
+                    type: "file",
+                    accept: "image/*,application/pdf",
+                    onChange: pick(setCommercialFile),
+                    style: { display: "none" },
+                  }),
+                  React.createElement(Icon, {
+                    name: commercialFile ? "check" : "upload",
+                    size: 18,
+                    color: "var(--green-deep)",
+                    stroke: commercialFile ? 3 : 2,
+                  }),
+                  React.createElement(
+                    "span",
+                    null,
+                    commercialFile
+                      ? commercialFile.name
+                      : "اختر ملف (صورة أو PDF)",
+                  ),
+                ),
+              ),
+            hasShop &&
+              React.createElement(
+                "div",
+                { className: "verif-field" },
+                React.createElement(
+                  "span",
+                  { className: "verif-label" },
+                  "صورة للمحل ",
+                  React.createElement("i", null, "اختياري"),
+                ),
+                React.createElement(
+                  "label",
+                  { className: "verif-pick" },
+                  React.createElement("input", {
+                    type: "file",
+                    accept: "image/*",
+                    onChange: pick(setShopFile),
+                    style: { display: "none" },
+                  }),
+                  React.createElement(Icon, {
+                    name: shopFile ? "check" : "upload",
+                    size: 18,
+                    color: "var(--green-deep)",
+                    stroke: shopFile ? 3 : 2,
+                  }),
+                  React.createElement(
+                    "span",
+                    null,
+                    shopFile ? shopFile.name : "اختر صورة",
+                  ),
+                ),
+              ),
+            err && React.createElement("span", { className: "verif-err" }, err),
+          ),
+      ),
+      !pending &&
+        !approved &&
+        React.createElement(
+          "div",
+          { className: "sheet-foot" },
+          React.createElement(
+            "button",
+            {
+              className: "btn btn-green",
+              disabled: !ready || busy,
+              onClick: submit,
+            },
+            React.createElement(Icon, {
+              name: busy ? "upload" : "check",
+              size: 18,
+              color: "#fff",
+              stroke: 3,
+            }),
+            React.createElement(
+              "span",
+              null,
+              busy ? "جارٍ الإرسال…" : "إرسال للمراجعة",
+            ),
+          ),
+        ),
+    ),
+  );
+}
+function SellerStore({
+  t,
+  lang,
+  store,
+  verifStatus,
+  onBack,
+  onSave,
+  onVerify,
+}) {
+  const s = store || {},
+    [name, setName] = useStateS(s.name || ""),
+    [desc, setDesc] = useStateS(s.description || ""),
+    [hours, setHours] = useStateS(s.hours || ""),
+    [enabled, setEnabled] = useStateS(s.enabled !== !1),
+    [minOrderEnabled, setMinOrderEnabled] = useStateS(s.minOrderEnabled === !0),
+    [minOrderAmount, setMinOrderAmount] = useStateS(
+      s.minOrderAmount != null ? String(s.minOrderAmount) : "",
+    ),
+    [imgFile, setImgFile] = useStateS(null),
+    [imgPreview, setImgPreview] = useStateS(s.image || ""),
+    [busy, setBusy] = useStateS(!1),
+    approved = verifStatus === "approved",
+    pickImg = (e) => {
+      const f = (e.target.files || [])[0];
+      f &&
+        (f.size > 10 * 1024 * 1024 ||
+          (setImgFile(f),
+          setImgPreview(URL.createObjectURL(f)),
+          (e.target.value = "")));
+    },
+    ready = name.trim(),
+    save = async () => {
+      !ready ||
+        busy ||
+        (setBusy(!0),
+        await onSave({
+          name: name.trim(),
+          description: desc.trim(),
+          hours: hours.trim(),
+          enabled,
+          imageFile: imgFile,
+          minOrderEnabled,
+          minOrderAmount,
+        }),
+        setBusy(!1));
+    };
+  return React.createElement(
+    "div",
+    { className: "screen seller-store" },
+    React.createElement(
+      "div",
+      { className: "sp-hero" },
+      React.createElement(
+        "label",
+        { className: "store-cover" },
+        React.createElement("input", {
+          type: "file",
+          accept: "image/*",
+          onChange: pickImg,
+          style: { display: "none" },
+        }),
+        imgPreview
+          ? React.createElement(Img, {
+              id: imgPreview,
+              ph: "",
+              radius: 0,
+              shape: "rect",
+              style: { width: "100%", height: "100%" },
+            })
+          : React.createElement(
+              "div",
+              { className: "store-cover-empty" },
+              React.createElement(Icon, {
+                name: "upload",
+                size: 26,
+                color: "#fff",
+              }),
+              React.createElement("span", null, "أضف صورة المتجر"),
+            ),
+        React.createElement(
+          "span",
+          { className: "store-cover-edit" },
+          React.createElement(Icon, {
+            name: "upload",
+            size: 14,
+            color: "#fff",
+          }),
+          "تغيير الصورة",
+        ),
+      ),
+      React.createElement(
+        "button",
+        { className: "hero-back", onClick: onBack },
+        React.createElement(Icon, {
+          name: t.dir === "rtl" ? "chevron" : "back",
+          size: 22,
+          color: "var(--ink)",
+        }),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "store-body" },
+      React.createElement(
+        "div",
+        { className: "store-badges" },
+        approved
+          ? React.createElement(
+              "span",
+              { className: "sb-badge ok" },
+              React.createElement(Icon, {
+                name: "check",
+                size: 13,
+                color: "#fff",
+                stroke: 3,
+              }),
+              "متجر موثّق",
+            )
+          : React.createElement(
+              "button",
+              { className: "sb-badge warn", onClick: onVerify },
+              React.createElement(Icon, {
+                name: "shield",
+                size: 13,
+                color: "#fff",
+              }),
+              "أكمل توثيقك",
+            ),
+        s.offers && s.offers.discount && s.offers.discount.percent
+          ? React.createElement(
+              "span",
+              { className: "sb-badge gold" },
+              React.createElement(Icon, {
+                name: "tag",
+                size: 13,
+                color: "var(--brown)",
+              }),
+              "خصم ",
+              s.offers.discount.percent,
+              "%",
+              s.offers.discount.scope === "product" ? " · صنف" : "",
+            )
+          : null,
+        s.offers && s.offers.freeDelivery && s.offers.freeDelivery.min
+          ? React.createElement(
+              "span",
+              { className: "sb-badge gold" },
+              React.createElement(Icon, {
+                name: "truck",
+                size: 13,
+                color: "var(--brown)",
+              }),
+              "توصيل مجاني فوق ",
+              s.offers.freeDelivery.min,
+            )
+          : null,
+      ),
+      React.createElement(
+        "label",
+        { className: "field" },
+        React.createElement("span", { className: "field-label" }, "اسم المتجر"),
+        React.createElement("input", {
+          className: "field-input",
+          value: name,
+          onChange: (e) => setName(e.target.value),
+          placeholder: "اسم متجرك",
+        }),
+      ),
+      React.createElement(
+        "label",
+        { className: "field" },
+        React.createElement(
+          "span",
+          { className: "field-label" },
+          "نبذة عن المتجر",
+        ),
+        React.createElement("textarea", {
+          className: "field-input store-desc",
+          rows: 3,
+          value: desc,
+          onChange: (e) => setDesc(e.target.value),
+          placeholder: "من أنت وماذا تبيع؟",
+        }),
+      ),
+      React.createElement(
+        "label",
+        { className: "field" },
+        React.createElement(
+          "span",
+          { className: "field-label" },
+          "ساعات العمل",
+        ),
+        React.createElement("input", {
+          className: "field-input",
+          value: hours,
+          onChange: (e) => setHours(e.target.value),
+          placeholder: "مثال: السبت–الخميس · ٨ص – ٨م",
+        }),
+      ),
+      React.createElement(
+        "div",
+        { className: "store-toggle" },
+        React.createElement("span", null, "المتجر مُفعّل ومرئي للعملاء"),
+        React.createElement(
+          "span",
+          {
+            className: `switch ${enabled ? "on" : ""}`,
+            onClick: () => setEnabled((v) => !v),
+          },
+          React.createElement("i", null),
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "store-toggle" },
+        React.createElement("span", null, "اشتراط حد أدنى للطلب"),
+        React.createElement(
+          "span",
+          {
+            className: `switch ${minOrderEnabled ? "on" : ""}`,
+            onClick: () => setMinOrderEnabled((v) => !v),
+          },
+          React.createElement("i", null),
+        ),
+      ),
+      minOrderEnabled &&
+        React.createElement(
+          "label",
+          { className: "field" },
+          React.createElement(
+            "span",
+            { className: "field-label" },
+            "الحد الأدنى للطلب (ريال يمني)",
+          ),
+          React.createElement("input", {
+            className: "field-input",
+            value: minOrderAmount,
+            onChange: (e) =>
+              setMinOrderAmount(e.target.value.replace(/[^0-9]/g, "")),
+            placeholder: "مثال: ٥٠٠٠",
+            inputMode: "numeric",
+          }),
+          React.createElement(
+            "p",
+            { className: "offer-note" },
+            "لن يتمكّن العميل من إتمام الطلب من متجرك إذا كان إجمالي سلّته أقل من هذا المبلغ.",
+          ),
+        ),
+    ),
+    React.createElement(
+      "div",
+      { className: "store-foot" },
+      React.createElement(
+        "button",
+        { className: "btn btn-green", disabled: !ready || busy, onClick: save },
+        React.createElement(Icon, {
+          name: "check",
+          size: 18,
+          color: "#fff",
+          stroke: 3,
+        }),
+        React.createElement(
+          "span",
+          null,
+          busy ? "جارٍ الحفظ…" : "حفظ الملف التجاري",
+        ),
+      ),
+    ),
+  );
+}
+function SellerOffers({
+  t,
+  lang,
+  store,
+  products,
+  onBack,
+  onSave,
+  role,
+  onBundles,
+  embedded,
+}) {
+  const o = (store && store.offers) || {},
+    d = o.discount || {},
+    fd = o.freeDelivery || {},
+    [discOn, setDiscOn] = useStateS(!!d.percent),
+    [discScope, setDiscScope] = useStateS(d.scope || "all"),
+    [discProduct, setDiscProduct] = useStateS(
+      d.productId || (products[0] && products[0].id) || "",
+    ),
+    [discPercent, setDiscPercent] = useStateS(
+      d.percent ? String(d.percent) : "",
+    ),
+    [fdOn, setFdOn] = useStateS(!!fd.min),
+    [fdMin, setFdMin] = useStateS(fd.min ? String(fd.min) : ""),
+    [busy, setBusy] = useStateS(!1),
+    pct = Math.min(90, Math.max(0, Number(discPercent) || 0)),
+    ready =
+      (!discOn || (pct > 0 && (discScope === "all" || discProduct))) &&
+      (!fdOn || Number(fdMin) > 0),
+    save = async () => {
+      !ready ||
+        busy ||
+        (setBusy(!0),
+        await onSave({
+          discount:
+            discOn && pct > 0
+              ? {
+                  percent: pct,
+                  scope: discScope,
+                  productId: discScope === "product" ? discProduct : null,
+                }
+              : null,
+          freeDelivery:
+            fdOn && Number(fdMin) > 0 ? { min: Number(fdMin) } : null,
+        }),
+        setBusy(!1));
+    };
+  return React.createElement(
+    embedded ? React.Fragment : "div",
+    embedded ? null : { className: "screen seller-offers" },
+    embedded
+      ? null
+      : React.createElement(TopBar, { title: "العروض", onBack, t }),
+    React.createElement(
+      "div",
+      { className: "set-scroll offers-scroll" },
+      role === "retail" &&
+        onBundles &&
+        React.createElement(
+          "button",
+          { className: "sdash-store-link or-bundle", onClick: onBundles },
+          React.createElement(
+            "span",
+            { className: "ssl-ic gold" },
+            React.createElement(Icon, {
+              name: "tag",
+              size: 18,
+              color: "var(--gold-deep)",
+            }),
+          ),
+          React.createElement(
+            "span",
+            { className: "ssl-txt" },
+            "عرض مشكّل",
+            React.createElement("i", null, "عرض مكوّن من عدة أصناف بسعر واحد"),
+          ),
+          React.createElement(Icon, {
+            name: t.dir === "rtl" ? "back" : "fwd",
+            size: 16,
+            color: "var(--muted)",
+          }),
+        ),
+      React.createElement(
+        "div",
+        { className: "offer-sec" },
+        React.createElement(
+          "div",
+          { className: "offer-sec-head" },
+          React.createElement(
+            "div",
+            { className: "osh-txt" },
+            React.createElement("strong", null, "خصم"),
+            React.createElement(
+              "span",
+              null,
+              "نسبة خصم على كل المتجر أو على صنف معيّن",
+            ),
+          ),
+          React.createElement(
+            "span",
+            {
+              className: `switch ${discOn ? "on" : ""}`,
+              onClick: () => setDiscOn((v) => !v),
+            },
+            React.createElement("i", null),
+          ),
+        ),
+        discOn &&
+          React.createElement(
+            "div",
+            { className: "offer-sec-body" },
+            React.createElement(
+              "div",
+              { className: "seg seg-2" },
+              React.createElement(
+                "button",
+                {
+                  className: discScope === "all" ? "on" : "",
+                  onClick: () => setDiscScope("all"),
+                },
+                "كل المتجر",
+              ),
+              React.createElement(
+                "button",
+                {
+                  className: discScope === "product" ? "on" : "",
+                  onClick: () => setDiscScope("product"),
+                },
+                "صنف معيّن",
+              ),
+            ),
+            discScope === "product" &&
+              (products.length
+                ? React.createElement(
+                    "select",
+                    {
+                      className: "field-input",
+                      value: discProduct,
+                      onChange: (e) => setDiscProduct(e.target.value),
+                    },
+                    products.map((p) =>
+                      React.createElement(
+                        "option",
+                        { key: p.id, value: p.id },
+                        p.name[lang],
+                      ),
+                    ),
+                  )
+                : React.createElement(
+                    "p",
+                    { className: "offer-note" },
+                    "أضف منتجاً أولاً لاختياره.",
+                  )),
+            React.createElement(
+              "label",
+              { className: "field" },
+              React.createElement(
+                "span",
+                { className: "field-label" },
+                "نسبة الخصم %",
+              ),
+              React.createElement("input", {
+                className: "field-input",
+                value: discPercent,
+                onChange: (e) =>
+                  setDiscPercent(e.target.value.replace(/[^0-9]/g, "")),
+                placeholder: "مثال: ١٥",
+                inputMode: "numeric",
+              }),
+            ),
+          ),
+      ),
+      React.createElement(
+        "div",
+        { className: "offer-sec" },
+        React.createElement(
+          "div",
+          { className: "offer-sec-head" },
+          React.createElement(
+            "div",
+            { className: "osh-txt" },
+            React.createElement("strong", null, "توصيل مجاني"),
+            React.createElement(
+              "span",
+              null,
+              "عند بلوغ حدّ أدنى للشراء تحدّده أنت",
+            ),
+          ),
+          React.createElement(
+            "span",
+            {
+              className: `switch ${fdOn ? "on" : ""}`,
+              onClick: () => setFdOn((v) => !v),
+            },
+            React.createElement("i", null),
+          ),
+        ),
+        fdOn &&
+          React.createElement(
+            "div",
+            { className: "offer-sec-body" },
+            React.createElement(
+              "label",
+              { className: "field" },
+              React.createElement(
+                "span",
+                { className: "field-label" },
+                "أقل مبلغ للشراء (ريال يمني)",
+              ),
+              React.createElement("input", {
+                className: "field-input",
+                value: fdMin,
+                onChange: (e) =>
+                  setFdMin(e.target.value.replace(/[^0-9]/g, "")),
+                placeholder: "مثال: ١٠٠٠٠",
+                inputMode: "numeric",
+              }),
+            ),
+            React.createElement(
+              "p",
+              { className: "offer-note" },
+              "يحصل العميل على توصيل مجاني عند بلوغ سلّته هذا المبلغ.",
+            ),
+          ),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "store-foot" },
+      React.createElement(
+        "button",
+        { className: "btn btn-green", disabled: !ready || busy, onClick: save },
+        React.createElement(Icon, {
+          name: "check",
+          size: 18,
+          color: "#fff",
+          stroke: 3,
+        }),
+        React.createElement("span", null, busy ? "جارٍ الحفظ…" : "حفظ العروض"),
+      ),
+    ),
+  );
+}
+function SellerReviews({ t, lang, vendorId, onBack, embedded }) {
+  const [rows, setRows] = useStateS(null),
+    [replyId, setReplyId] = useStateS(null),
+    [replyText, setReplyText] = useStateS(""),
+    load = () => {
+      !window.LOZI_SB ||
+        !vendorId ||
+        window.LOZI_SB.from("reviews")
+          .select("*")
+          .eq("store_vendor_id", vendorId)
+          .order("created_at", { ascending: !1 })
+          .then(({ data }) => setRows(data || []));
+    };
+  React.useEffect(load, [vendorId]);
+  const avg =
+      rows && rows.length
+        ? rows.reduce((a, r) => a + r.rating, 0) / rows.length
+        : 0,
+    saveReply = async (r) => {
+      const { error } = await window.LOZI_SB.from("reviews")
+        .update({ reply: replyText.trim() || null })
+        .eq("id", r.id);
+      error || (setReplyId(null), setReplyText(""), load());
+    };
+  return React.createElement(
+    embedded ? React.Fragment : "div",
+    embedded ? null : { className: "screen seller-reviews" },
+    embedded
+      ? null
+      : React.createElement(TopBar, { title: "التقييمات", onBack, t }),
+    React.createElement(
+      "div",
+      { className: "set-scroll", style: { padding: "16px 18px 40px" } },
+      React.createElement(
+        "div",
+        { className: "srev-summary" },
+        React.createElement(Stars, { value: avg, size: 18 }),
+        React.createElement("strong", null, avg ? avg.toFixed(1) : "—"),
+        React.createElement(
+          "span",
+          null,
+          "· ",
+          rows ? rows.length : 0,
+          " تقييم",
+        ),
+      ),
+      rows === null
+        ? React.createElement("div", { className: "vs-empty" }, "جارٍ التحميل…")
+        : rows.length
+          ? rows.map((r) =>
+              React.createElement(
+                "div",
+                { className: "rev-card", key: r.id },
+                React.createElement(
+                  "div",
+                  { className: "rev-top" },
+                  React.createElement(
+                    "strong",
+                    null,
+                    r.reviewer_name || "عميل",
+                  ),
+                  React.createElement(Stars, { value: r.rating, size: 13 }),
+                ),
+                r.comment &&
+                  React.createElement(
+                    "p",
+                    { className: "rev-comment" },
+                    r.comment,
+                  ),
+                replyId === r.id
+                  ? React.createElement(
+                      "div",
+                      { className: "srev-replybox" },
+                      React.createElement("textarea", {
+                        className: "field-input store-desc",
+                        rows: 2,
+                        value: replyText,
+                        onChange: (e) => setReplyText(e.target.value),
+                        placeholder: "اكتب ردّك…",
+                      }),
+                      React.createElement(
+                        "div",
+                        { className: "del-actions" },
+                        React.createElement(
+                          "button",
+                          {
+                            className: "btn btn-ghost flex1 sm",
+                            onClick: () => setReplyId(null),
+                          },
+                          "إلغاء",
+                        ),
+                        React.createElement(
+                          "button",
+                          {
+                            className: "btn btn-green flex1 sm",
+                            onClick: () => saveReply(r),
+                          },
+                          "حفظ الرد",
+                        ),
+                      ),
+                    )
+                  : r.reply
+                    ? React.createElement(
+                        "div",
+                        { className: "rev-reply" },
+                        React.createElement("b", null, "ردّك:"),
+                        " ",
+                        r.reply,
+                        " ",
+                        React.createElement(
+                          "button",
+                          {
+                            className: "srev-editreply",
+                            onClick: () => {
+                              (setReplyId(r.id), setReplyText(r.reply));
+                            },
+                          },
+                          "تعديل",
+                        ),
+                      )
+                    : React.createElement(
+                        "button",
+                        {
+                          className: "srev-replybtn",
+                          onClick: () => {
+                            (setReplyId(r.id), setReplyText(""));
+                          },
+                        },
+                        React.createElement(Icon, {
+                          name: "whatsapp",
+                          size: 14,
+                          color: "var(--green-deep)",
+                        }),
+                        "ردّ على التقييم",
+                      ),
+              ),
+            )
+          : React.createElement(
+              "div",
+              { className: "sdash-empty" },
+              React.createElement(
+                "div",
+                { className: "sdash-empty-ic" },
+                React.createElement(Icon, {
+                  name: "star",
+                  size: 30,
+                  color: "var(--gold-deep)",
+                }),
+              ),
+              React.createElement(
+                "p",
+                null,
+                "لا توجد تقييمات بعد — ستظهر هنا بعد أول عملية بيع.",
+              ),
+            ),
+    ),
+  );
+}
+function SellerOffersReviews({
+  t,
+  lang,
+  store,
+  products,
+  vendorId,
+  role,
+  onBack,
+  onSave,
+  onBundles,
+}) {
+  const [tab, setTab] = useStateS("offers");
+  return React.createElement(
+    "div",
+    { className: "screen seller-offers-reviews" },
+    React.createElement(TopBar, { title: "العروض والتقييمات", onBack, t }),
+    React.createElement(
+      "div",
+      { className: "seg seg-2 or-tabs" },
+      React.createElement(
+        "button",
+        {
+          className: tab === "offers" ? "on" : "",
+          onClick: () => setTab("offers"),
+        },
+        "العروض",
+      ),
+      React.createElement(
+        "button",
+        {
+          className: tab === "reviews" ? "on" : "",
+          onClick: () => setTab("reviews"),
+        },
+        "التقييمات",
+      ),
+    ),
+    tab === "offers"
+      ? React.createElement(SellerOffers, {
+          t,
+          lang,
+          store,
+          products,
+          role,
+          onBack,
+          onSave,
+          onBundles,
+          embedded: !0,
+        })
+      : React.createElement(SellerReviews, { t, lang, vendorId, embedded: !0 }),
+  );
+}
+Object.assign(window, {
+  SellerDashboard,
+  SellerOffersReviews,
+  MyProducts,
+  SellerWallet,
+  CommissionPaySheet,
+  VerifySheet,
+  SellerStore,
+  SellerOffers,
+  SellerReviews,
+  LOZI_SELLER_ORDERS_SEED,
+  LOZI_MY_PRODUCTS_SEED,
+  LOZI_COMMISSION_ORDERS,
+  LOZI_WALLET_DUE,
+});
+
+const { useState: useS, useEffect: useE } = React,
+  SECTION_ORDER = ["almond", "raisin", "retail", "wholesale"];
+function sectionsForRole(role) {
+  const canWholesale = role === "retail" || role === "wholesale";
+  return SECTION_ORDER.filter((s) => s !== "wholesale" || canWholesale);
+}
+function addMonths(date, m) {
+  const d = new Date(date);
+  return (d.setMonth(d.getMonth() + m), d);
+}
+function fmtDate(d, lang) {
+  return d
+    ? new Date(d).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
+    : "—";
+}
+function sbDate(iso) {
+  try {
+    const d = new Date(iso);
+    return {
+      ar: d.toLocaleDateString("ar-EG"),
+      en: d.toLocaleDateString("en-GB"),
+    };
+  } catch (e) {
+    return { ar: "محفوظ", en: "Saved" };
+  }
+}
+function MyBundles({
+  t,
+  lang,
+  bundles,
+  limit,
+  onBack,
+  onAdd,
+  onToggle,
+  onDelete,
+  onEdit,
+}) {
+  const used = bundles.length,
+    atLimit = used >= limit;
+  return React.createElement(
+    "div",
+    { className: "screen myproducts" },
+    React.createElement(TopBar, { title: "العروض المشكّلة", onBack, t }),
+    React.createElement(
+      "div",
+      { className: "myp-sum" },
+      React.createElement(
+        "div",
+        { className: "myp-sum-stat" },
+        React.createElement("strong", null, used),
+        React.createElement("span", null, "عرض مشكّل"),
+      ),
+      React.createElement(
+        "div",
+        { className: "myp-sum-stat" },
+        React.createElement("strong", null, limit),
+        React.createElement("span", null, "الحد الأقصى"),
+      ),
+      React.createElement(
+        "button",
+        { className: "myp-add", disabled: atLimit, onClick: onAdd },
+        React.createElement(Icon, {
+          name: "plus",
+          size: 16,
+          color: "#fff",
+          stroke: 2.4,
+        }),
+        "عرض جديد",
+      ),
+    ),
+    atLimit &&
+      React.createElement(
+        "div",
+        { className: "bundle-limit-note" },
+        React.createElement(Icon, {
+          name: "bolt",
+          size: 14,
+          color: "var(--gold-deep)",
+        }),
+        "الحد الأقصى للعروض المشكّلة لمتجرك هو " + limit,
+      ),
+    React.createElement(
+      "div",
+      { className: "myp-list" },
+      bundles.length
+        ? bundles.map((p) =>
+            React.createElement(MyProductCard, {
+              key: p.id,
+              p,
+              t,
+              lang,
+              onToggle,
+              onDelete,
+              onEdit,
+            }),
+          )
+        : React.createElement(
+            "div",
+            { className: "sdash-empty" },
+            React.createElement(
+              "div",
+              { className: "sdash-empty-ic" },
+              React.createElement(Icon, {
+                name: "tag",
+                size: 34,
+                color: "var(--gold-deep)",
+              }),
+            ),
+            React.createElement("p", null, "لا توجد عروض مشكّلة بعد."),
+            !atLimit &&
+              React.createElement(
+                "button",
+                { className: "myp-add solo", onClick: onAdd },
+                React.createElement(Icon, {
+                  name: "plus",
+                  size: 16,
+                  color: "#fff",
+                  stroke: 2.4,
+                }),
+                "إنشاء عرض مشكّل",
+              ),
+          ),
+    ),
+  );
+}
+function BundleSheet({ t, lang, initial, onClose, onPublish }) {
+  const editing = !!initial,
+    [name, setName] = useStateS(
+      (editing && (initial.name[lang] || initial.name.ar)) || "",
+    ),
+    [price, setPrice] = useStateS(
+      editing && initial.price ? String(initial.price) : "",
+    ),
+    [stock, setStock] = useStateS(
+      editing && initial.stock != null ? String(initial.stock) : "",
+    ),
+    [items, setItems] = useStateS(
+      editing && Array.isArray(initial.items) && initial.items.length
+        ? initial.items.map((it) => ({
+            name: it.name || "",
+            weight: it.weight != null ? String(it.weight) : "",
+            unit: it.unit === "kilo" ? "kilo" : "gram",
+          }))
+        : [
+            { name: "", weight: "", unit: "gram" },
+            { name: "", weight: "", unit: "gram" },
+          ],
+    ),
+    [photos, setPhotos] = useStateS(() =>
+      ((editing && initial.images) || []).map((u, i) => ({
+        url: u,
+        thumb: (initial.thumbs || [])[i],
+      })),
+    ),
+    onPickPhotos = (e) => {
+      const add = [];
+      (Array.from(e.target.files || []).forEach((f) => {
+        (f.type && f.type.indexOf("image/") !== 0) ||
+          f.size > 10 * 1024 * 1024 ||
+          add.push({ file: f, url: URL.createObjectURL(f) });
+      }),
+        setPhotos((ps) => [...ps, ...add].slice(0, 4)),
+        (e.target.value = ""));
+    },
+    removePhoto = (i) => setPhotos((ps) => ps.filter((_, x) => x !== i)),
+    setItem = (i, k, v) =>
+      setItems((arr) => arr.map((it, j) => (j === i ? { ...it, [k]: v } : it))),
+    addItem = () =>
+      setItems((arr) => [...arr, { name: "", weight: "", unit: "gram" }]),
+    removeItem = (i) =>
+      setItems((arr) => (arr.length > 1 ? arr.filter((_, j) => j !== i) : arr)),
+    cleanItems = items
+      .map((it) => ({
+        name: it.name.trim(),
+        weight: String(it.weight || "").trim(),
+        unit: it.unit === "kilo" ? "kilo" : "gram",
+      }))
+      .filter((it) => it.name),
+    ready = !!(
+      name.trim() &&
+      price &&
+      Number(price) > 0 &&
+      cleanItems.length >= 2
+    ),
+    publish = () => {
+      if (!ready) return;
+      const stockVal =
+          stock !== "" ? Math.max(0, Math.floor(Number(stock) || 0)) : null,
+        crop = {
+          id: editing ? initial.id : "mine-" + Date.now(),
+          store: editing ? initial.store : "mine-retail",
+          cat: "retail",
+          bundle: !0,
+          items: cleanItems,
+          stock: stockVal,
+          price: Number(price),
+          name: { ar: name.trim(), en: name.trim() },
+          weight: { ar: "عرض مشكّل", en: "Mixed bundle" },
+          desc: {
+            ar: "عرض مشكّل — محتويات وأوزان ثابتة بسعر واحد.",
+            en: "Mixed bundle — fixed contents and weights, one price.",
+          },
+          photoItems: photos.map((p) =>
+            p.file ? { file: p.file } : { url: p.url, thumb: p.thumb },
+          ),
+        };
+      (onPublish(crop, editing), onClose());
+    };
+  return React.createElement(
+    "div",
+    { className: "modal-overlay", onClick: onClose },
+    React.createElement(
+      "div",
+      { className: "sheet", onClick: (e) => e.stopPropagation() },
+      React.createElement("div", { className: "sheet-handle" }),
+      React.createElement(
+        "div",
+        { className: "sheet-scroll" },
+        React.createElement(
+          "div",
+          { className: "sub-head" },
+          React.createElement(
+            "div",
+            {
+              className: "sub-badge",
+              style: { background: "var(--gold-deep)" },
+            },
+            React.createElement(Icon, { name: "tag", size: 22, color: "#fff" }),
+          ),
+          React.createElement(
+            "h2",
+            null,
+            editing ? "تعديل عرض مشكّل" : "إنشاء عرض مشكّل",
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "field" },
+          React.createElement(
+            "span",
+            { className: "field-label" },
+            "اسم العرض",
+          ),
+          React.createElement("input", {
+            className: "field-input",
+            value: name,
+            onChange: (e) => setName(e.target.value),
+            placeholder: "مثال: عرض المكسّرات المشكّل",
+          }),
+        ),
+        React.createElement(
+          "div",
+          { className: "field" },
+          React.createElement(
+            "span",
+            { className: "field-label" },
+            "السعر الإجمالي (ريال)",
+          ),
+          React.createElement("input", {
+            className: "field-input",
+            value: price,
+            onChange: (e) => setPrice(e.target.value.replace(/[^0-9]/g, "")),
+            placeholder: "سعر العرض كاملاً",
+            inputMode: "numeric",
+          }),
+        ),
+        React.createElement(
+          "div",
+          { className: "field" },
+          React.createElement(
+            "span",
+            { className: "field-label" },
+            "الكمية المتوفّرة (اتركه فارغاً لغير محدود)",
+          ),
+          React.createElement("input", {
+            className: "field-input",
+            value: stock,
+            onChange: (e) => setStock(e.target.value.replace(/[^0-9]/g, "")),
+            placeholder: "مثال: ١٠",
+            inputMode: "numeric",
+          }),
+        ),
+        React.createElement(
+          "div",
+          { className: "field" },
+          React.createElement(
+            "span",
+            { className: "field-label" },
+            "مكوّنات العرض (صنف + وزن ثابت)",
+          ),
+          items.map((it, i) =>
+            React.createElement(
+              "div",
+              { className: "bundle-item-card", key: i },
+              React.createElement(
+                "div",
+                { className: "bundle-item-top" },
+                React.createElement(
+                  "span",
+                  { className: "bundle-item-no" },
+                  "الصنف " + (i + 1),
+                ),
+                React.createElement(
+                  "button",
+                  {
+                    className: "bundle-item-del",
+                    disabled: items.length <= 1,
+                    onClick: () => removeItem(i),
+                  },
+                  React.createElement(Icon, {
+                    name: "trash",
+                    size: 15,
+                    color: "var(--danger)",
+                  }),
+                ),
+              ),
+              React.createElement("input", {
+                className: "field-input",
+                value: it.name,
+                onChange: (e) => setItem(i, "name", e.target.value),
+                placeholder: "الصنف (مثال: لوز)",
+              }),
+              React.createElement(
+                "div",
+                { className: "bundle-wu" },
+                React.createElement("input", {
+                  className: "field-input",
+                  style: { flex: 1 },
+                  value: it.weight,
+                  onChange: (e) => setItem(i, "weight", e.target.value),
+                  inputMode: "decimal",
+                  placeholder: "الوزن (٢٥٠)",
+                }),
+                React.createElement(
+                  "select",
+                  {
+                    className: "field-input bundle-item-unit",
+                    value: it.unit || "gram",
+                    onChange: (e) => setItem(i, "unit", e.target.value),
+                  },
+                  React.createElement("option", { value: "gram" }, "جرام"),
+                  React.createElement("option", { value: "kilo" }, "كيلو"),
+                ),
+              ),
+            ),
+          ),
+          React.createElement(
+            "button",
+            { className: "bundle-add-item", onClick: addItem },
+            React.createElement(Icon, {
+              name: "plus",
+              size: 15,
+              color: "var(--green-deep)",
+              stroke: 2.4,
+            }),
+            "إضافة صنف",
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "field" },
+          React.createElement(
+            "span",
+            { className: "field-label" },
+            "صورة العرض",
+          ),
+          React.createElement(
+            "div",
+            { className: "photo-grid" },
+            photos.map((p, i) =>
+              React.createElement(
+                "div",
+                { className: "photo-thumb", key: i },
+                React.createElement("img", { src: p.url, alt: "" }),
+                React.createElement(
+                  "button",
+                  { className: "photo-del", onClick: () => removePhoto(i) },
+                  React.createElement(Icon, {
+                    name: "close",
+                    size: 13,
+                    color: "#fff",
+                    stroke: 3,
+                  }),
+                ),
+              ),
+            ),
+            photos.length < 4 &&
+              React.createElement(
+                "label",
+                { className: "photo-add" },
+                React.createElement("input", {
+                  type: "file",
+                  accept: "image/*",
+                  multiple: !0,
+                  onChange: onPickPhotos,
+                  style: { display: "none" },
+                }),
+                React.createElement(Icon, {
+                  name: "upload",
+                  size: 20,
+                  color: "var(--green-deep)",
+                }),
+                React.createElement("span", null, "إضافة صورة"),
+              ),
+          ),
+        ),
+        React.createElement(
+          "div",
+          { className: "bundle-sheet-note" },
+          React.createElement(Icon, {
+            name: "check",
+            size: 13,
+            color: "var(--green-deep)",
+            stroke: 3,
+          }),
+          "يُباع العرض كاملاً بمحتوياته وأوزانه الثابتة. يمكنك إظهاره أو إخفاؤه من قائمة العروض.",
+        ),
+      ),
+      React.createElement(
+        "div",
+        { className: "sheet-foot" },
+        React.createElement(
+          "button",
+          { className: "btn btn-green", disabled: !ready, onClick: publish },
+          React.createElement(Icon, {
+            name: "check",
+            size: 18,
+            color: "#fff",
+            stroke: 3,
+          }),
+          React.createElement(
+            "span",
+            null,
+            editing ? "حفظ التعديل" : "نشر العرض",
+          ),
+        ),
+      ),
+    ),
+  );
+}
+function OfflineBanner() {
+  const [off, setOff] = React.useState(
+    typeof navigator !== "undefined" && navigator.onLine === !1,
+  );
+  React.useEffect(() => {
+    const on = () => setOff(!1),
+      down = () => setOff(!0);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", down);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
+  return off
+    ? React.createElement(
+        "div",
+        { className: "lz-offline", role: "alert" },
+        React.createElement(
+          "svg",
+          {
+            className: "lz-offline-ic",
+            width: 18,
+            height: 18,
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke: "#fff",
+            strokeWidth: 2.2,
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+          },
+          React.createElement("path", { d: "m2 2 20 20" }),
+          React.createElement("path", { d: "M8.5 16.4a5 5 0 0 1 7 0" }),
+          React.createElement("path", { d: "M5 12.9a10 10 0 0 1 5.2-2.6" }),
+          React.createElement("path", { d: "M19 12.9a10 10 0 0 0-3.2-2.2" }),
+          React.createElement("path", { d: "M2 8.8a16 16 0 0 1 6.5-3.4" }),
+          React.createElement("path", { d: "M22 8.8a16 16 0 0 0-8.3-3.7" }),
+          React.createElement("path", { d: "M12 20h.01" }),
+        ),
+        React.createElement("span", null, "خطأ: لا يوجد إنترنت"),
+      )
+    : null;
+}
+function Spinner({ size = 36, label }) {
+  return React.createElement(
+    "div",
+    { className: "lz-load" },
+    React.createElement("span", {
+      className: "lz-spin",
+      style: { width: size, height: size },
+    }),
+    label
+      ? React.createElement("p", { className: "lz-load-txt" }, label)
+      : null,
+  );
+}
+function SkeletonCard() {
+  return React.createElement(
+    "div",
+    { className: "lz-skel-card" },
+    React.createElement("div", { className: "lz-skel-img lz-shimmer" }),
+    React.createElement(
+      "div",
+      { className: "lz-skel-body" },
+      React.createElement("div", {
+        className: "lz-skel-line lz-shimmer",
+        style: { width: "80%" },
+      }),
+      React.createElement("div", {
+        className: "lz-skel-line lz-shimmer",
+        style: { width: "50%" },
+      }),
+    ),
+  );
+}
+function SkeletonGrid({ count = 4 }) {
+  return Array.from({ length: count }).map((_, i) =>
+    React.createElement(SkeletonCard, { key: i }),
+  );
+}
+function SkeletonStores({ count = 4 }) {
+  return React.createElement(
+    "div",
+    { className: "lz-skel-stores" },
+    Array.from({ length: count }).map((_, i) =>
+      React.createElement(
+        "div",
+        { className: "lz-skel-store", key: i },
+        React.createElement("div", { className: "lz-skel-thumb lz-shimmer" }),
+        React.createElement(
+          "div",
+          { className: "lz-skel-meta" },
+          React.createElement("div", {
+            className: "lz-skel-line lz-shimmer",
+            style: { width: "60%" },
+          }),
+          React.createElement("div", {
+            className: "lz-skel-line lz-shimmer",
+            style: { width: "40%" },
+          }),
+        ),
+      ),
+    ),
+  );
+}
+function ErrorRetry({ onRetry, msg }) {
+  return React.createElement(
+    "div",
+    { className: "lz-error" },
+    React.createElement(
+      "div",
+      { className: "lz-error-ic" },
+      React.createElement(
+        "svg",
+        {
+          width: 30,
+          height: 30,
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "var(--gold-deep)",
+          strokeWidth: 2,
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+        },
+        React.createElement("path", {
+          d: "M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z",
+        }),
+        React.createElement("path", { d: "M12 9v4" }),
+        React.createElement("path", { d: "M12 17h.01" }),
+      ),
+    ),
+    React.createElement(
+      "p",
+      { className: "lz-error-txt" },
+      msg || "حدث خطأ، يرجى إعادة المحاولة.",
+    ),
+    onRetry
+      ? React.createElement(
+          "button",
+          { className: "lz-retry", onClick: onRetry },
+          React.createElement(
+            "svg",
+            {
+              width: 16,
+              height: 16,
+              viewBox: "0 0 24 24",
+              fill: "none",
+              stroke: "#fff",
+              strokeWidth: 2.4,
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+            },
+            React.createElement("path", { d: "M3 12a9 9 0 0 1 15-6.7L21 8" }),
+            React.createElement("path", { d: "M21 3v5h-5" }),
+            React.createElement("path", { d: "M21 12a9 9 0 0 1-15 6.7L3 16" }),
+            React.createElement("path", { d: "M3 21v-5h5" }),
+          ),
+          "إعادة المحاولة",
+        )
+      : null,
+  );
+}
+function App() {
+  const [lang, setLang] = useS("ar"),
+    [currency, setCurrencyState] = useS("YER"),
+    [stage, setStage] = useS(() =>
+      window.LOZI_RECOVERY
+        ? "reset"
+        : sessionStorage.getItem("lozi_active")
+          ? localStorage.getItem("lozi_stage") || "register"
+          : "splash",
+    ),
+    [screen, setScreen] = useS("home"),
+    [params, setParams] = useS({}),
+    [tab, setTab] = useS("home"),
+    [hist, setHist] = useS([]),
+    [cart, setCart] = useS([]),
+    [favs, setFavs] = useS(() => {
+      try {
+        return JSON.parse(localStorage.getItem("lozi_favs")) || [];
+      } catch (e) {
+        return [];
+      }
+    }),
+    [orders, setOrders] = useS(LOZI_ORDERS_SEED),
+    [reports, setReports] = useS([]),
+    [notifs, setNotifs] = useS(LOZI_NOTIFS_SEED),
+    [subscribed, setSubscribed] = useS(!1),
+    [subPending, setSubPending] = useS(!1),
+    [subOpen, setSubOpen] = useS(!1),
+    [termsOpen, setTermsOpen] = useS(!1),
+    [supportOpen, setSupportOpen] = useS(!1),
+    [support, setSupport] = useS(() => {
+      try {
+        return (
+          JSON.parse(localStorage.getItem("lozi_support")) || LOZI_SUPPORT_SEED
+        );
+      } catch (e) {
+        return LOZI_SUPPORT_SEED;
+      }
+    }),
+    [supportWa, setSupportWa] = useS("777184208"),
+    [verif, setVerif] = useS(null),
+    [verifOpen, setVerifOpen] = useS(!1),
+    [store, setStore] = useS(null),
+    [uploadProg, setUploadProg] = useS(null),
+    [addCropOpen, setAddCropOpen] = useS(!1),
+    [dbProducts, setDbProducts] = useS([]),
+    [productsLoad, setProductsLoad] = useS("loading"),
+    [userId, setUserId] = useS(null),
+    rowToProduct = (r) => ({
+      ...(r.data || {}),
+      id: r.id,
+      cat: r.category || (r.data && r.data.cat),
+      price: r.price != null ? r.price : r.data && r.data.price,
+      active: r.status !== "hidden",
+      _vendor: r.vendor_id,
+      shahtiStatus: r.shahti_status || (r.data && r.data.shahtiStatus) || null,
+      stock:
+        r.stock != null
+          ? r.stock
+          : r.data && r.data.stock != null
+            ? r.data.stock
+            : null,
+      pinned: r.pinned === !0,
+      pinnedAt: r.pinned_at || null,
+    }),
+    isBlockedAccount = async (uid) => {
+      if (!window.LOZI_SB || !uid) return !1;
+      try {
+        const { data, error } = await window.LOZI_SB.from("profiles")
+          .select("status")
+          .eq("user_id", uid)
+          .maybeSingle();
+        if (error || !data) return !1;
+        if (data.status === "banned")
+          return (
+            await window.LOZI_SB.auth.signOut(),
+            setStage("login"),
+            showToast("تم حظر هذا الحساب. للاستفسار تواصل مع الدعم."),
+            !0
+          );
+        if (data.status === "suspended")
+          return (window.LoziGuard && window.LoziGuard.showSuspended(), !0);
+      } catch (e) {}
+      return !1;
+    },
+    loadProducts = () => {
+      window.LOZI_SB &&
+        window.LOZI_SB.from("products")
+          .select("*")
+          .then(
+            ({ data, error }) => {
+              if (error) {
+                console.warn("load products:", error.message);
+                setProductsLoad("error");
+                return;
+              }
+              (setDbProducts((data || []).map(rowToProduct)),
+                setProductsLoad("ready"));
+            },
+            () => setProductsLoad("error"),
+          );
+    },
+    [editingProduct, setEditingProduct] = useS(null),
+    [bundleSheetOpen, setBundleSheetOpen] = useS(!1),
+    [editingBundle, setEditingBundle] = useS(null),
+    [bundleLimit, setBundleLimit] = useS(1),
+    [sellerOrders, setSellerOrders] = useS(
+      typeof LOZI_SELLER_ORDERS_SEED != "undefined"
+        ? LOZI_SELLER_ORDERS_SEED
+        : [],
+    ),
+    [walletPayOpen, setWalletPayOpen] = useS(!1),
+    [lastPay, setLastPay] = useS({
+      amount: 9800,
+      date: { ar: "٣١ مايو", en: "May 31" },
+      status: "approved",
+    }),
+    [seenNewOrders, setSeenNewOrders] = useS([]),
+    [sub, setSub] = useS({ start: null, expiry: null }),
+    [userRole, setUserRole] = useS(
+      () => localStorage.getItem("lozi_role") || "customer",
+    ),
+    [themeMode, setThemeMode] = useS(
+      () => localStorage.getItem("lozi_theme") || "light",
+    ),
+    [person, setPerson] = useS(() => {
+      try {
+        return (
+          JSON.parse(localStorage.getItem("lozi_person")) || {
+            name: "",
+            phone: "",
+            city: "",
+            address: "",
+          }
+        );
+      } catch (e) {
+        return { name: "", phone: "", city: "", address: "" };
+      }
+    }),
+    [toast, setToast] = useS(""),
+    t = LOZI_T[lang];
+  (setCurrency(currency),
+    useE(() => {
+      ((document.documentElement.lang = lang),
+        (document.documentElement.dir = t.dir));
+    }, [lang]),
+    useE(() => {
+      stage !== "splash" &&
+        stage !== "reset" &&
+        (localStorage.setItem("lozi_stage", stage),
+        sessionStorage.setItem("lozi_active", "1"));
+    }, [stage]),
+    useE(() => {
+      localStorage.setItem("lozi_role", userRole);
+    }, [userRole]),
+    useE(() => {
+      localStorage.setItem("lozi_person", JSON.stringify(person));
+    }, [person]));
+  const resolveTheme = (mode) => {
+    if (mode === "dark") return "dark";
+    if (mode === "light") return "light";
+    const h = new Date().getHours();
+    return h >= 18 || h < 6 ? "dark" : "light";
+  };
+  (useE(() => {
+    localStorage.setItem("lozi_theme", themeMode);
+    const apply = () => {
+      const root = document.querySelector(".app-root");
+      root && root.setAttribute("data-theme", resolveTheme(themeMode));
+    };
+    if ((apply(), themeMode === "auto")) {
+      const iv = setInterval(apply, 6e4);
+      return () => clearInterval(iv);
+    }
+  }, [themeMode]),
+    useE(() => {
+      localStorage.setItem("lozi_support", JSON.stringify(support));
+    }, [support]),
+    useE(() => {
+      if (!window.LOZI_SB) return;
+      if (window.LOZI_RECOVERY) {
+        setStage("reset");
+        return;
+      }
+      const sub2 = window.LOZI_SB.auth.onAuthStateChange((event) => {
+        event === "PASSWORD_RECOVERY" && setStage("reset");
+      });
+      return (
+        window.LOZI_SB.auth.getSession().then(async ({ data }) => {
+          if (window.LOZI_RECOVERY) {
+            setStage("reset");
+            return;
+          }
+          const u = data && data.session && data.session.user;
+          if (!u || (await isBlockedAccount(u.id))) return;
+          setUserId(u.id);
+          const md = u.user_metadata || {};
+          (md.role &&
+            setUserRole(md.role === "farmer" ? "farmer_almond" : md.role),
+            setPerson((p) => ({
+              ...p,
+              name: md.name || md.full_name || p.name,
+              phone: md.phone || (u.phone ? "+" + u.phone : p.phone),
+            })),
+            setStage("app"));
+        }),
+        () => {
+          try {
+            sub2.data.subscription.unsubscribe();
+          } catch (e) {}
+        }
+      );
+    }, []),
+    useE(() => {
+      window.LOZI_SB && loadCustomerOrders();
+    }, []),
+    useE(() => {
+      try {
+        localStorage.setItem("lozi_favs", JSON.stringify(favs));
+      } catch (e) {}
+    }, [favs]),
+    useE(() => {
+      if (!window.LOZI_SB || !userId) return;
+      window.LOZI_SB.from("favorites")
+        .select("product_id")
+        .eq("user_id", userId)
+        .then(({ data, error }) => {
+          error || !data || setFavs(data.map((r) => r.product_id));
+        });
+    }, [userId]));
+  const rowToCustomerOrder = (r) => ({
+      id: r.order_no || String(r.id).slice(0, 6),
+      status: r.status === "new" ? "received" : r.status || "received",
+      total: r.total || 0,
+      delivery_fee: r.delivery_fee != null ? r.delivery_fee : null,
+      wholesale: (Array.isArray(r.items) ? r.items : []).some((it) => {
+        const pr = dbProducts.find((p) => p.id === it.p);
+        return pr && pr.cat === "wholesale";
+      }),
+      pay: r.pay || "cod",
+      date: sbDate(r.created_at),
+      items: Array.isArray(r.items) ? r.items : [],
+      seller: r.seller_vendor_id || null,
+      rid: r.id,
+      vendor: r.vendor || null,
+    }),
+    loadCustomerOrders = () => {
+      !window.LOZI_SB ||
+        !userId ||
+        window.LOZI_SB.from("orders")
+          .select("*")
+          .eq("customer_id", userId)
+          .order("created_at", { ascending: !1 })
+          .then(({ data, error }) => {
+            error || setOrders((data || []).map(rowToCustomerOrder));
+          });
+    };
+  useE(() => {
+    loadCustomerOrders();
+  }, [userId]);
+  const rowToSellerOrder = (r) => ({
+      id: r.order_no || String(r.id).slice(0, 6),
+      status:
+        r.status === "received" || r.status === "payreview"
+          ? "new"
+          : r.status || "new",
+      total: r.total || 0,
+      pay: r.pay || "cod",
+      items: Array.isArray(r.items) ? r.items : [],
+      customer: r.customer || { name: "" },
+      rejectReason: r.reject_reason || null,
+      date: sbDate(r.created_at),
+      placed: sbDate(r.created_at),
+    }),
+    loadSellerOrders = () => {
+      const seller = userRole !== "customer";
+      !window.LOZI_SB ||
+        !userId ||
+        !seller ||
+        window.LOZI_SB.from("orders")
+          .select("*")
+          .eq("seller_vendor_id", userId)
+          .order("created_at", { ascending: !1 })
+          .then(({ data, error }) => {
+            error || setSellerOrders((data || []).map(rowToSellerOrder));
+          });
+    };
+  (useE(() => {
+    loadSellerOrders();
+  }, [userRole, userId]),
+    useE(() => {
+      (screen === "orders" && loadCustomerOrders(),
+        screen === "dashboard" && loadSellerOrders());
+    }, [screen]),
+    useE(() => {
+      loadProducts();
+    }, [stage, userId]),
+    useE(() => {
+      window.LOZI_SB &&
+        window.LOZI_SB.from("settings")
+          .select("key,value")
+          .then(({ data, error }) => {
+            if (error || !data) return;
+            const bl = data.find((r) => r.key === "retail_bundle_limit");
+            if (bl && bl.value != null && bl.value !== "") {
+              const n = parseInt(bl.value, 10);
+              if (isFinite(n) && n >= 0) setBundleLimit(n);
+            }
+            const row = data.find((r) => r.key === "support_wa");
+            if (row && row.value) {
+              const local = String(row.value)
+                .replace(/[^0-9]/g, "")
+                .replace(/^967/, "");
+              (setSupportWa(local),
+                setSupport((list) =>
+                  list.map((n) => (n.primary ? { ...n, phone: local } : n)),
+                ));
+            }
+          });
+    }, []));
+  const loadVerif = () => {
+    !(
+      userRole === "farmer_almond" ||
+      userRole === "farmer_raisin" ||
+      userRole === "retail" ||
+      userRole === "wholesale"
+    ) ||
+      !userId ||
+      !window.LOZI_SB ||
+      window.LOZI_SB.from("vendor_verifications")
+        .select("status,doc_path,note")
+        .eq("user_id", userId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          error || setVerif(data || { status: "none" });
+        });
+  };
+  useE(() => {
+    loadVerif();
+  }, [userRole, userId]);
+  const loadStore = () => {
+    !(
+      userRole === "farmer_almond" ||
+      userRole === "farmer_raisin" ||
+      userRole === "retail" ||
+      userRole === "wholesale"
+    ) ||
+      !userId ||
+      !window.LOZI_SB ||
+      window.LOZI_SB.from("stores")
+        .select(
+          "name,description,hours,enabled,shahti_free,image_path,offers,min_order_amount,min_order_enabled",
+        )
+        .eq("vendor_id", userId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          error ||
+            setStore(
+              data
+                ? {
+                    name: data.name,
+                    description: data.description,
+                    hours: data.hours,
+                    enabled: data.enabled,
+                    shahti_free: data.shahti_free,
+                    image: data.image_path,
+                    offers: data.offers || null,
+                    minOrderAmount:
+                      data.min_order_amount != null
+                        ? Number(data.min_order_amount)
+                        : null,
+                    minOrderEnabled: data.min_order_enabled === !0,
+                  }
+                : { name: "" },
+            );
+        });
+  };
+  useE(() => {
+    loadStore();
+  }, [userRole, userId]);
+  const [myRating, setMyRating] = useS({ avg: 0, count: 0 }),
+    loadMyRating = () => {
+      !(
+        userRole === "farmer_almond" ||
+        userRole === "farmer_raisin" ||
+        userRole === "retail" ||
+        userRole === "wholesale"
+      ) ||
+        !userId ||
+        !window.LOZI_SB ||
+        window.LOZI_SB.from("reviews")
+          .select("rating")
+          .eq("store_vendor_id", userId)
+          .then(({ data, error }) => {
+            error ||
+              !data ||
+              setMyRating({
+                count: data.length,
+                avg: data.length
+                  ? data.reduce((a, r) => a + r.rating, 0) / data.length
+                  : 0,
+              });
+          });
+    };
+  useE(() => {
+    loadMyRating();
+  }, [userRole, userId]);
+  const [storeOffers, setStoreOffers] = useS({}),
+    [storesMap, setStoresMap] = useS({}),
+    [sectionVarieties, setSectionVarieties] = useS({}),
+    loadStoreOffers = () => {
+      window.LOZI_SB &&
+        window.LOZI_SB.from("stores")
+          .select(
+            "vendor_id,name,image_path,offers,trusted_badge,badge_source,average_rating,ratings_count,shahti_free,free_delivery,min_order_amount,min_order_enabled",
+          )
+          .then(({ data, error }) => {
+            if (error || !data) return;
+            const m = {},
+              names = {};
+            (data.forEach((r) => {
+              (r.offers && (m[r.vendor_id] = r.offers),
+                (names[r.vendor_id] = {
+                  name: r.name,
+                  image: r.image_path,
+                  trustedBadge: r.trusted_badge === !0,
+                  badgeSource: r.badge_source,
+                  rating:
+                    r.average_rating != null ? Number(r.average_rating) : null,
+                  ratingsCount: r.ratings_count || 0,
+                  shahtiFree: r.shahti_free === !0,
+                  freeDelivery: r.free_delivery === !0,
+                  minOrderAmount:
+                    r.min_order_amount != null
+                      ? Number(r.min_order_amount)
+                      : null,
+                  minOrderEnabled: r.min_order_enabled === !0,
+                  offers: r.offers || null,
+                }));
+            }),
+              setStoreOffers(m),
+              setStoresMap(names));
+          });
+    },
+    loadSectionVarieties = () => {
+      window.LOZI_SB &&
+        window.LOZI_SB.from("section_varieties")
+          .select("section,variety_id,label_ar,label_en,sort")
+          .order("sort")
+          .then(({ data, error }) => {
+            if (error || !data) return;
+            const mm = {};
+            (data.forEach((r) => {
+              (mm[r.section] = mm[r.section] || []).push({
+                id: r.variety_id,
+                label: { ar: r.label_ar, en: r.label_en || r.label_ar },
+              });
+            }),
+              setSectionVarieties(mm));
+          });
+    };
+  useE(() => {
+    loadStoreOffers();
+  }, [stage, userId]);
+  useE(() => {
+    loadSectionVarieties();
+  }, []);
+  const withDiscount = (p) => {
+      const off = storeOffers[p._vendor],
+        d = off && off.discount;
+      return !d ||
+        !d.percent ||
+        !p.price ||
+        !(d.scope === "all" || (d.scope === "product" && d.productId === p.id))
+        ? p
+        : {
+            ...p,
+            price: Math.round(p.price * (1 - d.percent / 100)),
+            old: p.price,
+          };
+    },
+    browseProducts = async (o) => {
+      if (!window.LOZI_SB || !window.LOZI_SB.rpc) return null;
+      try {
+        const { data, error } = await window.LOZI_SB.rpc("browse_products", {
+          p_section: o.section || null,
+          p_sort: o.sort || "best",
+          p_varieties: o.varieties && o.varieties.length ? o.varieties : null,
+          p_price_min:
+            o.priceMin != null && o.priceMin !== "" ? Number(o.priceMin) : null,
+          p_price_max:
+            o.priceMax != null && o.priceMax !== "" ? Number(o.priceMax) : null,
+          p_shahti_only: !!o.shahti,
+          p_free_delivery_only: !!o.freeDelivery,
+          p_bundle_only: !!o.bundle,
+          p_discount_only: !!o.discount,
+          p_limit: o.limit || 120,
+          p_offset: o.offset || 0,
+        });
+        if (error || !data) return null;
+        return data.map(rowToProduct).map(withDiscount);
+      } catch (e) {
+        return null;
+      }
+    },
+    submitVerif = async ({
+      address,
+      idFront,
+      idBack,
+      commercialFile,
+      shopFile,
+    }) => {
+      if (!window.LOZI_SB) return { ok: !1, error: "الخدمة غير متاحة" };
+      const { data: au } = await window.LOZI_SB.auth.getUser(),
+        uid = au && au.user && au.user.id;
+      if (!uid) return { ok: !1, error: "سجّل الدخول أولاً" };
+      const mk = (file, tag) => {
+          const ext =
+            (String(file.name).split(".").pop() || "jpg")
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, "") || "jpg";
+          return {
+            file,
+            bucket: "vendor-docs",
+            path: uid + "/" + tag + "-" + Date.now() + "." + ext,
+            key: tag,
+          };
+        },
+        jobs = [mk(idFront, "id_front"), mk(idBack, "id_back")];
+      (commercialFile && jobs.push(mk(commercialFile, "commercial")),
+        shopFile && jobs.push(mk(shopFile, "shop")));
+      const res = await uploadFiles(
+          jobs.map((j) => ({ file: j.file, bucket: j.bucket, path: j.path })),
+        ),
+        docs = {};
+      for (let i = 0; i < jobs.length; i++) {
+        if (!res[i] || !res[i].ok)
+          return {
+            ok: !1,
+            error: (res[i] && res[i].error) || "تعذّر رفع الملف",
+          };
+        docs[jobs[i].key] = jobs[i].path;
+      }
+      const { error } = await window.LOZI_SB.from(
+        "vendor_verifications",
+      ).upsert(
+        {
+          user_id: uid,
+          status: "pending",
+          doc_path: docs.id_front,
+          docs,
+          address,
+          name: (person && person.name) || null,
+          phone:
+            (person && person.phone) ||
+            (au.user.phone ? "+" + au.user.phone : null),
+          note: null,
+          submitted_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+      return error
+        ? { ok: !1, error: error.message }
+        : (setVerif({ status: "pending", doc_path: docs.id_front }),
+          { ok: !0 });
+    },
+    showToast = (m) => {
+      (setToast(m), setTimeout(() => setToast(""), 1500));
+    },
+    toggleLang = () => setLang((l) => (l === "ar" ? "en" : "ar")),
+    TAB_SCREENS = [
+      "home",
+      "sections",
+      "savings",
+      "cart",
+      "profile",
+      "dashboard",
+      "wallet",
+    ],
+    go = (s, p = {}) => {
+      (setHist((h) =>
+        TAB_SCREENS.includes(s) ? [] : [...h, { screen, params }],
+      ),
+        setScreen(s),
+        setParams(p),
+        TAB_SCREENS.includes(s)
+          ? setTab(s)
+          : s === "store" || s === "product" || s === "vstore"
+            ? setTab("sections")
+            : s === "myproducts" ||
+                s === "mystore" ||
+                s === "myoffers" ||
+                s === "myreviews"
+              ? setTab("dashboard")
+              : [
+                  "orders",
+                  "favorites",
+                  "reports",
+                  "settings",
+                  "personal",
+                  "subscription",
+                ].includes(s) && setTab("profile"));
+      const main = document.querySelector(".app-main");
+      main && (main.scrollTop = 0);
+    },
+    goBack = () => {
+      setHist((h) => {
+        if (!h.length) return (setScreen("home"), setTab("home"), []);
+        const prev = h[h.length - 1];
+        return (
+          setScreen(prev.screen),
+          setParams(prev.params),
+          setTab(
+            TAB_SCREENS.includes(prev.screen)
+              ? prev.screen
+              : prev.screen === "store"
+                ? "sections"
+                : tab,
+          ),
+          h.slice(0, -1)
+        );
+      });
+      const main = document.querySelector(".app-main");
+      main && (main.scrollTop = 0);
+    },
+    addToCart = (p, q = 1, meta) => {
+      (setCart((c) => {
+        const ex = c.find((it) => it.p.id === p.id);
+        if (meta && meta.byAmount) {
+          const item = {
+            p,
+            q,
+            byAmount: !0,
+            grams: meta.grams,
+            amount: meta.amount,
+          };
+          return ex
+            ? c.map((it) => (it.p.id === p.id ? item : it))
+            : [...c, item];
+        }
+        return ex
+          ? c.map((it) =>
+              it.p.id === p.id ? { ...it, q: it.q + q, byAmount: !1 } : it,
+            )
+          : [...c, { p, q }];
+      }),
+        showToast(t.added));
+    },
+    setQty = (id, q) =>
+      setCart((c) => c.map((it) => (it.p.id === id ? { ...it, q } : it))),
+    removeItem = (id) => setCart((c) => c.filter((it) => it.p.id !== id)),
+    toggleFav = (id) => {
+      const has = favs.includes(id);
+      setFavs((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
+      if (window.LOZI_SB && userId) {
+        const q = has
+          ? window.LOZI_SB.from("favorites")
+              .delete()
+              .eq("user_id", userId)
+              .eq("product_id", id)
+          : window.LOZI_SB.from("favorites").upsert({
+              user_id: userId,
+              product_id: id,
+            });
+        Promise.resolve(q).then(({ error }) => {
+          error && console.warn("favorite sync:", error.message);
+        });
+      }
+    },
+    confirmOrder = async (vendorId, pay = "cod", receiptFile) => {
+      const grp = cart.filter((it) => it.p._vendor === vendorId);
+      if (!grp.length) return;
+      const subtotal = grp.reduce((a, it) => a + it.p.price * it.q, 0),
+        deliveryFee =
+          typeof feeFor == "function" ? feeFor(grp, storeOffers) : 1e3,
+        total = subtotal + (deliveryFee || 0),
+        id = String(Date.now()).slice(-6),
+        items = grp.map((it) =>
+          it.byAmount
+            ? {
+                p: it.p.id,
+                q: 1,
+                name: (it.p.name && (it.p.name.ar || it.p.name)) || "",
+                weight: "≈ " + it.grams + " جم",
+                price: Math.round(it.amount),
+              }
+            : {
+                p: it.p.id,
+                q: it.q,
+                name: (it.p.name && (it.p.name.ar || it.p.name)) || "",
+                weight: (it.p.weight && (it.p.weight.ar || it.p.weight)) || "",
+                price: it.p.price,
+              },
+        );
+      (setOrders((o) => [
+        {
+          id,
+          status: "received",
+          date: { ar: "الآن", en: "Just now" },
+          total,
+          pay,
+          items,
+          seller: vendorId,
+        },
+        ...o,
+      ]),
+        setCart((c) => c.filter((it) => it.p._vendor !== vendorId)),
+        pay === "prepaid" && showToast(t.prepaid_sent_toast),
+        go("success", { review: pay === "prepaid" }));
+      let payReceipt = null;
+      if (receiptFile && window.LOZI_SB && userId) {
+        let blob = receiptFile,
+          ext = "webp";
+        try {
+          blob = await compressImage(receiptFile);
+        } catch (e) {
+          ext =
+            (String(receiptFile.name).split(".").pop() || "jpg")
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, "") || "jpg";
+        }
+        const path =
+          "receipts/" +
+          userId +
+          "/" +
+          id +
+          "-" +
+          Math.random().toString(36).slice(2, 8) +
+          "." +
+          ext;
+        try {
+          const res = await uploadFiles([
+            { file: blob, bucket: "product-images", path },
+          ]);
+          res[0] &&
+            res[0].ok &&
+            (payReceipt = lozPublicUrl("product-images", path));
+        } catch (e) {}
+      }
+      window.LOZI_SB &&
+        userId &&
+        window.LOZI_SB.from("orders")
+          .insert({
+            order_no: id,
+            seller_vendor_id: vendorId,
+            customer_id: userId,
+            vendor: vendorId,
+            status: "new",
+            pay,
+            total,
+            delivery_fee: deliveryFee,
+            items,
+            customer: person || null,
+            pay_receipt: payReceipt,
+            pay_status: pay === "prepaid" ? "pending" : null,
+          })
+          .then(({ error }) => {
+            error
+              ? console.warn("save order:", error.message)
+              : (loadCustomerOrders(), setTimeout(loadProducts, 600));
+          });
+    },
+    reorder = (o) => {
+      (go("cart"), showToast(t.added));
+    },
+    cancelOrder = (id) => {
+      (setOrders((os) => os.filter((o) => o.id !== id)),
+        window.LOZI_SB &&
+          userId &&
+          window.LOZI_SB.from("orders")
+            .delete()
+            .eq("order_no", id)
+            .eq("customer_id", userId)
+            .then(() => {}));
+    },
+    unreadNotifs = notifs.filter((n) => !n.read).length,
+    sellerNotifs = sellerOrders
+      .filter((o) => o.status === "new")
+      .map((o) => ({
+        id: "so-" + o.id,
+        type: "order",
+        read: seenNewOrders.includes(o.id),
+        link: "dashboard",
+        title: { ar: "طلب جديد وصلك 🛎️", en: "New order received 🛎️" },
+        body: {
+          ar: `طلب #${o.id} من ${o.customer.name} · ${moneyStr(o.total)}`,
+          en: `Order #${o.id} from ${o.customer.name} · ${moneyStr(o.total)}`,
+        },
+        time: o.placed,
+      })),
+    unreadSellerNotifs = sellerOrders.filter(
+      (o) => o.status === "new" && !seenNewOrders.includes(o.id),
+    ).length,
+    openNotifs = () => {
+      (go("notifications"),
+        isSeller
+          ? setSeenNewOrders(
+              sellerOrders.filter((o) => o.status === "new").map((o) => o.id),
+            )
+          : setNotifs((ns) => ns.map((n) => ({ ...n, read: !0 }))));
+    },
+    rowToReport = (r) => ({
+      id: r.id,
+      typeId: r.type_id,
+      orderId: r.order_id,
+      target: r.target,
+      subject: r.subject,
+      desc: r.description,
+      status: r.status,
+      reply: r.reply || null,
+      date: {
+        ar: new Date(r.created_at).toLocaleDateString("ar-EG"),
+        en: new Date(r.created_at).toLocaleDateString("en-GB"),
+      },
+    }),
+    loadReports = () => {
+      !window.LOZI_SB ||
+        !userId ||
+        window.LOZI_SB.from("reports")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: !1 })
+          .then(({ data, error }) => {
+            error || setReports((data || []).map(rowToReport));
+          });
+    };
+  useE(() => {
+    loadReports();
+  }, [userId]);
+  const submitReport = async (r) => {
+      const id = String(Date.now()).slice(-5);
+      if (
+        (setReports((rs) => [
+          {
+            id,
+            status: "review",
+            date: { ar: "الآن", en: "Just now" },
+            reply: null,
+            ...r,
+          },
+          ...rs,
+        ]),
+        showToast(t.rep_sent),
+        window.LOZI_SB && userId)
+      ) {
+        const { error } = await window.LOZI_SB.from("reports").insert({
+          user_id: userId,
+          type_id: r.typeId,
+          target: r.target,
+          subject: r.subject,
+          description: r.desc,
+          order_id: r.orderId,
+          reporter_name: (person && person.name) || null,
+          reporter_phone: (person && person.phone) || null,
+          status: "review",
+        });
+        error || loadReports();
+      }
+    },
+    reportOrder = (o) => {
+      const first = findP(o.items[0].p),
+        vk = vendorKey(first),
+        info = vendorInfo(vk, lang),
+        typeId =
+          vk === "farmers" ? "farmer" : vk === "lozi" ? "general" : "retail";
+      go("reports", {
+        prefill: {
+          typeId,
+          target: typeId === "general" ? "" : info.name,
+          orderId: o.id,
+        },
+      });
+    },
+    reviewStore = (o) => {
+      const first = o.items && o.items[0] && findP(o.items[0].p),
+        vid = first && first._vendor;
+      if (!vid) {
+        showToast("تعذّر تحديد المتجر");
+        return;
+      }
+      go("vstore", { vendorId: vid });
+    },
+    compressImage = (file, maxDim = 1600, quality = 0.82) =>
+      new Promise((resolve, reject) => {
+        const img = new Image(),
+          url = URL.createObjectURL(file);
+        ((img.onload = () => {
+          URL.revokeObjectURL(url);
+          let w = img.width,
+            h = img.height;
+          if (w > maxDim || h > maxDim) {
+            const r = Math.min(maxDim / w, maxDim / h);
+            ((w = Math.round(w * r)), (h = Math.round(h * r)));
+          }
+          const c = document.createElement("canvas");
+          ((c.width = w),
+            (c.height = h),
+            c.getContext("2d").drawImage(img, 0, 0, w, h),
+            c.toBlob(
+              (b) => (b ? resolve(b) : reject(new Error("encode"))),
+              "image/webp",
+              quality,
+            ));
+        }),
+          (img.onerror = () => {
+            (URL.revokeObjectURL(url), reject(new Error("load")));
+          }),
+          (img.src = url));
+      }),
+    uploadFiles = async (jobs) => {
+      const total = jobs.length;
+      if (!total) return [];
+      const started = Date.now();
+      setUploadProg({ pct: 0 });
+      const { data: sess } = await window.LOZI_SB.auth.getSession(),
+        token = sess && sess.session && sess.session.access_token,
+        results = [];
+      for (let i = 0; i < total; i++) {
+        const j = jobs[i];
+        let res = await lozUploadXHR(j.bucket, j.path, j.file, token, (p) =>
+          setUploadProg({ pct: (i + p) / total }),
+        );
+        if (!res || !res.ok) {
+          const up = await window.LOZI_SB.storage
+            .from(j.bucket)
+            .upload(j.path, j.file, {
+              upsert: !0,
+              contentType: j.file.type || void 0,
+            });
+          res = up.error ? { ok: !1, error: up.error.message } : { ok: !0 };
+        }
+        (setUploadProg({ pct: (i + 1) / total }), results.push(res));
+      }
+      const elapsed = Date.now() - started;
+      return (
+        elapsed < 700 &&
+          (await new Promise((r) => setTimeout(r, 700 - elapsed))),
+        setUploadProg(null),
+        results
+      );
+    },
+    addCrop = async (crop, isEdit) => {
+      if (
+        (setAddCropOpen(!1),
+        setEditingProduct(null),
+        userRole !== "customer" && !(verif && verif.status === "approved"))
+      ) {
+        (showToast("فعّل حسابك أولاً للنشر"), setVerifOpen(!0));
+        return;
+      }
+      if (!window.LOZI_SB) {
+        showToast(isEdit ? t.product_updated : t.crop_published);
+        return;
+      }
+      const { data: au } = await window.LOZI_SB.auth.getUser(),
+        uid = au && au.user && au.user.id;
+      if (!uid) {
+        showToast("سجّل الدخول أولاً");
+        return;
+      }
+      /* TODO(Pro): replace manual two-version generation with Supabase Image Transformations (request any size/format on-the-fly via the image URL render params instead of storing multiple copies). */ const items =
+          crop.photoItems || [],
+        images = new Array(items.length).fill(null),
+        thumbs = new Array(items.length).fill(null),
+        jobs = [];
+      items.some((it) => it.file) && setUploadProg({ pct: 0 });
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].url) {
+          ((images[i] = items[i].url),
+            (thumbs[i] = items[i].thumb || items[i].url));
+          continue;
+        }
+        let blob = items[i].file,
+          ext = "webp";
+        try {
+          blob = await compressImage(items[i].file, 1600, 0.82);
+        } catch (e) {
+          ext =
+            (String(items[i].file.name).split(".").pop() || "jpg")
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, "") || "jpg";
+        }
+        const stamp = Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+          path = uid + "/" + stamp + "." + ext;
+        jobs.push({
+          file: blob,
+          bucket: "product-images",
+          path,
+          idx: i,
+          kind: "full",
+        });
+        let tblob = null;
+        try {
+          tblob = await compressImage(items[i].file, 500, 0.72);
+        } catch (e) {
+          tblob = null;
+        }
+        tblob &&
+          jobs.push({
+            file: tblob,
+            bucket: "product-images",
+            path: uid + "/" + stamp + "-thumb.webp",
+            idx: i,
+            kind: "thumb",
+          });
+      }
+      try {
+        if (jobs.length) {
+          const res2 = await uploadFiles(
+            jobs.map((j) => ({ file: j.file, bucket: j.bucket, path: j.path })),
+          );
+          let failErr = "";
+          (jobs.forEach((j, k) => {
+            if (res2[k] && res2[k].ok) {
+              const pub = lozPublicUrl("product-images", j.path);
+              j.kind === "thumb"
+                ? (thumbs[j.idx] = pub)
+                : (images[j.idx] = pub);
+            } else
+              j.kind !== "thumb" &&
+                (failErr = (res2[k] && res2[k].error) || "فشل الرفع");
+          }),
+            failErr && showToast("تعذّر رفع الصورة: " + failErr));
+        }
+      } finally {
+        setUploadProg(null);
+      }
+      const data = Object.assign({}, crop);
+      delete data.photoItems;
+      const fullUrls = [],
+        thumbUrls = [];
+      for (let i = 0; i < images.length; i++)
+        images[i] &&
+          (fullUrls.push(images[i]), thumbUrls.push(thumbs[i] || images[i]));
+      ((data.images = fullUrls),
+        (data.img = fullUrls[0] || data.img),
+        (data.thumbs = thumbUrls),
+        (data.thumb = thumbUrls[0] || data.img));
+      const role3 = userRole.indexOf("farmer") === 0 ? "farmer" : userRole,
+        seg =
+          crop.cat === "wholesale"
+            ? "wholesale"
+            : crop.cat === "retail"
+              ? "retail"
+              : null,
+        row = {
+          vendor_id: uid,
+          vendor_role: role3,
+          market_segment: seg,
+          category: crop.cat,
+          name: (crop.name && crop.name.ar) || "",
+          description: (crop.desc && crop.desc.ar) || null,
+          price: crop.price != null ? Number(crop.price) : null,
+          status: "available",
+          data,
+          shahti_status: data.shahtiStatus || null,
+          stock: data.stock != null ? data.stock : null,
+        },
+        res =
+          isEdit && crop.id
+            ? await window.LOZI_SB.from("products")
+                .update(row)
+                .eq("id", crop.id)
+            : await window.LOZI_SB.from("products").insert(row);
+      if (res.error) {
+        showToast("خطأ: " + res.error.message);
+        return;
+      }
+      (showToast(isEdit ? t.product_updated : t.crop_published),
+        loadProducts());
+    },
+    saveStore = async ({
+      name,
+      description,
+      hours,
+      enabled,
+      imageFile,
+      minOrderEnabled,
+      minOrderAmount,
+    }) => {
+      if (!window.LOZI_SB) return (showToast("الخدمة غير متاحة"), { ok: !1 });
+      const { data: au } = await window.LOZI_SB.auth.getUser(),
+        uid = au && au.user && au.user.id;
+      if (!uid) return (showToast("سجّل الدخول أولاً"), { ok: !1 });
+      let image_path = (store && store.image) || null;
+      if (imageFile) {
+        let blob = imageFile,
+          ext = "webp";
+        try {
+          blob = await compressImage(imageFile);
+        } catch (e) {
+          ext =
+            (String(imageFile.name).split(".").pop() || "jpg")
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, "") || "jpg";
+        }
+        const path = uid + "/store-" + Date.now() + "." + ext,
+          res = await uploadFiles([
+            { file: blob, bucket: "product-images", path },
+          ]);
+        res[0] &&
+          res[0].ok &&
+          (image_path = lozPublicUrl("product-images", path));
+      }
+      const { error } = await window.LOZI_SB.from("stores").upsert(
+        {
+          vendor_id: uid,
+          name,
+          description,
+          hours,
+          enabled,
+          image_path,
+          min_order_enabled: minOrderEnabled === !0,
+          min_order_amount:
+            minOrderEnabled && minOrderAmount ? Number(minOrderAmount) : null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "vendor_id" },
+      );
+      return error
+        ? (showToast("خطأ: " + error.message), { ok: !1, error: error.message })
+        : (setStore((st) => ({
+            ...(st || {}),
+            name,
+            description,
+            hours,
+            enabled,
+            image: image_path,
+            minOrderEnabled: minOrderEnabled === !0,
+            minOrderAmount:
+              minOrderEnabled && minOrderAmount ? Number(minOrderAmount) : null,
+          })),
+          showToast("تم حفظ الملف التجاري"),
+          go("dashboard"),
+          { ok: !0 });
+    },
+    saveOffers = async (offers) => {
+      if (!window.LOZI_SB) return (showToast("الخدمة غير متاحة"), { ok: !1 });
+      const { data: au } = await window.LOZI_SB.auth.getUser(),
+        uid = au && au.user && au.user.id;
+      if (!uid) return (showToast("سجّل الدخول أولاً"), { ok: !1 });
+      const { error } = await window.LOZI_SB.from("stores").upsert(
+        { vendor_id: uid, offers, updated_at: new Date().toISOString() },
+        { onConflict: "vendor_id" },
+      );
+      return error
+        ? (showToast("خطأ: " + error.message), { ok: !1, error: error.message })
+        : (setStore((st) => ({ ...(st || {}), offers })),
+          setStoreOffers((m) => Object.assign({}, m, { [uid]: offers })),
+          showToast("تم حفظ العروض"),
+          go("dashboard"),
+          { ok: !0 });
+    },
+    myProducts = dbProducts
+      .filter((p) => p._vendor && p._vendor === userId)
+      .map(withDiscount),
+    myBundles = myProducts.filter((p) => p.bundle),
+    myRegularProducts = myProducts.filter((p) => !p.bundle),
+    pinProduct = async (id, pin) => {
+      if (!window.LOZI_SB) return;
+      if (pin) {
+        const cnt = myProducts.filter((x) => x.pinned && x.id !== id).length;
+        if (cnt >= 3) {
+          showToast("الحد الأقصى 3 منتجات مثبّتة");
+          return;
+        }
+      }
+      setDbProducts((ps) =>
+        ps.map((x) => (x.id === id ? { ...x, pinned: pin } : x)),
+      );
+      const r = await window.LOZI_SB.from("products")
+        .update({
+          pinned: pin,
+          pinned_at: pin ? new Date().toISOString() : null,
+        })
+        .eq("id", id);
+      r.error
+        ? (showToast("خطأ: " + r.error.message), loadProducts())
+        : showToast(pin ? "تم التثبيت 📌" : "تم إلغاء التثبيت");
+    },
+    toggleProduct = async (id) => {
+      if (!window.LOZI_SB) return;
+      const p = myProducts.find((x) => x.id === id),
+        next = p && p.active === !1 ? "active" : "hidden";
+      setDbProducts((ps) =>
+        ps.map((x) => (x.id === id ? { ...x, active: next !== "hidden" } : x)),
+      );
+      const { error } = await window.LOZI_SB.from("products")
+        .update({ status: next })
+        .eq("id", id);
+      error && (showToast("خطأ: " + error.message), loadProducts());
+    },
+    removeProduct = async (id) => {
+      if (!window.LOZI_SB) return;
+      setDbProducts((ps) => ps.filter((x) => x.id !== id));
+      const { error } = await window.LOZI_SB.from("products")
+        .delete()
+        .eq("id", id);
+      if (error) {
+        (showToast("خطأ: " + error.message), loadProducts());
+        return;
+      }
+      showToast(t.myp_removed);
+    },
+    startEditProduct = (id) => {
+      const p = myProducts.find((x) => x.id === id);
+      p && (setEditingProduct(p), setAddCropOpen(!0));
+    },
+    openAddBundle = () => {
+      if (isSeller && !sellerApproved) {
+        setVerifOpen(!0);
+        return;
+      }
+      if (userRole !== "retail") return;
+      if (myProducts.filter((p) => p.bundle).length >= bundleLimit) {
+        showToast("الحد الأقصى للعروض المشكّلة لمتجرك هو " + bundleLimit);
+        return;
+      }
+      (setEditingBundle(null), setBundleSheetOpen(!0));
+    },
+    startEditBundle = (id) => {
+      const p = myProducts.find((x) => x.id === id);
+      p && (setEditingBundle(p), setBundleSheetOpen(!0));
+    },
+    SELLER_FLOW = {
+      new: "preparing",
+      preparing: "delivering",
+      delivering: "delivered",
+    },
+    updateOrderStatus = (id, status, extra) => {
+      !window.LOZI_SB ||
+        !userId ||
+        window.LOZI_SB.from("orders")
+          .update(Object.assign({ status }, extra || {}))
+          .eq("order_no", id)
+          .eq("seller_vendor_id", userId)
+          .then(({ error }) => {
+            error && showToast("خطأ: " + error.message);
+          });
+    },
+    advanceSellerOrder = (id) =>
+      setSellerOrders((os) =>
+        os.map((o) => {
+          if (o.id === id && SELLER_FLOW[o.status]) {
+            const next = SELLER_FLOW[o.status];
+            return (updateOrderStatus(id, next), { ...o, status: next });
+          }
+          return o;
+        }),
+      ),
+    assignSellerCourier = (id, who) =>
+      setSellerOrders((os) =>
+        os.map((o) => (o.id === id ? { ...o, courier: who } : o)),
+      ),
+    rejectSellerOrder = (id, reason) => {
+      (setSellerOrders((os) =>
+        os.map((o) =>
+          o.id === id ? { ...o, status: "rejected", rejectReason: reason } : o,
+        ),
+      ),
+        updateOrderStatus(id, "rejected", { reject_reason: reason }),
+        showToast(t.rej_done));
+    },
+    submitWalletPay = () => {
+      (setWalletPayOpen(!1),
+        setLastPay({
+          amount: LOZI_WALLET_DUE,
+          date: { ar: "الآن", en: "Just now" },
+          status: "review",
+        }),
+        showToast(t.wal_pay_submitted));
+    },
+    openSub = () => setSubOpen(!0),
+    submitSub = () => {
+      (setSubOpen(!1),
+        setSubPending(!0),
+        showToast(t.sub_pending),
+        setTimeout(() => {
+          const start = new Date();
+          (setSub({ start, expiry: addMonths(start, LOZI_SUB.months) }),
+            setSubPending(!1),
+            setSubscribed(!0));
+        }, 3200));
+    },
+    onRegistered = ({ role, person: pers }) => {
+      (setUserRole(role), pers && setPerson(pers), setStage("app"), go("home"));
+    },
+    e164 = (p) =>
+      String(p).charAt(0) === "+"
+        ? String(p)
+        : "+967" +
+          String(p)
+            .replace(/[^0-9]/g, "")
+            .replace(/^0+/, ""),
+    appRole = (r) => (r === "farmer" ? "farmer_almond" : r),
+    openSupportWa = () => {
+      try {
+        window.open(
+          "https://wa.me/967" +
+            String(supportWa)
+              .replace(/[^0-9]/g, "")
+              .replace(/^967/, ""),
+          "_blank",
+        );
+      } catch (e) {}
+    },
+    invokeFn = async (fn, body2) => {
+      if (!window.LOZI_SB) return { ok: !1, error: "الخدمة غير متاحة" };
+      const { data, error } = await window.LOZI_SB.functions.invoke(fn, {
+        body: body2,
+      });
+      if (!error) return data || { ok: !1 };
+      try {
+        const b = await error.context.json();
+        if (b && (b.reason === "not_authorized" || b.reason === "rate_limited"))
+          return b;
+        if (b) return { ok: !1, error: b.detail || b.reason || error.message };
+      } catch (e) {}
+      return { ok: !1, error: error.message };
+    },
+    onVendorSendOtp = ({ phone: ph, purpose = "register" }) =>
+      invokeFn("request-otp", { phone: e164(ph), purpose }),
+    onVendorVerify = ({ phone: ph, code, purpose = "register" }) =>
+      invokeFn("verify-otp", { phone: e164(ph), code, purpose }),
+    onVendorSetPassword = ({ phone: ph, setup_token, password }) =>
+      invokeFn("vendor-forgot-password", {
+        phone: e164(ph),
+        setup_token,
+        password,
+      }),
+    onVendorSignIn = async ({ phone: ph, password, role, name }) => {
+      if (!window.LOZI_SB) return { ok: !1, error: "الخدمة غير متاحة" };
+      const { data, error } = await window.LOZI_SB.auth.signInWithPassword({
+        phone: e164(ph),
+        password,
+      });
+      if (error) return { ok: !1, error: error.message };
+      if (data.user && (await isBlockedAccount(data.user.id)))
+        return { ok: !1, error: "هذا الحساب معلّق أو محظور. تواصل مع الدعم." };
+      data.user && setUserId(data.user.id);
+      const md = (data.user && data.user.user_metadata) || {};
+      if (name && name !== md.name)
+        try {
+          await window.LOZI_SB.auth.updateUser({ data: { name } });
+        } catch (e) {}
+      return (
+        onRegistered({
+          role: appRole(role || md.role) || "customer",
+          person: { name: name || md.name || "", phone: e164(ph) },
+        }),
+        { ok: !0 }
+      );
+    },
+    onDevSkip = async (role) => {
+      if (!window.LOZI_SB) {
+        showToast("الخدمة غير متاحة");
+        return;
+      }
+      if (!window.LOZI_SB.auth.signInAnonymously) {
+        showToast("حدّث الصفحة — الإصدار قديم");
+        return;
+      }
+      const { data, error } = await window.LOZI_SB.auth.signInAnonymously();
+      if (error) {
+        showToast("فعّل «Anonymous» في Supabase أولاً");
+        return;
+      }
+      const uid = data.user && data.user.id;
+      uid && setUserId(uid);
+      const r = appRole(role) || "retail";
+      try {
+        await window.LOZI_SB.auth.updateUser({
+          data: { role: r, name: "تاجر تجريبي" },
+        });
+      } catch (e) {}
+      try {
+        await window.LOZI_SB.from("vendor_verifications").upsert(
+          { user_id: uid, status: "approved" },
+          { onConflict: "user_id" },
+        );
+      } catch (e) {}
+      (setVerif({ status: "approved" }),
+        onRegistered({ role: r, person: { name: "تاجر تجريبي", phone: "" } }));
+    },
+    onCustomerSignIn = async ({ email, password }) => {
+      if (!window.LOZI_SB) return { ok: !1, error: "الخدمة غير متاحة" };
+      const { data, error } = await window.LOZI_SB.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) return { ok: !1, error: error.message };
+      if (data.user && (await isBlockedAccount(data.user.id)))
+        return { ok: !1, error: "هذا الحساب معلّق أو محظور. تواصل مع الدعم." };
+      data.user && setUserId(data.user.id);
+      const md = (data.user && data.user.user_metadata) || {};
+      return (
+        onRegistered({
+          role: appRole(md.role) || "customer",
+          person: { name: md.name || "", phone: md.phone || "" },
+        }),
+        { ok: !0 }
+      );
+    },
+    onCustomerSignUp = async ({ name, email, password, phone: ph }) => {
+      if (!window.LOZI_SB) return { ok: !1, error: "الخدمة غير متاحة" };
+      const appUrl = window.location.origin + window.location.pathname,
+        { data, error } = await window.LOZI_SB.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: appUrl,
+            data: { role: "customer", name, phone: e164(ph) },
+          },
+        });
+      if (error) return { ok: !1, error: error.message };
+      if (data.session) {
+        data.user && setUserId(data.user.id);
+        try {
+          await window.LOZI_SB.from("customers").insert({
+            user_id: data.user.id,
+            full_name: name,
+            phone: e164(ph),
+            email,
+          });
+        } catch (e) {}
+        return (
+          onRegistered({ role: "customer", person: { name, phone: e164(ph) } }),
+          { ok: !0 }
+        );
+      }
+      if (
+        data.user &&
+        Array.isArray(data.user.identities) &&
+        data.user.identities.length === 0
+      )
+        return {
+          ok: !1,
+          alreadyRegistered: !0,
+          error:
+            "هذا البريد الإلكتروني مسجّل بالفعل. إن لم تؤكّد حسابك بعد فابحث عن رسالة التأكيد في بريدك، وإلا فسجّل الدخول مباشرة.",
+        };
+      return { ok: !0, needsConfirm: !0 };
+    },
+    onCustomerForgot = async ({ email }) => {
+      if (!window.LOZI_SB) return { ok: !1, error: "الخدمة غير متاحة" };
+      const { error } = await window.LOZI_SB.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.href.split("#")[0].split("?")[0],
+      });
+      return error
+        ? {
+            ok: !1,
+            error:
+              (error.message || "تعذّر الإرسال") +
+              (error.status ? " (" + error.status + ")" : ""),
+          }
+        : { ok: !0 };
+    },
+    onSetNewPassword = async ({ password }) => {
+      if (!window.LOZI_SB) return { ok: !1, error: "الخدمة غير متاحة" };
+      const { data, error } = await window.LOZI_SB.auth.updateUser({
+        password,
+      });
+      if (error) return { ok: !1, error: error.message };
+      data.user && setUserId(data.user.id);
+      try {
+        window.LOZI_RECOVERY = !1;
+      } catch (e) {}
+      const md = (data.user && data.user.user_metadata) || {};
+      return (
+        onRegistered({
+          role: appRole(md.role) || "customer",
+          person: {
+            name: md.name || "",
+            phone: md.phone || (data.user.phone ? "+" + data.user.phone : ""),
+          },
+        }),
+        { ok: !0 }
+      );
+    },
+    onLogout = () => {
+      if (window.LOZI_SB)
+        try {
+          window.LOZI_SB.auth.signOut();
+        } catch (e) {}
+      (localStorage.removeItem("lozi_stage"),
+        localStorage.removeItem("lozi_role"),
+        localStorage.removeItem("lozi_person"),
+        setUserRole("customer"),
+        setPerson({ name: "", phone: "", city: "", address: "" }),
+        setFavs([]),
+        setStage("login"));
+    },
+    requestDeleteAccount = async () => {
+      if (!window.LOZI_SB) return { ok: !1, error: "الخدمة غير متاحة" };
+      const { data: au } = await window.LOZI_SB.auth.getUser(),
+        u = au && au.user;
+      if (!u) return { ok: !1, error: "سجّل الدخول أولاً" };
+      const { error } = await window.LOZI_SB.from("deletion_requests").upsert(
+        {
+          user_id: u.id,
+          role: userRole,
+          name:
+            (person && person.name) ||
+            (u.user_metadata && u.user_metadata.name) ||
+            null,
+          phone: (person && person.phone) || (u.phone ? "+" + u.phone : null),
+          email: u.email || null,
+          status: "pending",
+          created_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+      return error ? { ok: !1, error: error.message } : { ok: !0 };
+    },
+    cartCount = cart.reduce((a, it) => a + it.q, 0),
+    showNav = stage === "app" && TAB_SCREENS.includes(screen),
+    isFarmCat = (p) => p.cat === "almond" || p.cat === "raisin",
+    catalog = dbProducts
+      .filter(
+        (p) =>
+          p.active !== !1 &&
+          p.cat !== "savings" &&
+          p.cat !== "vip" &&
+          !(isFarmCat(p) && p.stock != null && p.stock <= 0),
+      )
+      .map(withDiscount),
+    savingsProducts = dbProducts
+      .filter((p) => p.cat === "savings" && p.active !== !1)
+      .map(withDiscount)
+      .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)),
+    vipProducts = dbProducts
+      .filter((p) => p.cat === "vip" && p.active !== !1)
+      .map(withDiscount)
+      .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)),
+    allProducts = [
+      ...catalog,
+      ...savingsProducts,
+      ...vipProducts,
+      ...LOZI_SAVINGS,
+    ],
+    findP = (p) =>
+      typeof p == "string" ? allProducts.find((x) => x.id === p) : p,
+    avail = sectionsForRole(userRole),
+    sellSection =
+      {
+        farmer_almond: "almond",
+        farmer_raisin: "raisin",
+        retail: "retail",
+        wholesale: "wholesale",
+      }[userRole] || null,
+    isSeller = !!sellSection,
+    sellerApproved = verif && verif.status === "approved",
+    openAddProduct = () => {
+      if (isSeller && !sellerApproved) {
+        setVerifOpen(!0);
+        return;
+      }
+      (setEditingProduct(null), setAddCropOpen(!0));
+    };
+  let body = null;
+  if (stage === "splash")
+    body = React.createElement(Splash, {
+      onDone: () => setStage(localStorage.getItem("lozi_stage") || "register"),
+    });
+  else if (stage === "register")
+    body = React.createElement(Register, {
+      t,
+      lang,
+      onDone: onRegistered,
+      onVendorSendOtp,
+      onVendorVerify,
+      onVendorSetPassword,
+      onVendorSignIn,
+      onCustomerSignUp,
+      onSupport: openSupportWa,
+      onGoLogin: () => setStage("login"),
+      openTerms: () => setTermsOpen(!0),
+      onDevSkip,
+    });
+  else if (stage === "login")
+    body = React.createElement(Login, {
+      t,
+      lang,
+      onCustomerSignIn,
+      onCustomerForgot,
+      onVendorSignIn,
+      onVendorSendOtp,
+      onVendorVerify,
+      onVendorSetPassword,
+      onSupport: openSupportWa,
+      goRegister: () => setStage("register"),
+    });
+  else if (stage === "reset")
+    body = React.createElement(ResetPassword, { onSetNewPassword });
+  else
+    switch (screen) {
+      case "home":
+        body = React.createElement(Home, {
+          t,
+          lang,
+          go,
+          role: userRole,
+          avail,
+          catalog,
+          storesMap,
+          isSeller,
+          sellSection,
+          notifCount: isSeller ? unreadSellerNotifs : unreadNotifs,
+          onBell: openNotifs,
+          onAddCrop: openAddProduct,
+          openStore: (s) => go("store", { store: s }),
+          openProduct: (p) => go("product", { p }),
+          addToCart,
+          favs,
+          toggleFav,
+          loadStatus: productsLoad,
+          onRetry: loadProducts,
+        });
+        break;
+      case "sections":
+        body = React.createElement(SectionBrowse, {
+          t,
+          lang,
+          go,
+          avail,
+          catalog,
+          storesMap,
+          init: params.section,
+          initType: params.type,
+          openStore: (s) => go("store", { store: s }),
+          openProduct: (p) => go("product", { p }),
+          addToCart,
+          favs,
+          toggleFav,
+          loadStatus: productsLoad,
+          onRetry: loadProducts,
+          browse: browseProducts,
+          sectionVarieties,
+        });
+        break;
+      case "store":
+        body = React.createElement(StoreProfile, {
+          s: params.store,
+          t,
+          lang,
+          onBack: goBack,
+          openProduct: (p) => go("product", { p }),
+          addToCart,
+          favs,
+          toggleFav,
+        });
+        break;
+      case "vstore":
+        body = React.createElement(VendorStore, {
+          t,
+          lang,
+          vendorId: params.vendorId,
+          me: { id: userId, name: person && person.name },
+          products: catalog
+            .filter((p) => p._vendor === params.vendorId)
+            .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)),
+          onBack: goBack,
+          openProduct: (p) => go("product", { p }),
+          addToCart,
+          favs,
+          toggleFav,
+          showToast,
+          sectionVarieties,
+        });
+        break;
+      case "product":
+        body = React.createElement(Product, {
+          p: findP(params.p),
+          t,
+          lang,
+          onBack: goBack,
+          addToCart,
+          fav: favs.includes(findP(params.p).id),
+          onFav: toggleFav,
+          go,
+        });
+        break;
+      case "cart":
+        body = React.createElement(Cart, {
+          t,
+          lang,
+          items: cart,
+          setQty,
+          removeItem,
+          go,
+          offers: storeOffers,
+          storesMap,
+        });
+        break;
+      case "checkout":
+        body = React.createElement(Checkout, {
+          t,
+          lang,
+          items: cart.filter((it) => it.p._vendor === params.vendor),
+          vendor: params.vendor,
+          person,
+          onSaveAddress: (a) => setPerson((p) => ({ ...p, ...a })),
+          onBack: () => go("cart"),
+          onConfirm: (pay, receipt) =>
+            confirmOrder(params.vendor, pay, receipt),
+          offers: storeOffers,
+          storesMap,
+        });
+        break;
+      case "success":
+        body = React.createElement(OrderSuccess, {
+          t,
+          go,
+          review: params.review,
+        });
+        break;
+      case "orders":
+        body = React.createElement(Orders, {
+          t,
+          lang,
+          orders,
+          onBack: () => go("profile"),
+          reorder,
+          cancel: cancelOrder,
+          reportOrder,
+          go,
+          isSeller,
+          role: userRole,
+          onReview: reviewStore,
+        });
+        break;
+      case "savings":
+        body = React.createElement(Savings, {
+          t,
+          lang,
+          products: savingsProducts,
+          subscribed,
+          subPending,
+          onSubscribe: openSub,
+          openProduct: (p) => go("product", { p }),
+          addToCart,
+          favs,
+          toggleFav,
+          onVip: () => go("vip"),
+          canSubscribe: userRole !== "retail" && userRole !== "wholesale",
+        });
+        break;
+      case "vip":
+        body = React.createElement(Vip, {
+          t,
+          lang,
+          products: vipProducts,
+          openProduct: (p) => go("product", { p }),
+          addToCart,
+          favs,
+          toggleFav,
+          onBack: () => go("savings"),
+        });
+        break;
+      case "dashboard":
+        body = React.createElement(SellerDashboard, {
+          t,
+          lang,
+          role: userRole,
+          person,
+          storeName: store && store.name,
+          orders: sellerOrders,
+          onAdvance: advanceSellerOrder,
+          onAssign: assignSellerCourier,
+          onReject: rejectSellerOrder,
+          productCount: myProducts.length,
+          go,
+          onAddProduct: openAddProduct,
+          onMyProducts: () => go("myproducts"),
+          onStore: () => go("mystore"),
+          onOffers: () => go("myoffers"),
+          onReviews: () => go("myreviews"),
+          onBundles: () => go("mybundles"),
+          showBundles: userRole === "retail",
+          rating: myRating,
+          verifStatus: verif ? verif.status : "none",
+          onVerify: () => setVerifOpen(!0),
+        });
+        break;
+      case "mystore":
+        body = React.createElement(SellerStore, {
+          t,
+          lang,
+          store,
+          verifStatus: verif ? verif.status : "none",
+          onBack: () => go("dashboard"),
+          onSave: saveStore,
+          onVerify: () => setVerifOpen(!0),
+        });
+        break;
+      case "myoffers":
+        body = React.createElement(SellerOffersReviews, {
+          t,
+          lang,
+          store,
+          products: myProducts,
+          vendorId: userId,
+          role: userRole,
+          onBack: () => go("dashboard"),
+          onSave: saveOffers,
+          onBundles: () => go("mybundles"),
+        });
+        break;
+      case "myreviews":
+        body = React.createElement(SellerReviews, {
+          t,
+          lang,
+          vendorId: userId,
+          onBack: () => go("dashboard"),
+        });
+        break;
+      case "myproducts":
+        body = React.createElement(MyProducts, {
+          t,
+          lang,
+          role: userRole,
+          products: myRegularProducts,
+          onBack: () => go("dashboard"),
+          onAdd: openAddProduct,
+          onToggle: toggleProduct,
+          onDelete: removeProduct,
+          onEdit: startEditProduct,
+          onPin: pinProduct,
+        });
+        break;
+      case "mybundles":
+        body = React.createElement(MyBundles, {
+          t,
+          lang,
+          bundles: myBundles,
+          limit: bundleLimit,
+          onBack: () => go("dashboard"),
+          onAdd: openAddBundle,
+          onToggle: toggleProduct,
+          onDelete: removeProduct,
+          onEdit: startEditBundle,
+        });
+        break;
+      case "wallet":
+        body = isSeller
+          ? React.createElement(SellerWallet, {
+              t,
+              lang,
+              person,
+              due: LOZI_WALLET_DUE,
+              deadline: t.wal_deadline_val,
+              lastPay,
+              orders: LOZI_COMMISSION_ORDERS,
+              onPay: () => setWalletPayOpen(!0),
+            })
+          : React.createElement(Home, {
+              t,
+              lang,
+              go,
+              role: userRole,
+              avail,
+              catalog,
+              storesMap,
+              isSeller,
+              sellSection,
+              notifCount: unreadNotifs,
+              onBell: openNotifs,
+              onAddCrop: openAddProduct,
+              openStore: (s) => go("store", { store: s }),
+              openProduct: (p) => go("product", { p }),
+              addToCart,
+              favs,
+              toggleFav,
+            });
+        break;
+      case "profile":
+        body = React.createElement(Profile, {
+          t,
+          lang,
+          go,
+          favCount: favs.length,
+          subscribed,
+          subPending,
+          role: userRole,
+          person,
+          isSeller,
+          dashCount: sellerOrders.filter((o) => o.status === "new").length,
+        });
+        break;
+      case "personal":
+        body = React.createElement(PersonalInfo, {
+          t,
+          lang,
+          role: userRole,
+          onBack: goBack,
+          person,
+          onSave: (p) => {
+            (setPerson(p), showToast(t.saved));
+          },
+        });
+        break;
+      case "subscription":
+        body = React.createElement(SubscriptionDetails, {
+          t,
+          lang,
+          onBack: goBack,
+          subscribed,
+          subPending,
+          sub,
+          onSubscribe: openSub,
+          fmtDate,
+        });
+        break;
+      case "favorites":
+        body = React.createElement(Favorites, {
+          t,
+          lang,
+          favs,
+          catalog: allProducts,
+          onBack: goBack,
+          openProduct: (p) => go("product", { p }),
+          addToCart,
+          toggleFav,
+          go,
+        });
+        break;
+      case "reports":
+        body = React.createElement(Reports, {
+          t,
+          lang,
+          onBack: goBack,
+          reports,
+          onSubmit: submitReport,
+          prefill: params.prefill,
+          showToast,
+        });
+        break;
+      case "notifications":
+        body = React.createElement(Notifications, {
+          t,
+          lang,
+          notifs: isSeller ? sellerNotifs : notifs,
+          onBack: goBack,
+          go,
+        });
+        break;
+      case "settings":
+        body = React.createElement(Settings, {
+          t,
+          lang,
+          onBack: () => go("profile"),
+          toggleLang,
+          currency,
+          setCurrencyState,
+          themeMode,
+          setThemeMode,
+          openTerms: () => setTermsOpen(!0),
+          go,
+          person,
+          onLogout,
+          openSupport: () => setSupportOpen(!0),
+          onRequestDelete: requestDeleteAccount,
+        });
+        break;
+      default:
+        body = null;
+    }
+  const chrome = stage === "app";
+  return React.createElement(
+    "div",
+    { className: "app-root", dir: t.dir },
+    React.createElement(OfflineBanner, null),
+    React.createElement(
+      "div",
+      {
+        className: `app-main ${showNav ? "with-nav" : ""} ${chrome ? "" : "full"}`,
+      },
+      body,
+    ),
+    showNav &&
+      React.createElement(BottomNav, {
+        active: tab,
+        go,
+        cartCount,
+        t,
+        isSeller,
+      }),
+    subOpen &&
+      React.createElement(SubModal, {
+        t,
+        lang,
+        onClose: () => setSubOpen(!1),
+        onSubmitted: submitSub,
+      }),
+    termsOpen &&
+      React.createElement(TermsSheet, {
+        t,
+        lang,
+        onClose: () => setTermsOpen(!1),
+      }),
+    supportOpen &&
+      React.createElement(SupportSheet, {
+        t,
+        lang,
+        numbers: support,
+        onClose: () => setSupportOpen(!1),
+      }),
+    addCropOpen &&
+      React.createElement(AddProductSheet, {
+        t,
+        lang,
+        section: (editingProduct && editingProduct.cat) || sellSection,
+        role: userRole,
+        initial: editingProduct,
+        onClose: () => {
+          (setAddCropOpen(!1), setEditingProduct(null));
+        },
+        onPublish: addCrop,
+      }),
+    bundleSheetOpen &&
+      React.createElement(BundleSheet, {
+        t,
+        lang,
+        initial: editingBundle,
+        onClose: () => {
+          (setBundleSheetOpen(!1), setEditingBundle(null));
+        },
+        onPublish: addCrop,
+      }),
+    verifOpen &&
+      React.createElement(VerifySheet, {
+        t,
+        role: userRole,
+        status: verif ? verif.status : "none",
+        note: verif ? verif.note : null,
+        onClose: () => setVerifOpen(!1),
+        onSubmit: submitVerif,
+      }),
+    walletPayOpen &&
+      React.createElement(CommissionPaySheet, {
+        t,
+        lang,
+        amount: LOZI_WALLET_DUE,
+        onClose: () => setWalletPayOpen(!1),
+        onSubmitted: submitWalletPay,
+      }),
+    uploadProg && React.createElement(UploadRing, { pct: uploadProg.pct }),
+    React.createElement(Toast, { msg: toast }),
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(
+  React.createElement(App, null),
+);
