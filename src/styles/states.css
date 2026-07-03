@@ -1,0 +1,25 @@
+
+/* ===== حالات التحميل / الخطأ / عدم الاتصال (Loading / Error / Offline) ===== */
+.lz-offline{display:flex;align-items:center;justify-content:center;gap:8px;background:#D32F2F;color:#fff;font-weight:800;font-size:14px;line-height:1.4;padding:11px 16px;text-align:center;box-shadow:0 4px 14px rgba(211,47,47,.45);position:relative;z-index:60;letter-spacing:.2px}
+.lz-offline-ic{flex:0 0 auto}
+.lz-load{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;padding:46px 20px;color:var(--muted)}
+.lz-spin{display:inline-block;box-sizing:border-box;border:3px solid var(--green-soft);border-top-color:var(--green-deep);border-radius:50%;animation:lz-spin .8s linear infinite}
+@keyframes lz-spin{to{transform:rotate(360deg)}}
+.lz-load-txt{font-size:13px;font-weight:700;margin:0}
+.lz-error{text-align:center;padding:42px 22px;color:var(--muted)}
+.lz-error-ic{width:64px;height:64px;border-radius:50%;background:var(--sand);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.lz-error-txt{font-size:14px;font-weight:700;margin:0 0 16px;color:var(--ink-soft)}
+.lz-retry{display:inline-flex;align-items:center;gap:7px;background:var(--green-deep);color:#fff;border:none;border-radius:14px;padding:11px 22px;font-size:14px;font-weight:800;font-family:inherit}
+.lz-retry:active{transform:scale(.96)}
+.lz-shimmer{position:relative;overflow:hidden;background:var(--sand)}
+.lz-shimmer::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:lz-shim 1.3s infinite}
+@keyframes lz-shim{100%{transform:translateX(100%)}}
+.app-root[data-theme=dark] .lz-shimmer::after{background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent)}
+.lz-skel-card{border-radius:18px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}
+.lz-skel-img{width:100%;aspect-ratio:1/1}
+.lz-skel-body{padding:11px 12px 14px}
+.lz-skel-line{height:11px;border-radius:6px;margin-top:9px}
+.lz-skel-stores{padding:4px 16px}
+.lz-skel-store{display:flex;align-items:center;gap:12px;padding:12px;border-radius:18px;background:var(--surface);box-shadow:var(--shadow);margin-bottom:12px}
+.lz-skel-store .lz-skel-thumb{width:72px;height:72px;border-radius:16px;flex:0 0 auto}
+.lz-skel-store .lz-skel-meta{flex:1}

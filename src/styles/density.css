@@ -1,0 +1,89 @@
+
+/* ===== Density tweaks: medium (~20-30%) card/element size reduction =====
+   Scoped so Home page lists (featured stores .store-list / home .prod-grid) keep their size.
+   Affects: section store cards (.store-list.pad-sm), product cards on
+   section + store pages (.prod-grid.pad), and account (حسابي) fields/boxes. */
+
+/* --- Store cards inside الأقسام (SectionBrowse) --- */
+.store-list.pad-sm{gap:9px}
+.store-list.pad-sm .store-card{gap:10px;border-radius:16px;padding:9px}
+.store-list.pad-sm .store-img,.store-list.pad-sm .store-img image-slot{width:66px;height:66px}
+.store-list.pad-sm .ver-dot{width:22px;height:22px;border-width:2px}
+.store-list.pad-sm .store-body{gap:4px}
+.store-list.pad-sm .store-name{font-size:14px}
+.store-list.pad-sm .store-addr{font-size:11px}
+.store-list.pad-sm .badge{font-size:10px;padding:3px 8px}
+
+/* --- Product cards on section + store pages (.prod-grid.pad) --- */
+.prod-grid.pad{gap:10px}
+.prod-grid.pad .prod-card{border-radius:16px}
+.prod-grid.pad .prod-img{height:98px}
+.prod-grid.pad .save-tag,.prod-grid.pad .soldout-tag{font-size:10px;padding:2px 7px;top:7px}
+.prod-grid.pad .fav-btn{width:29px;height:29px;top:7px}
+.prod-grid.pad .prod-body{padding:8px 9px 9px}
+.prod-grid.pad .prod-name{font-size:13px;min-height:2.6em}
+.prod-grid.pad .prod-weight{font-size:11px}
+.prod-grid.pad .prod-foot{margin-top:7px}
+.prod-grid.pad .price{font-size:15.5px}
+.prod-grid.pad .price-old{font-size:12px}
+.prod-grid.pad .add-mini{width:32px;height:32px;border-radius:11px}
+
+/* --- Account hub (حسابي / Profile) cards & rows --- */
+.screen.profile .prof-greet{font-size:21px;padding-top:14px}
+.prof-card{gap:11px;margin:2px 18px 14px;border-radius:18px;padding:13px}
+.prof-av{width:48px;height:48px}
+.prof-meta strong{font-size:16px}
+.prof-list{padding:5px}
+.prof-row{padding:11px 11px}
+.prow-ic{width:36px;height:36px;border-radius:11px}
+.prow-label{font-size:14.5px}
+
+/* --- Personal info / subdetails fields & boxes --- */
+.form-fields{gap:10px}
+.field{gap:5px}
+.subd-card{padding:5px 14px}
+.subd-row{padding:11px 0}
+.subd-ic{width:40px;height:40px;border-radius:12px}
+.pinfo-hint-card{padding:10px 12px;margin-bottom:12px}
+.pinfo-sec-head{margin:14px 2px 9px;padding-top:12px}
+.set-scroll{padding:13px 18px;gap:11px}
+
+/* --- Inputs: modest reduction, tap target stays >=44px --- */
+.field-input{height:46px}
+.phone-cc{height:46px}
+
+/* --- Settings rows/groups --- */
+.set-group{padding:5px;margin:11px 0}
+.set-row{gap:11px;padding:11px 11px}
+.set-row.col{gap:7px;padding-bottom:11px}
+/* ===== سوق VIP — gold entry button beside the savings (التوفير) hero ===== */
+.sv-hero-row{display:flex;align-items:stretch;gap:11px;margin:8px 18px 0}
+.sv-hero-row .sv-hero{flex:1 1 auto;min-width:0;margin:0}
+.vip-entry{flex:0 0 58px;width:58px;border:none;border-radius:22px;padding:14px 0;cursor:pointer;position:relative;overflow:hidden;font-family:inherit;color:#1c1607;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;background:linear-gradient(160deg,#F2D88B 0%,#E3C26A 36%,#CBA35C 68%,#A9823F 100%);box-shadow:0 8px 22px rgba(180,140,60,.5),inset 0 1px 0 rgba(255,255,255,.55);animation:vipPulse 2.4s ease-in-out infinite}
+.vip-entry:active{transform:scale(.97)}
+.vip-entry>*{position:relative;z-index:1}
+.vip-entry .vip-crown{font-size:22px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.22))}
+.vip-entry .vip-vtext{writing-mode:vertical-rl;text-orientation:mixed;font-weight:900;font-size:15px;letter-spacing:1.5px;white-space:nowrap}
+.vip-entry .vip-arrow{font-size:15px;font-weight:900;line-height:1}
+.vip-entry:before{content:"";position:absolute;top:-60%;left:-60%;width:42%;height:220%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.7),transparent);transform:translateX(0) rotate(20deg);animation:vipShine 3.4s ease-in-out infinite;z-index:0}
+@keyframes vipShine{0%{transform:translateX(0) rotate(20deg)}55%,100%{transform:translateX(420%) rotate(20deg)}}
+@keyframes vipPulse{0%,100%{box-shadow:0 8px 22px rgba(180,140,60,.45),inset 0 1px 0 rgba(255,255,255,.55)}50%{box-shadow:0 11px 30px rgba(214,167,90,.78),inset 0 1px 0 rgba(255,255,255,.6)}}
+/* ===== سوق VIP — standalone gold/dark premium page ===== */
+.vip-screen{--cream:#15140F;--surface:#1E1B12;--sand:#262215;--sand-2:#2C2718;--ink:#F3EFE6;--ink-soft:#D8CFB8;--muted:#9C927C;--line:#4A3E25;--brown:#E3C26A;--gold:#E3C26A;--gold-deep:#CBA35C;--green:#CBA35C;--green-deep:#E3C26A;--green-soft:#2A2415;--shadow:0 10px 30px rgba(0,0,0,.5);background:#15140F;color:#F3EFE6;min-height:100%;padding-bottom:14px}
+.vip-screen .topbar{background:#15140F;border-bottom:1px solid #4A3E25}
+.vip-screen .topbar h2{color:#F3EFE6}
+.vip-hero{position:relative;margin:12px 18px 0;border-radius:24px;overflow:hidden;padding:26px 22px;color:#F3EFE6;border:1px solid #6a5526}
+.vip-hero-bg{position:absolute;inset:0;background:linear-gradient(150deg,#1c2a20 0%,#15140F 55%,#1a160d 100%)}
+.vip-hero-bg:after{content:"";position:absolute;inset:0;background:radial-gradient(120% 90% at 100% 0%,rgba(227,194,106,.42),transparent 55%)}
+.vip-hero-content{position:relative;display:flex;flex-direction:column;gap:7px;align-items:flex-start}
+.vip-kicker{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;color:#15140F;background:linear-gradient(135deg,#E3C26A,#CBA35C);padding:5px 13px;border-radius:20px;box-shadow:0 3px 10px rgba(203,163,92,.4)}
+.vip-hero-content h1{font-size:27px;font-weight:900;margin:5px 0 0;color:#E3C26A;letter-spacing:.5px}
+.vip-hero-content p{font-size:13.5px;line-height:1.7;color:#E8E1CE;margin:2px 0 0}
+.vip-grid-wrap{margin-top:6px}
+.vip-grid-wrap .sec-head{margin:18px 20px 13px}
+.vip-screen .prod-card{border:1px solid #4A3E25;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.vip-screen .save-tag{background:linear-gradient(135deg,#E3C26A,#CBA35C);color:#15140F}
+.vip-screen .add-mini{background:linear-gradient(135deg,#E3C26A,#CBA35C);box-shadow:0 4px 12px rgba(203,163,92,.5)}
+.vip-screen .fav-btn{background:#0d0c08c2}
+.vip-empty{text-align:center;color:#C9BFA6;padding:48px 16px}
+.vip-empty-ic{font-size:46px;margin-bottom:10px;filter:drop-shadow(0 2px 6px rgba(227,194,106,.4))}
