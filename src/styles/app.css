@@ -127,3 +127,29 @@
 .rfq-offer-thumb{width:100%;height:120px;border-radius:12px;object-fit:cover;background:var(--sand);margin-top:8px;display:block}
 .rfq-offer-imgbtn{display:flex;align-items:center;justify-content:center;gap:6px;height:44px;border-radius:12px;border:1.5px dashed var(--gold-deep);color:var(--gold-deep);font-weight:800;background:transparent;width:100%;margin-top:8px;cursor:pointer}
 .rfq-offer-hint{text-align:center;font-size:12.5px;font-weight:700;color:var(--muted);padding:8px 0}
+
+/* ===== RFQ Phase 3 — units + buyer ranked offers ===== */
+.rfq-unit-chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip.sm{padding:7px 12px;font-size:12.5px}
+.rfq-meta-btns{display:flex;gap:8px;align-items:center}
+.rfq-offers-btn{font-size:12.5px;font-weight:800;color:var(--green-deep);background:var(--green-soft);padding:7px 14px;border-radius:12px}
+.rfq-offers-reqbar{display:flex;align-items:center;gap:6px;padding:2px 2px 12px;font-size:13px;font-weight:800;color:var(--ink)}
+.rfq-offers-count{margin-inline-start:auto;font-size:12px;font-weight:800;color:var(--gold-deep)}
+.rfq-offer-card.accepted{border-color:var(--green);box-shadow:0 0 0 1.5px var(--green-soft)}
+.rfq-seller{display:flex;align-items:center;gap:7px;min-width:0}
+.rfq-seller-name{font-size:14.5px;font-weight:900;color:var(--ink)}
+.rfq-seller-rate{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:800;color:var(--ink-soft)}
+.rfq-best{font-size:10.5px;font-weight:900;padding:3px 8px;border-radius:20px;background:var(--gold-deep);color:#fff;white-space:nowrap}
+.rfq-offer-items{display:flex;flex-direction:column;gap:9px;margin:10px 0}
+.rfq-offer-line{display:flex;gap:9px;align-items:flex-start}
+.rfq-offer-line-img{width:46px;height:46px;border-radius:12px;object-fit:cover;flex-shrink:0;background:var(--sand);display:flex;align-items:center;justify-content:center}
+.rfq-offer-line-img.ph{border:1px solid var(--line)}
+.rfq-offer-line-b{flex:1;min-width:0}
+.rfq-offer-line-t{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.rfq-offer-price{font-size:14px;font-weight:900;color:var(--green-deep);white-space:nowrap}
+.rfq-offer-line-s{font-size:12px;font-weight:600;color:var(--muted);margin-top:2px}
+.rfq-offer-total{display:flex;align-items:center;justify-content:space-between;padding:9px 0 4px;border-top:1px solid var(--line);font-size:13px;font-weight:800;color:var(--ink-soft)}
+.rfq-offer-total b{font-size:16px;font-weight:900;color:var(--brown)}
+.rfq-offer-actions{display:flex;gap:9px;margin-top:8px}
+.rfq-offer-actions .btn{height:46px;flex:1}
+.rfq-chat-btn{flex:0 0 auto;width:auto;padding:0 16px}
