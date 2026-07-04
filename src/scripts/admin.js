@@ -1335,7 +1335,7 @@ function ChatsAdmin({ me }) {
                 </div>
                 {r.last_message_preview && <div className="conv-prev">{r.last_message_preview}</div>}
                 <div className="conv-meta">
-                  {r.order_no ? 'طلب #' + r.order_no + ' · ' : ''}🕒 {fmtDT(r.last_message_at)}
+                  {r.rfq_offer_id ? 'طلب مسبق · ' : r.order_no ? 'طلب #' + r.order_no + ' · ' : ''}🕒 {fmtDT(r.last_message_at)}
                 </div>
               </div>
               <span style={{ color: 'var(--muted)', fontSize: 20 }}>‹</span>
@@ -1350,6 +1350,14 @@ function RfqAdmin({ me }) {
   const [rows, setRows] = useState(null);
   const [names, setNames] = useState({});
   const [flags, setFlags] = useState([]);
+  const [subtab, setSubtab] = useState('overview');
+  const [convs, setConvs] = useState(null);
+  const [chatOpen, setChatOpen] = useState(null);
+  const loadConvs = async () => {
+    const { data } = await SB.from('admin_conversations').select('*').not('rfq_offer_id', 'is', null)
+      .order('flagged', { ascending: false }).order('last_message_at', { ascending: false }).limit(300);
+    setConvs(data || []);
+  };
   const load = async () => {
     const { data } = await SB.from('rfq_requests')
       .select('*, rfq_request_items(*), rfq_offers(*, rfq_offer_items(*))')
@@ -1374,12 +1382,45 @@ function RfqAdmin({ me }) {
       .subscribe();
     return () => { SB.removeChannel(ch); };
   }, []);
+  useEffect(() => {
+    if (subtab !== 'chats') return;
+    loadConvs();
+    const ch = SB.channel('admin-rfq-convs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => loadConvs())
+      .subscribe();
+    return () => { SB.removeChannel(ch); };
+  }, [subtab]);
   const nm = (id) => { const p = names[id]; return p ? (p.name || 'مستخدم') + (p.role ? ' · ' + p.role : '') : (id ? id.slice(0, 8) : '—'); };
   const stAr = { open: 'مفتوح', closed: 'مغلق', expired: 'منتهي', pending: 'قيد الانتظار', accepted: 'مقبول', declined: 'مرفوض' };
   const unit = (it) => { let u = it.unit === 'g' ? 'غرام' : it.unit === 'ton' ? 'طن' : it.unit === 'ratl' ? 'رطل' : it.unit === 'qadah' ? 'قدح' : it.unit === 'carton' ? 'كرتون' : it.unit === 'sack' ? 'شوال' : 'كغ'; if (it.unit_weight_kg) u += ' (' + it.unit_weight_kg + 'ك)'; return u; };
   const resolveFlag = async (id) => { await SB.from('rfq_flag_alerts').update({ resolved: true }).eq('id', id); setFlags((f) => f.filter((x) => x.id !== id)); };
+  if (chatOpen) return <ChatThread conv={chatOpen} me={me} onBack={() => { setChatOpen(null); loadConvs(); }} />;
   return (
     <div>
+      <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
+        {[['overview', 'الطلبات والعروض'], ['chats', 'الدردشات']].map(([s, l]) =>
+          <button key={s} className={subtab === s ? 'on' : ''} onClick={() => setSubtab(s)}>{l}</button>)}
+      </div>
+      {subtab === 'chats' ? (
+        convs === null ? <div className="empty">جارٍ التحميل…</div>
+          : !convs.length ? <div className="empty">لا توجد دردشات طلبات مسبقة بعد.</div>
+            : convs.map((r) => (
+              <button className={`conv-row${r.flagged ? ' flag' : ''}`} key={r.id} onClick={() => setChatOpen(r)}>
+                <div className="ci">
+                  <div className="conv-parties">
+                    {(r.participant_a_name || 'طرف أول')} <span className="role-chip">{roleLabel(r.participant_a_role)}</span>
+                    <span style={{ color: 'var(--muted)' }}>↔</span>
+                    {(r.participant_b_name || 'طرف ثاني')} <span className="role-chip">{roleLabel(r.participant_b_role)}</span>
+                    <span className="role-chip" style={{ background: 'var(--green-soft)', color: 'var(--green-deep)' }}>طلب مسبق</span>
+                    {r.flagged && <span className="flag-chip">⚠ مُعلَّمة{r.flagged_count ? ' (' + r.flagged_count + ')' : ''}</span>}
+                  </div>
+                  {r.last_message_preview && <div className="conv-prev">{r.last_message_preview}</div>}
+                  <div className="conv-meta">🕒 {fmtDT(r.last_message_at)}</div>
+                </div>
+                <span style={{ color: 'var(--muted)', fontSize: 20 }}>‹</span>
+              </button>
+            ))
+      ) : (<>
       <div className="muted" style={{ fontSize: 12.5, marginBottom: 10, lineHeight: 1.7 }}>
         مراقبة كاملة لكل طلبات الأسعار والعروض.
         {flags.length > 0 && <span style={{ color: 'var(--danger)', fontWeight: 800 }}>{' '}· تنبيهات تسريب أرقام غير معالجة: {flags.length}</span>}
@@ -1421,6 +1462,7 @@ function RfqAdmin({ me }) {
               <div className="kv ts"><b>التاريخ:</b> 🕒 {fmtDT(r.created_at)}</div>
             </div>
           ))}
+      </>)}
     </div>
   );
 }
