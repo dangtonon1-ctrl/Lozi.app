@@ -1346,6 +1346,85 @@ function ChatsAdmin({ me }) {
   );
 }
 
+function RfqAdmin({ me }) {
+  const [rows, setRows] = useState(null);
+  const [names, setNames] = useState({});
+  const [flags, setFlags] = useState([]);
+  const load = async () => {
+    const { data } = await SB.from('rfq_requests')
+      .select('*, rfq_request_items(*), rfq_offers(*, rfq_offer_items(*))')
+      .order('created_at', { ascending: false }).limit(300);
+    const reqs = data || [];
+    setRows(reqs);
+    const ids = new Set();
+    reqs.forEach((r) => { if (r.buyer_id) ids.add(r.buyer_id); (r.rfq_offers || []).forEach((o) => o.seller_id && ids.add(o.seller_id)); });
+    if (ids.size) {
+      const { data: ps } = await SB.from('profiles').select('user_id,name,role').in('user_id', Array.from(ids));
+      const m = {}; (ps || []).forEach((p) => { m[p.user_id] = p; }); setNames(m);
+    }
+    const { data: fl } = await SB.from('rfq_flag_alerts').select('*').eq('resolved', false).order('created_at', { ascending: false }).limit(100);
+    setFlags(fl || []);
+  };
+  useEffect(() => {
+    load();
+    const ch = SB.channel('admin-rfq')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rfq_requests' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rfq_offers' }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rfq_flag_alerts' }, () => load())
+      .subscribe();
+    return () => { SB.removeChannel(ch); };
+  }, []);
+  const nm = (id) => { const p = names[id]; return p ? (p.name || 'مستخدم') + (p.role ? ' · ' + p.role : '') : (id ? id.slice(0, 8) : '—'); };
+  const stAr = { open: 'مفتوح', closed: 'مغلق', expired: 'منتهي', pending: 'قيد الانتظار', accepted: 'مقبول', declined: 'مرفوض' };
+  const unit = (it) => { let u = it.unit === 'g' ? 'غرام' : it.unit === 'ton' ? 'طن' : it.unit === 'ratl' ? 'رطل' : it.unit === 'qadah' ? 'قدح' : it.unit === 'carton' ? 'كرتون' : it.unit === 'sack' ? 'شوال' : 'كغ'; if (it.unit_weight_kg) u += ' (' + it.unit_weight_kg + 'ك)'; return u; };
+  const resolveFlag = async (id) => { await SB.from('rfq_flag_alerts').update({ resolved: true }).eq('id', id); setFlags((f) => f.filter((x) => x.id !== id)); };
+  return (
+    <div>
+      <div className="muted" style={{ fontSize: 12.5, marginBottom: 10, lineHeight: 1.7 }}>
+        مراقبة كاملة لكل طلبات الأسعار والعروض.
+        {flags.length > 0 && <span style={{ color: 'var(--danger)', fontWeight: 800 }}>{' '}· تنبيهات تسريب أرقام غير معالجة: {flags.length}</span>}
+      </div>
+      {flags.length > 0 && (
+        <div className="card" style={{ borderColor: 'var(--danger)' }}>
+          <div className="v-head"><strong>⚠ تنبيهات مشاركة أرقام</strong></div>
+          {flags.map((f) => (
+            <div className="kv" key={f.id}>
+              <b>{f.source === 'offer_desc' ? 'وصف عرض' : 'وصف طلب'}:</b> {nm(f.user_id)} — <span style={{ color: 'var(--danger)' }}>{f.excerpt}</span>
+              <button className="btn sm ghost" style={{ marginInlineStart: 8 }} onClick={() => resolveFlag(f.id)}>معالجة</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {rows === null ? <div className="empty">جارٍ التحميل…</div>
+        : !rows.length ? <div className="empty">لا توجد طلبات مسبقة.</div>
+          : rows.map((r) => (
+            <div className="card" key={r.id}>
+              <div className="v-head">
+                <strong>{nm(r.buyer_id)}</strong>
+                <span className={'tag ' + (r.status === 'open' ? 'approved' : r.status === 'expired' ? 'rejected' : '')}>{stAr[r.status] || r.status}</span>
+              </div>
+              <div className="kv"><b>المدينة:</b> {r.city} · <b>الأصناف:</b> {(r.rfq_request_items || []).map((it) => it.product_type + ' ' + (+it.quantity) + ' ' + unit(it)).join('، ')}</div>
+              {(r.rfq_offers || []).length === 0
+                ? <div className="muted" style={{ fontSize: 12 }}>لا توجد عروض بعد</div>
+                : (r.rfq_offers || []).map((o) => (
+                  <div className="kv" key={o.id} style={{ borderTop: '1px solid var(--line)', paddingTop: 6, marginTop: 6 }}>
+                    <b>عرض من {nm(o.seller_id)}</b>{' '}
+                    <span className={'tag ' + (o.status === 'accepted' ? 'approved' : o.status === 'declined' ? 'rejected' : 'pending')}>{stAr[o.status] || o.status}</span>
+                    <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 3 }}>
+                      {(o.rfq_offer_items || []).map((oi) => {
+                        const ri = (r.rfq_request_items || []).find((x) => x.id === oi.request_item_id) || {};
+                        return (ri.product_type || 'صنف') + ': ' + (+oi.price) + ' ريال × ' + (+oi.available_quantity);
+                      }).join(' · ')}
+                    </div>
+                  </div>
+                ))}
+              <div className="kv ts"><b>التاريخ:</b> 🕒 {fmtDT(r.created_at)}</div>
+            </div>
+          ))}
+    </div>
+  );
+}
+
 function Admin() {
   const [user, setUser] = useState(undefined); // undefined=loading, null=logged out
   const [tab, setTab] = useState('verif');
@@ -1359,7 +1438,7 @@ function Admin() {
   }, []);
   if (user === undefined) return <div className="empty">جارٍ التحميل…</div>;
   if (!user) return <Login onIn={setUser} />;
-  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['chats', 'الدردشات'], ['levels', 'مستويات البائعين'], ['trust', 'شارات الثقة'], ['lozisave', 'خانة التوفير'], ['vip', 'سوق VIP'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
+  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['chats', 'الدردشات'], ['rfq', 'الطلبات المسبقة'], ['levels', 'مستويات البائعين'], ['trust', 'شارات الثقة'], ['lozisave', 'خانة التوفير'], ['vip', 'سوق VIP'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
   return (
     <div>
       <div className="topbar"><h1>لوزي · لوحة الإدارة</h1><button onClick={() => { SB.auth.signOut(); setUser(null); }}>خروج</button></div>
@@ -1369,6 +1448,7 @@ function Admin() {
         {tab === 'users' && <Users />}
         {tab === 'orders' && <OrdersAdmin />}
         {tab === 'chats' && <ChatsAdmin me={user} />}
+        {tab === 'rfq' && <RfqAdmin me={user} />}
         {tab === 'levels' && <SellerLevels />}
         {tab === 'trust' && <TrustBadges />}
         {tab === 'lozisave' && <SavingsAdmin />}
