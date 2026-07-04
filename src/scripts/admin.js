@@ -295,9 +295,13 @@ function SettingsTab() {
   const [bundleLimit, setBundleLimit] = useState('1');
   const [blMsg, setBlMsg] = useState('');
   const [blUpdated, setBlUpdated] = useState(null);
+  const [rfqLaunch, setRfqLaunch] = useState('');
+  const [rlMsg, setRlMsg] = useState('');
+  const [rlUpdated, setRlUpdated] = useState(null);
   useEffect(() => {
     SB.from('settings').select('value,updated_at').eq('key', 'support_wa').maybeSingle().then(({ data }) => { if (data) { setWa(data.value || ''); setWaUpdated(data.updated_at || null); } });
     SB.from('settings').select('value,updated_at').eq('key', 'retail_bundle_limit').maybeSingle().then(({ data }) => { if (data && data.value != null && data.value !== '') { setBundleLimit(String(data.value)); setBlUpdated(data.updated_at || null); } });
+    SB.from('settings').select('value,updated_at').eq('key', 'rfq_launch_date').maybeSingle().then(({ data }) => { if (data && data.value != null && data.value !== '') { setRfqLaunch(String(data.value).replace(/"/g, '').slice(0, 10)); setRlUpdated(data.updated_at || null); } });
   }, []);
   const saveWa = async () => {
     const now = new Date().toISOString();
@@ -312,6 +316,13 @@ function SettingsTab() {
     if (!error) { setBundleLimit(String(n)); setBlUpdated(now); }
     setBlMsg(error ? 'خطأ: ' + error.message : 'تم الحفظ ✓ · 🕒 ' + nowStamp()); setTimeout(() => setBlMsg(''), 3000);
   };
+  const saveRfqLaunch = async () => {
+    const now = new Date().toISOString();
+    const { error } = await SB.from('settings').upsert({ key: 'rfq_launch_date', value: rfqLaunch || '', updated_at: now }, { onConflict: 'key' });
+    if (!error) setRlUpdated(now);
+    setRlMsg(error ? 'خطأ: ' + error.message : (rfqLaunch ? 'تم الحفظ ✓ · 🕒 ' : 'أُلغي التاريخ ✓ · 🕒 ') + nowStamp()); setTimeout(() => setRlMsg(''), 3000);
+  };
+  const clearRfqLaunch = () => { setRfqLaunch(''); };
   return (
     <div>
       <div className="card">
@@ -330,6 +341,20 @@ function SettingsTab() {
         <button className="btn sm" onClick={saveBundleLimit}>حفظ الحد</button>
         {blUpdated && <Stamp at={blUpdated} label="آخر تحديث" />}
         {blMsg && <div className={blMsg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{blMsg}</div>}
+      </div>
+      <div className="card">
+        <div className="secttl">تاريخ إطلاق «الطلب المسبق»</div>
+        <div className="kv" style={{ marginBottom: 8, color: 'var(--muted)' }}>
+          عند تحديد التاريخ: يُفتح النظام لكل التجّار المُوثّقين لمدة ٦ أشهر من هذا التاريخ، ثم يقتصر بعدها على تجزئة المستوى ٥ (مبيعات تراكمية ٥٠٠٬٠٠٠ فأكثر). اترك الحقل فارغاً ليبقى مفتوحاً دائماً لكل التجّار المُوثّقين.
+        </div>
+        <label className="fld"><span>التاريخ</span>
+          <input type="date" value={rfqLaunch} onChange={(e) => setRfqLaunch(e.target.value)} /></label>
+        <div className="acts" style={{ flexWrap: 'wrap' }}>
+          <button className="btn sm" onClick={saveRfqLaunch}>حفظ التاريخ</button>
+          {rfqLaunch && <button className="btn sm ghost" onClick={clearRfqLaunch}>مسح</button>}
+        </div>
+        {rlUpdated && <Stamp at={rlUpdated} label="آخر تحديث" />}
+        {rlMsg && <div className={rlMsg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{rlMsg}</div>}
       </div>
     </div>
   );
@@ -970,10 +995,13 @@ function OrdersAdmin() {
             const c = o.customer || {};
             const st = STAT[o.status] || [o.status, 'pending'];
             const items = Array.isArray(o.items) ? o.items : [];
+            const isRfq = items.some((it) => String(it.p || '').startsWith('rfq-'));
             const isPlatform = tab === 'savings' || tab === 'vip';
             return (
               <div className="card" key={o.order_no}>
-                <div className="v-head"><strong>طلب #{o.order_no}</strong><span className={`tag ${st[1]}`}>{st[0]}</span></div>
+                <div className="v-head"><strong>طلب #{o.order_no}</strong>
+                  {isRfq && <span className="tag" style={{ background: 'var(--gold-deep)', color: '#fff' }}>طلب مسبق</span>}
+                  <span className={`tag ${st[1]}`}>{st[0]}</span></div>
                 <Stamp at={o.created_at} label="تاريخ ووقت الطلب" />
                 {o.updated_at && <Stamp at={o.updated_at} label="آخر تحديث" />}
 
