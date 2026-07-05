@@ -1837,6 +1837,9 @@ function ChatThread({ conv, me, onBack }) {
 }
 
 function ChatsAdmin({ me }) {
+  // Sub-tab: read-only store surveillance (existing) | reply-enabled Lozi chats.
+  const [section, setSection] = useState('store'); // store | lozi
+  // ── existing store-surveillance state/behaviour (unchanged) ──────────────
   const [rows, setRows] = useState(null);
   const [filter, setFilter] = useState('all'); // all | flagged
   const [q, setQ] = useState('');
@@ -1859,7 +1862,30 @@ function ChatsAdmin({ me }) {
       .subscribe();
     return () => { SB.removeChannel(ch); };
   }, []);
+  // ── new: "دردشات عملاء لوزي" — admin-routed (تواصل مع لوزي) threads ─────────
+  // These have LOZI (an admin) as a participant, so the admin can actually REPLY
+  // via the shared ChatThread (not just surveil). One row per customer thread.
+  const [lozi, setLozi] = useState(null);
+  const [loziOpen, setLoziOpen] = useState(null);
+  const loadLozi = async () => {
+    const { data } = await SB.rpc('admin_lozi_customer_chats');
+    setLozi(data || []);
+  };
+  useEffect(() => {
+    loadLozi();
+    // Keep the list + unread badge live. The after-insert trigger bumps the
+    // conversation's last_message_at on every new message, so a conversations
+    // change is enough to rerun the RPC and refresh `unanswered`.
+    const ch = SB.channel('admin-lozi-chats')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => loadLozi())
+      .subscribe();
+    return () => { SB.removeChannel(ch); };
+  }, []);
+  const unanswered = (lozi || []).filter((r) => r.unanswered).length;
+
   if (open) return <ChatThread conv={open} me={me} onBack={() => { setOpen(null); load(); }} />;
+  if (loziOpen) return <ChatThread conv={loziOpen} me={me} onBack={() => { setLoziOpen(null); loadLozi(); }} />;
+
   let shown = rows || [];
   if (filter === 'flagged') shown = shown.filter((r) => r.flagged);
   const query = q.trim().toLowerCase();
@@ -1867,37 +1893,68 @@ function ChatsAdmin({ me }) {
     [(r.participant_a_name || ''), (r.participant_b_name || ''), (r.order_no || '')].join(' ').toLowerCase().includes(query));
   return (
     <div>
-      <div className="muted" style={{ fontSize: 12.5, marginBottom: 10, lineHeight: 1.7 }}>
-        مراقبة كاملة لكل المحادثات داخل التطبيق. النظام يميّز تلقائياً الرسائل المشبوهة (أرقام هواتف، روابط واتساب/تلغرام، بريد) كطبقة تنبيه إضافية.
-        {alerts > 0 && <span style={{ color: 'var(--danger)', fontWeight: 800 }}>{' '}· تنبيهات غير معالجة: {alerts}</span>}
-      </div>
       <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
-        {[['all', 'كل المحادثات'], ['flagged', 'المُعلَّمة فقط']].map(([f, l]) =>
-          <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{l}</button>)}
+        <button className={section === 'store' ? 'on' : ''} onClick={() => setSection('store')}>مراقبة الدردشات</button>
+        <button className={section === 'lozi' ? 'on' : ''} onClick={() => setSection('lozi')}>
+          دردشات عملاء لوزي
+          {unanswered > 0 &&
+            <span style={{ marginInlineStart: 6, background: 'var(--danger)', color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 800 }}>{unanswered}</span>}
+        </button>
       </div>
-      <label className="fld" style={{ marginBottom: 12 }}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث باسم أحد الطرفين أو رقم الطلب…" />
-      </label>
-      {rows === null ? <div className="empty">جارٍ التحميل…</div>
-        : !shown.length ? <div className="empty">لا توجد محادثات مطابقة.</div>
-          : shown.map((r) => (
-            <button className={`conv-row${r.flagged ? ' flag' : ''}`} key={r.id} onClick={() => setOpen(r)}>
-              <div className="ci">
-                <div className="conv-parties">
-                  {(r.participant_a_name || 'طرف أول')} <span className="role-chip">{roleLabel(r.participant_a_role)}</span>
-                  <span style={{ color: 'var(--muted)' }}>↔</span>
-                  {(r.participant_b_name || 'طرف ثاني')} <span className="role-chip">{roleLabel(r.participant_b_role)}</span>
-                  {r.flagged && <span className="flag-chip">⚠ مُعلَّمة{r.flagged_count ? ' (' + r.flagged_count + ')' : ''}</span>}
+      {section === 'store' ? (<>
+        <div className="muted" style={{ fontSize: 12.5, marginBottom: 10, lineHeight: 1.7 }}>
+          مراقبة كاملة لكل المحادثات داخل التطبيق. النظام يميّز تلقائياً الرسائل المشبوهة (أرقام هواتف، روابط واتساب/تلغرام، بريد) كطبقة تنبيه إضافية.
+          {alerts > 0 && <span style={{ color: 'var(--danger)', fontWeight: 800 }}>{' '}· تنبيهات غير معالجة: {alerts}</span>}
+        </div>
+        <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
+          {[['all', 'كل المحادثات'], ['flagged', 'المُعلَّمة فقط']].map(([f, l]) =>
+            <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{l}</button>)}
+        </div>
+        <label className="fld" style={{ marginBottom: 12 }}>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث باسم أحد الطرفين أو رقم الطلب…" />
+        </label>
+        {rows === null ? <div className="empty">جارٍ التحميل…</div>
+          : !shown.length ? <div className="empty">لا توجد محادثات مطابقة.</div>
+            : shown.map((r) => (
+              <button className={`conv-row${r.flagged ? ' flag' : ''}`} key={r.id} onClick={() => setOpen(r)}>
+                <div className="ci">
+                  <div className="conv-parties">
+                    {(r.participant_a_name || 'طرف أول')} <span className="role-chip">{roleLabel(r.participant_a_role)}</span>
+                    <span style={{ color: 'var(--muted)' }}>↔</span>
+                    {(r.participant_b_name || 'طرف ثاني')} <span className="role-chip">{roleLabel(r.participant_b_role)}</span>
+                    {r.flagged && <span className="flag-chip">⚠ مُعلَّمة{r.flagged_count ? ' (' + r.flagged_count + ')' : ''}</span>}
+                  </div>
+                  {r.last_message_preview && <div className="conv-prev">{r.last_message_preview}</div>}
+                  <div className="conv-meta">
+                    {r.rfq_offer_id ? 'طلب مسبق · ' : r.order_no ? 'طلب #' + r.order_no + ' · ' : ''}🕒 {fmtDT(r.last_message_at)}
+                  </div>
                 </div>
-                {r.last_message_preview && <div className="conv-prev">{r.last_message_preview}</div>}
-                <div className="conv-meta">
-                  {r.rfq_offer_id ? 'طلب مسبق · ' : r.order_no ? 'طلب #' + r.order_no + ' · ' : ''}🕒 {fmtDT(r.last_message_at)}
+                <span style={{ color: 'var(--muted)', fontSize: 20 }}>‹</span>
+              </button>
+            ))}
+        <div className="muted" style={{ textAlign: 'center', padding: '6px 0' }}>{rows ? shown.length + ' محادثة' : ''}</div>
+      </>) : (<>
+        <div className="muted" style={{ fontSize: 12.5, marginBottom: 10, lineHeight: 1.7 }}>
+          دردشات العملاء التي بدأت عبر زر «تواصل مع لوزي» وتصل إلى الإدارة مباشرةً (وليست إلى متجر). يمكنك الرد عليها من هنا.
+          {unanswered > 0 && <span style={{ color: 'var(--danger)', fontWeight: 800 }}>{' '}· بانتظار ردّك: {unanswered}</span>}
+        </div>
+        {lozi === null ? <div className="empty">جارٍ التحميل…</div>
+          : !lozi.length ? <div className="empty">لا توجد دردشات عملاء مع لوزي بعد.</div>
+            : lozi.map((r) => (
+              <button className="conv-row" key={r.id} onClick={() => setLoziOpen(r)}>
+                <div className="ci">
+                  <div className="conv-parties">
+                    {(r.customer_name || 'عميل')} <span className="role-chip">{roleLabel(r.customer_role)}</span>
+                    {r.unanswered && <span className="flag-chip" style={{ background: '#FDECC8', color: '#9A6B2E' }}>● بانتظار الرد</span>}
+                  </div>
+                  {r.last_message_preview && <div className="conv-prev">{r.last_message_preview}</div>}
+                  <div className="conv-meta">🕒 {fmtDT(r.last_message_at)}</div>
                 </div>
-              </div>
-              <span style={{ color: 'var(--muted)', fontSize: 20 }}>‹</span>
-            </button>
-          ))}
-      <div className="muted" style={{ textAlign: 'center', padding: '6px 0' }}>{rows ? shown.length + ' محادثة' : ''}</div>
+                <span style={{ color: 'var(--muted)', fontSize: 20 }}>‹</span>
+              </button>
+            ))}
+        <div className="muted" style={{ textAlign: 'center', padding: '6px 0' }}>{lozi ? lozi.length + ' دردشة' : ''}</div>
+      </>)}
     </div>
   );
 }
