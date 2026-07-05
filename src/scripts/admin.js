@@ -901,7 +901,251 @@ function BundleAdmin() {
   );
 }
 
-// ---- Orders management (الطلبات) ----
+// ---- Order lifecycle state machine (client mirror of the backend rules) ----
+// Backend is authoritative (RPCs admin_set_order_status / admin_reject_payment);
+// these constants drive which controls are shown. Ranks must match
+// public.order_status_rank in the DB.
+const ORDER_RANK = { new: 0, received: 0, payreview: 0, preparing: 1, delivering: 2, delivered: 3 };
+const rankOf = (s) => (s in ORDER_RANK ? ORDER_RANK[s] : -1);
+// Progression states indexed by rank (0..3) — [status_key, label].
+const PROGRESSION = [
+  ['payreview', 'بانتظار المراجعة'],
+  ['preparing', 'قيد التجهيز'],
+  ['delivering', 'قيد التوصيل'],
+  ['delivered', 'مكتمل'],
+];
+const STATUS_META = {
+  new: ['بانتظار المراجعة', 'pending'], received: ['بانتظار المراجعة', 'pending'], payreview: ['بانتظار مراجعة الدفع', 'pending'],
+  preparing: ['قيد التجهيز', 'pending'], delivering: ['قيد التوصيل', 'pending'], delivered: ['مكتمل', 'approved'],
+  rejected: ['مرفوض', 'rejected'], cancelled: ['ملغى', 'rejected'],
+};
+const PAY_META = { pending: ['بانتظار المراجعة', 'pending'], approved: ['مقبول', 'approved'], rejected: ['مرفوض', 'rejected'] };
+const orderMoney = (n) => (Number(n) || 0).toLocaleString('en-US') + ' ريال';
+const ROLE_AR = { farmer_almond: 'مزارع لوز', farmer_raisin: 'مزارع زبيب', farmer: 'مزارع', retail: 'تاجر تجزئة', wholesale: 'تاجر جملة', customer: 'زبون', admin: 'لوزي' };
+
+// ---- Full Order Details view (dynamic products, commission, receipt, lifecycle) ----
+function OrderDetails({ order, seller, storeName, isPlatform, platformLabel, showFee, tiers, onBack, onChanged }) {
+  const [ord, setOrd] = useState(order);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [receipt, setReceipt] = useState(null);      // signed/public url when the modal is open
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const [feeInput, setFeeInput] = useState(ord.delivery_fee != null ? String(ord.delivery_fee) : '');
+
+  const c = ord.customer || {};
+  const items = Array.isArray(ord.items) ? ord.items : [];
+  const isRfq = items.some((it) => String(it.p || '').startsWith('rfq-'));
+  const subtotal = items.reduce((a, it) => a + (Number(it.price) || 0) * (Number(it.q) || 0), 0);
+  const curRank = rankOf(ord.status);
+  const terminal = curRank < 0;
+  const st = STATUS_META[ord.status] || [ord.status, 'pending'];
+  const forwardTarget = (curRank >= 0 && curRank < 3) ? PROGRESSION[curRank + 1] : null;
+  const backTargets = curRank > 0 ? PROGRESSION.slice(0, curRank) : [];
+  const canCancel = curRank === 0 || curRank === 1;
+
+  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 2600); };
+  const patch = (p) => { setOrd((o) => ({ ...o, ...p })); if (onChanged) onChanged(ord.order_no, p); };
+
+  // Every lifecycle move goes through the backend state machine (single source of truth).
+  const doStatus = async (next, confirmMsg) => {
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+    setBusy(true); setErr('');
+    const { error } = await SB.rpc('admin_set_order_status', { p_order_no: ord.order_no, p_new_status: next });
+    setBusy(false);
+    if (error) { setErr('تعذّر تحديث الحالة: ' + (error.message || '')); return; }   // failure → keep displayed state
+    patch({ status: next });
+    flash('تم تحديث الحالة ✓ · 🕒 ' + nowStamp());
+  };
+  // Forward: one step; only "Completed" asks for confirmation.
+  const goForward = () => forwardTarget && doStatus(forwardTarget[0], forwardTarget[0] === 'delivered' ? 'تأكيد إتمام الطلب وتسليمه للعميل؟' : null);
+  // Backward: any lower step, silent (backend sends no notification).
+  const goCancel = () => doStatus('cancelled', 'تأكيد إلغاء الطلب نهائياً؟ لا يمكن التراجع عن هذا الإجراء.');
+
+  const acceptPay = async () => {
+    setBusy(true); setErr('');
+    const { error } = await SB.from('orders').update({ pay_status: 'approved' }).eq('order_no', ord.order_no);
+    setBusy(false);
+    if (error) { setErr('خطأ: ' + error.message); return; }
+    patch({ pay_status: 'approved' });
+    flash('تم قبول الدفع ✓ · 🕒 ' + nowStamp());
+  };
+  const openReceipt = async () => {
+    let url = ord.pay_receipt;
+    if (url && url.indexOf('http') !== 0) { const { data } = SB.storage.from('product-images').getPublicUrl(url); url = data.publicUrl; }
+    if (url) setReceipt(url);
+  };
+  const submitReject = async () => {
+    const r = reason.trim();
+    if (!r) { setErr('يجب إدخال سبب الرفض'); return; }
+    setBusy(true); setErr('');
+    const { error } = await SB.rpc('admin_reject_payment', { p_order_no: ord.order_no, p_reason: r });
+    setBusy(false);
+    if (error) { setErr('تعذّر رفض الدفع: ' + (error.message || '')); return; }
+    const p = { pay_status: 'rejected', reject_reason: r };
+    if (rankOf(ord.status) >= 0 && rankOf(ord.status) <= 1) p.status = 'payreview';
+    patch(p);
+    setRejectOpen(false); setReason('');
+    flash('تم رفض الدفع وإخطار العميل ✓ · 🕒 ' + nowStamp());
+  };
+  const saveFee = async () => {
+    if (feeInput === '' || feeInput == null) { setErr('أدخل رسوم التوصيل أولاً'); return; }
+    const fee = Math.max(0, Math.round(Number(feeInput) || 0));
+    setBusy(true); setErr('');
+    const { error } = await SB.from('orders').update({ delivery_fee: fee, total: subtotal + fee }).eq('order_no', ord.order_no);
+    setBusy(false);
+    if (error) { setErr('خطأ: ' + error.message); return; }
+    patch({ delivery_fee: fee, total: subtotal + fee });
+    flash('تم تحديث رسوم التوصيل ✓ · 🕒 ' + nowStamp());
+  };
+
+  const commTier = ord.commission_amount != null ? tierOf(tiers, ord.segment, ord.cumulative_before) : null;
+  const commReversed = ord.commission_state === 'reversed' || ord.commission_state === 'partially_reversed';
+  const grand = ord.total != null ? ord.total : subtotal + (Number(ord.delivery_fee) || 0);
+
+  return (
+    <div className="card">
+      <div className="chat-head">
+        <button className="od-back" onClick={onBack}>‹ رجوع للقائمة</button>
+        <div style={{ flex: 1, minWidth: 0, textAlign: 'end' }}>
+          <strong style={{ fontSize: 16, fontWeight: 900 }}>طلب #{ord.order_no}</strong>{' '}
+          {isRfq && <span className="tag" style={{ background: 'var(--gold-deep)', color: '#fff' }}>طلب مسبق</span>}{' '}
+          <span className={`tag ${st[1]}`}>{st[0]}</span>
+        </div>
+      </div>
+      <Stamp at={ord.created_at} label="تاريخ ووقت الطلب" />
+
+      <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13.5 }}>🌿 البائع</div>
+      <div className="kv"><b>الاسم:</b> {(seller && seller.name) || (isPlatform ? platformLabel : '—')}</div>
+      <div className="kv"><b>الهاتف:</b> {(seller && seller.phone) || '—'}</div>
+      <div className="kv"><b>الدور:</b> {(seller && ROLE_AR[seller.role]) || (isPlatform ? 'لوزي' : (seller && seller.role) || '—')}</div>
+      {storeName && <div className="kv"><b>المتجر:</b> {storeName}</div>}
+
+      <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13.5 }}>🛒 المشتري</div>
+      <div className="kv"><b>الاسم:</b> {c.name || '—'}</div>
+      <div className="kv"><b>الهاتف:</b> {c.phone || '—'}</div>
+      <div className="kv"><b>العنوان:</b> {[c.city, c.address].filter(Boolean).join('، ') || '—'}</div>
+
+      <div className="secttl" style={{ margin: '14px 0 6px', fontSize: 13.5 }}>📦 تفاصيل الطلب</div>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="od-table">
+          <thead>
+            <tr><th>الصنف</th><th className="num">الكمية</th><th className="num">سعر الوحدة</th><th className="num">الإجمالي</th></tr>
+          </thead>
+          <tbody>
+            {items.length === 0
+              ? <tr><td colSpan="4" style={{ color: 'var(--muted)' }}>لا توجد أصناف.</td></tr>
+              : items.map((it, i) => (
+                <tr key={i}>
+                  <td>{it.name || 'منتج'}{it.weight ? ' · ' + it.weight : ''}</td>
+                  <td className="num">{Number(it.q) || 0}</td>
+                  <td className="num">{orderMoney(it.price)}</td>
+                  <td className="num">{orderMoney((Number(it.price) || 0) * (Number(it.q) || 0))}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="od-total"><span>إجمالي البضاعة</span><span>{orderMoney(subtotal)}</span></div>
+      {showFee &&
+        <div className="kv" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '6px 0' }}>
+          <b>رسوم التوصيل:</b>
+          <input type="number" min="0" inputMode="numeric" placeholder="أدخل التكلفة" value={feeInput}
+            onChange={(e) => setFeeInput(e.target.value)} style={{ width: 120 }} />
+          <button className="btn sm" disabled={busy} onClick={saveFee}>حفظ</button>
+          <span style={{ color: 'var(--muted)' }}>{ord.delivery_fee != null ? 'الحالي: ' + orderMoney(ord.delivery_fee) : 'لم تُحدَّد بعد'}</span>
+        </div>}
+      {!showFee && ord.delivery_fee != null && ord.delivery_fee > 0 &&
+        <div className="od-total"><span>رسوم التوصيل</span><span>{orderMoney(ord.delivery_fee)}</span></div>}
+      <div className="od-total grand"><span>الإجمالي الكلي</span><span>{orderMoney(grand)}</span></div>
+
+      {ord.commission_amount != null &&
+        <div className="od-comm">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontWeight: 900, color: 'var(--gold-deep)' }}>٪ عمولة لوزي</div>
+            <div style={{ fontWeight: 900, color: '#E06A72', direction: 'ltr' }}>− {money2(ord.commission_amount)} ر</div>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 9 }}>
+            <span className="tag">نوع البيع: {SEG_AR[ord.segment] || ord.segment || '—'}</span>
+            {commTier && <span className="tag">مستوى التاجر: {AR(commTier.level)}</span>}
+            <span className="tag">نسبة العمولة: {pct(ord.commission_rate_applied, ord.segment)}</span>
+            <span className="tag">الأساس المالي: {money2(ord.goods_subtotal)} ر</span>
+          </div>
+          <div className="kv" style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <b>العمولة المخصومة النهائية</b>
+            <span style={{ color: '#E06A72', fontWeight: 900, direction: 'ltr' }}>− {money2(ord.commission_amount)} ريال</span>
+          </div>
+          {commReversed && <div className="kv" style={{ marginTop: 6, color: 'var(--danger)', fontWeight: 800 }}>
+            {ord.commission_state === 'reversed' ? 'أُعيدت العمولة كاملة' : 'أُعيد جزء من العمولة'} ({money2(ord.reversed_amount)} ر)
+          </div>}
+        </div>}
+
+      <div className="secttl" style={{ margin: '14px 0 6px', fontSize: 13.5 }}>💳 الدفع والإيصال</div>
+      <div className="kv" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <b>حالة الدفع:</b>
+        <span className="tag">{ord.pay === 'prepaid' ? 'تحويل مسبق' : 'نقداً عند الاستلام'}</span>
+        {ord.pay === 'prepaid' && <span className={`tag ${(PAY_META[ord.pay_status] || PAY_META.pending)[1]}`}>{(PAY_META[ord.pay_status] || PAY_META.pending)[0]}</span>}
+      </div>
+      {ord.reject_reason && <div className="kv"><b>سبب رفض الدفع:</b> <span style={{ color: 'var(--danger)' }}>{ord.reject_reason}</span></div>}
+      {ord.pay === 'prepaid' &&
+        <div className="acts" style={{ flexWrap: 'wrap' }}>
+          {ord.pay_receipt && <button className="btn sm ghost" disabled={busy} onClick={openReceipt}>عرض الإيصال</button>}
+          {/* Payment can only be reviewed/accepted/rejected before the order leaves for delivery. */}
+          {(curRank === 0 || curRank === 1) && ord.pay_status !== 'approved' && <button className="btn sm" disabled={busy} onClick={acceptPay}>قبول الدفع</button>}
+          {(curRank === 0 || curRank === 1) && <button className="btn sm danger" disabled={busy} onClick={() => { setErr(''); setRejectOpen(true); }}>رفض الدفع</button>}
+        </div>}
+
+      <div className="secttl" style={{ margin: '16px 0 6px', fontSize: 13.5 }}>🔄 دورة حياة الطلب</div>
+      <div className="od-stepper">
+        {PROGRESSION.map(([k, l], r) => (
+          <div key={k} className={`st${curRank === r ? ' cur' : curRank > r ? ' on' : ''}`}>{l}</div>
+        ))}
+      </div>
+      {terminal
+        ? <div className="kv" style={{ color: 'var(--muted)' }}>الطلب في حالة نهائية ({st[0]}) — لا يمكن تغيير الحالة.</div>
+        : <>
+          <div className="acts" style={{ flexWrap: 'wrap' }}>
+            {forwardTarget && <button className="btn sm" disabled={busy} onClick={goForward}>➜ {forwardTarget[1]}</button>}
+            {canCancel && <button className="btn sm danger" disabled={busy} onClick={goCancel}>إلغاء الطلب</button>}
+          </div>
+          {backTargets.length > 0 &&
+            <div className="acts" style={{ flexWrap: 'wrap', marginTop: 6 }}>
+              <span className="kv" style={{ width: '100%', color: 'var(--muted)', margin: 0 }}>رجوع خطوة أو أكثر (صامت — بدون إشعار للعميل):</span>
+              {backTargets.map(([k, l]) => <button key={k} className="btn sm ghost" disabled={busy} onClick={() => doStatus(k)}>◂ {l}</button>)}
+            </div>}
+        </>}
+
+      {err && <div className="err">{err}</div>}
+      {msg && <div className="ok">{msg}</div>}
+
+      {receipt &&
+        <div className="modal-ov" onClick={() => setReceipt(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="v-head"><strong style={{ flex: 1 }}>إيصال الدفع</strong><button className="od-back" onClick={() => setReceipt(null)}>إغلاق</button></div>
+            <img src={receipt} alt="إيصال الدفع" />
+          </div>
+        </div>}
+
+      {rejectOpen &&
+        <div className="modal-ov" onClick={() => setRejectOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="secttl" style={{ color: 'var(--danger)' }}>رفض إثبات الدفع</div>
+            <p className="muted" style={{ margin: '0 0 10px' }}>سيعود الطلب إلى «بانتظار المراجعة» بانتظار إيصال جديد، ويُرسَل للعميل إشعار فوري بالسبب.</p>
+            <label className="fld"><span>سبب الرفض (إلزامي)</span>
+              <textarea rows="3" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="مثال: الإيصال غير واضح / المبلغ غير مطابق" /></label>
+            <div className="row2">
+              <button className="btn sm danger" disabled={busy || !reason.trim()} onClick={submitReject}>تأكيد الرفض وإخطار العميل</button>
+              <button className="btn sm ghost" disabled={busy} onClick={() => setRejectOpen(false)}>تراجع</button>
+            </div>
+            {err && <div className="err">{err}</div>}
+          </div>
+        </div>}
+    </div>
+  );
+}
+
+// ---- Orders management (الطلبات) — list + Order Details lifecycle ----
 function OrdersAdmin() {
   const [orders, setOrders] = useState(null);
   const [prof, setProf] = useState({});   // user_id -> {name, phone, role}
@@ -910,9 +1154,8 @@ function OrdersAdmin() {
   const [vcat, setVcat] = useState({});    // vendor_id -> category (fallback)
   const [tab, setTab] = useState('savings');
   const [sub, setSub] = useState('almond');
-  const [msg, setMsg] = useState('');
-  const [feeInput, setFeeInput] = useState({}); // order_no -> wholesale delivery fee being edited
   const [tiers, setTiers] = useState([]);
+  const [openNo, setOpenNo] = useState(null); // order_no whose details are open
   const load = async () => {
     setOrders(null);
     const [o, p, s, pr, t] = await Promise.all([
@@ -931,6 +1174,8 @@ function OrdersAdmin() {
     setOrders(o.error ? [] : (o.data || []));
   };
   useEffect(() => { load(); }, []);
+  // Patch a single order in place after a details action (no full reload / no list blank).
+  const patchOrder = (order_no, p) => setOrders((os) => (os || []).map((o) => o.order_no === order_no ? { ...o, ...p } : o));
   // Each order's section is taken from its products' category (the accurate source),
   // falling back to the seller's category / role if a product was deleted.
   const catOf = (o) => {
@@ -944,37 +1189,29 @@ function OrdersAdmin() {
     return 'other';
   };
   const bucketOf = (c) => (c === 'savings' ? 'savings' : c === 'vip' ? 'vip' : (c === 'almond' || c === 'raisin') ? 'farmer' : (c === 'retail' || c === 'wholesale') ? c : 'other');
-  const ROLE = { farmer_almond: 'مزارع لوز', farmer_raisin: 'مزارع زبيب', farmer: 'مزارع', retail: 'تاجر تجزئة', wholesale: 'تاجر جملة', customer: 'زبون', admin: 'لوزي' };
-  const STAT = { new: ['جديد', 'pending'], received: ['جديد', 'pending'], payreview: ['بانتظار مراجعة الدفع', 'pending'], preparing: ['قيد التجهيز', 'pending'], delivering: ['قيد التسليم', 'pending'], delivered: ['مكتمل', 'approved'], rejected: ['مرفوض', 'rejected'], cancelled: ['ملغى', 'rejected'] };
-  const PAYST = { pending: ['بانتظار المراجعة', 'pending'], approved: ['مقبول', 'approved'], rejected: ['مرفوض', 'rejected'] };
-  const money = (n) => (Number(n) || 0).toLocaleString('en-US') + ' ريال';
-  const when = (s) => fmtDT(s);
-  const setStatus = async (o, status) => {
-    const { error } = await SB.from('orders').update({ status }).eq('order_no', o.order_no);
-    if (error) return setMsg('خطأ: ' + error.message);
-    setMsg('تم تحديث الحالة ✓ · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 3000); load();
-  };
-  const openReceipt = async (o) => {
-    let url = o.pay_receipt;
-    if (url && url.indexOf('http') !== 0) { const { data } = SB.storage.from('product-images').getPublicUrl(url); url = data.publicUrl; }
-    if (url) window.open(url, '_blank');
-  };
-  const setPay = async (o, pay_status) => {
-    const { error } = await SB.from('orders').update({ pay_status }).eq('order_no', o.order_no);
-    if (error) return setMsg('خطأ: ' + error.message);
-    setMsg((pay_status === 'approved' ? 'تم قبول الإيصال ✓' : 'تم رفض الإيصال') + ' · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 3000); load();
-  };
-  // Wholesale only: admin enters the delivery cost; total = subtotal + fee.
-  const setDelivery = async (o) => {
-    const raw = feeInput[o.order_no];
-    if (raw === '' || raw == null) return setMsg('أدخل رسوم التوصيل أولاً');
-    const fee = Math.max(0, Math.round(Number(raw) || 0));
-    const items = Array.isArray(o.items) ? o.items : [];
-    const subtotal = items.reduce((a, it) => a + (Number(it.price) || 0) * (Number(it.q) || 0), 0);
-    const { error } = await SB.from('orders').update({ delivery_fee: fee, total: subtotal + fee }).eq('order_no', o.order_no);
-    if (error) return setMsg('خطأ: ' + error.message);
-    setMsg('تم تحديث رسوم التوصيل ✓ · 🕒 ' + nowStamp()); setTimeout(() => setMsg(''), 3000); load();
-  };
+
+  // Details view takes over the whole tab when an order is open.
+  if (openNo != null) {
+    const o = (orders || []).find((x) => x.order_no === openNo);
+    if (o) {
+      const b = bucketOf(catOf(o));
+      const isPlatform = b === 'savings' || b === 'vip';
+      return (
+        <OrderDetails
+          order={o}
+          seller={prof[o.seller_vendor_id] || {}}
+          storeName={stores[o.seller_vendor_id]}
+          isPlatform={isPlatform}
+          platformLabel={catOf(o) === 'vip' ? 'لوزي · VIP' : 'لوزي · التوفير'}
+          showFee={b === 'wholesale'}
+          tiers={tiers}
+          onBack={() => setOpenNo(null)}
+          onChanged={patchOrder}
+        />
+      );
+    }
+  }
+
   const shown = (orders || []).filter((o) => { const b = bucketOf(catOf(o)); if (b !== tab) return false; if (tab === 'farmer') return catOf(o) === sub; return true; });
   return (
     <div>
@@ -987,86 +1224,25 @@ function OrdersAdmin() {
           {[['almond', 'لوز'], ['raisin', 'زبيب']].map(([id, label]) =>
             <button key={id} className={sub === id ? 'on' : ''} onClick={() => setSub(id)}>{label}</button>)}
         </div>}
-      {msg && <div className="ok" style={{ marginBottom: 10 }}>{msg}</div>}
       {orders === null ? <div className="empty">جارٍ التحميل…</div>
         : !shown.length ? <div className="empty">لا توجد طلبات في هذا القسم.</div>
           : shown.map((o) => {
-            const seller = prof[o.seller_vendor_id] || {};
-            const c = o.customer || {};
-            const st = STAT[o.status] || [o.status, 'pending'];
+            const cust = o.customer || {};
+            const st = STATUS_META[o.status] || [o.status, 'pending'];
             const items = Array.isArray(o.items) ? o.items : [];
             const isRfq = items.some((it) => String(it.p || '').startsWith('rfq-'));
-            const isPlatform = tab === 'savings' || tab === 'vip';
+            const nItems = items.reduce((a, it) => a + (Number(it.q) || 0), 0);
             return (
               <div className="card" key={o.order_no}>
-                <div className="v-head"><strong>طلب #{o.order_no}</strong>
+                <div className="v-head"><strong style={{ flex: 1 }}>طلب #{o.order_no}</strong>
                   {isRfq && <span className="tag" style={{ background: 'var(--gold-deep)', color: '#fff' }}>طلب مسبق</span>}
                   <span className={`tag ${st[1]}`}>{st[0]}</span></div>
+                <div className="kv"><b>المشتري:</b> {cust.name || '—'}{cust.phone ? ' · ' + cust.phone : ''}</div>
+                <div className="kv"><b>عدد الأصناف:</b> {AR(nItems)} · <b>الإجمالي:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 900 }}>{orderMoney(o.total)}</span></div>
+                {o.pay === 'prepaid' && <div className="kv"><b>الدفع:</b> تحويل مسبق <span className={`tag ${(PAY_META[o.pay_status] || PAY_META.pending)[1]}`}>{(PAY_META[o.pay_status] || PAY_META.pending)[0]}</span></div>}
                 <Stamp at={o.created_at} label="تاريخ ووقت الطلب" />
-                {o.updated_at && <Stamp at={o.updated_at} label="آخر تحديث" />}
-
-                <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13.5 }}>🌿 البائع</div>
-                <div className="kv"><b>الاسم:</b> {seller.name || (isPlatform ? (tab === 'vip' ? 'لوزي · VIP' : 'لوزي · التوفير') : '—')}</div>
-                <div className="kv"><b>الهاتف:</b> {seller.phone || '—'}</div>
-                <div className="kv"><b>الدور:</b> {ROLE[seller.role] || (isPlatform ? 'لوزي' : seller.role || '—')}</div>
-                {stores[o.seller_vendor_id] && <div className="kv"><b>المتجر:</b> {stores[o.seller_vendor_id]}</div>}
-
-                <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13.5 }}>🛒 المشتري</div>
-                <div className="kv"><b>الاسم:</b> {c.name || '—'}</div>
-                <div className="kv"><b>الهاتف:</b> {c.phone || '—'}</div>
-                <div className="kv"><b>العنوان:</b> {[c.city, c.address].filter(Boolean).join('، ') || '—'}</div>
-
-                <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13.5 }}>📦 تفاصيل الطلب</div>
-                {items.map((it, i) =>
-                  <div className="kv" key={i}>• {it.name || 'منتج'} — {it.q}{it.weight ? ' × ' + it.weight : ''} · {money(it.price)}</div>)}
-                {tab === 'wholesale' &&
-                  <div className="kv" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '4px 0' }}>
-                    <b>رسوم التوصيل:</b>
-                    <input type="number" min="0" inputMode="numeric" placeholder="أدخل التكلفة"
-                      value={feeInput[o.order_no] != null ? feeInput[o.order_no] : (o.delivery_fee != null ? o.delivery_fee : '')}
-                      onChange={(e) => setFeeInput((s) => ({ ...s, [o.order_no]: e.target.value }))}
-                      style={{ width: 120 }} />
-                    <button className="btn sm" onClick={() => setDelivery(o)}>حفظ</button>
-                    <span style={{ color: 'var(--muted)' }}>{o.delivery_fee != null ? 'الحالي: ' + money(o.delivery_fee) : 'لم تُحدَّد بعد'}</span>
-                  </div>}
-                <div className="kv"><b>الإجمالي:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 900 }}>{money(o.total)}</span></div>
-
-                {o.commission_amount != null && (() => {
-                  const tr = tierOf(tiers, o.segment, o.cumulative_before);
-                  const reversed = o.commission_state === 'reversed' || o.commission_state === 'partially_reversed';
-                  return (
-                    <div style={{ margin: '10px 0', background: 'var(--sand)', border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ fontWeight: 900, color: 'var(--gold-deep)' }}>٪ عمولة لوزي</div>
-                        <div style={{ fontWeight: 900, color: 'var(--danger)', direction: 'ltr' }}>− {money2(o.commission_amount)} ر</div>
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 9 }}>
-                        <span className="tag">{SEG_AR[o.segment] || o.segment}</span>
-                        {tr && <span className="tag">مستوى {AR(tr.level)}</span>}
-                        <span className="tag">النسبة {pct(o.commission_rate_applied, o.segment)}</span>
-                        <span className="tag">الأساس: البضاعة {money2(o.goods_subtotal)} ر</span>
-                      </div>
-                      {reversed && <div className="kv" style={{ marginTop: 8, color: 'var(--danger)', fontWeight: 800 }}>
-                        {o.commission_state === 'reversed' ? 'أُعيدت العمولة كاملة' : 'أُعيد جزء من العمولة'} ({money2(o.reversed_amount)} ر)
-                      </div>}
-                    </div>
-                  );
-                })()}
-
-                <div className="kv"><b>الدفع:</b> {o.pay === 'prepaid' ? 'تحويل مسبق' : 'نقداً عند الاستلام'}
-                  {o.pay === 'prepaid' && <span className={`tag ${(PAYST[o.pay_status] || PAYST.pending)[1]}`} style={{ marginInlineStart: 6 }}>{(PAYST[o.pay_status] || PAYST.pending)[0]}</span>}</div>
-                {o.reject_reason && <div className="kv"><b>سبب الرفض:</b> {o.reject_reason}</div>}
-
-                {o.pay === 'prepaid' && o.pay_receipt &&
-                  <div className="acts" style={{ flexWrap: 'wrap' }}>
-                    <button className="btn sm ghost" onClick={() => openReceipt(o)}>عرض الإيصال</button>
-                    {o.pay_status !== 'approved' && <button className="btn sm" onClick={() => setPay(o, 'approved')}>قبول الدفع</button>}
-                    {o.pay_status !== 'rejected' && <button className="btn sm danger" onClick={() => setPay(o, 'rejected')}>رفض الدفع</button>}
-                  </div>}
-
-                <div className="acts" style={{ flexWrap: 'wrap', marginTop: 10 }}>
-                  {[['preparing', 'قيد التجهيز'], ['delivering', 'قيد التسليم'], ['delivered', 'مكتمل'], ['cancelled', 'إلغاء']].map(([s, label]) =>
-                    <button key={s} className={`btn sm ${o.status === s ? '' : (s === 'cancelled' ? 'danger' : 'ghost')}`} onClick={() => setStatus(o, s)}>{label}</button>)}
+                <div className="acts">
+                  <button className="btn sm" onClick={() => setOpenNo(o.order_no)}>عرض تفاصيل الطلب ‹</button>
                 </div>
               </div>
             );
