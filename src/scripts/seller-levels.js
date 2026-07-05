@@ -19,6 +19,23 @@
   var nextTier = function (tiers, seg, level) {
     return (tiers || []).filter(function (t) { return t.segment === seg; }).find(function (t) { return t.level === level + 1; }) || null;
   };
+  // Progressive/marginal commission across cumulative-sales tier bands — mirrors
+  // the DB commission_bracket(). The order pushes the seller's counter from
+  // `before` to `before + goods`; each slice of that span is charged at the rate
+  // of the band it lands in (band upper bound = next tier's min_sales).
+  var bracketCommission = function (tiers, seg, before, goods) {
+    var rows = (tiers || []).filter(function (t) { return t.segment === seg; }).sort(function (a, b) { return a.level - b.level; });
+    var start = Math.max(0, Number(before) || 0);
+    var end = start + Math.max(0, Number(goods) || 0);
+    var comm = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var lo = Number(rows[i].min_sales);
+      var hi = i + 1 < rows.length ? Number(rows[i + 1].min_sales) : Infinity;
+      var from = Math.max(start, lo), to = Math.min(end, hi);
+      if (to > from) comm += (to - from) * Number(rows[i].rate);
+    }
+    return Math.round(comm * 100) / 100;
+  };
 
   var SB = null, STATE = { uid: null, profile: null, tiers: [], orders: null, calcSeg: "retail", calcAmt: 4500, tab: "level" };
 
@@ -247,24 +264,25 @@
     var cum = Number(p[seg + "_cumulative_sales"]) || 0;
     var tr = tierOf(STATE.tiers, seg, cum);
     var amt = Number(STATE.calcAmt) || 0;
-    var rate = tr ? Number(tr.rate) : 0;
-    var comm = Math.round(amt * rate * 100) / 100;
+    // Progressive brackets over [cum, cum + amt]; effective rate = comm / amt.
+    var comm = bracketCommission(STATE.tiers, seg, cum, amt);
     var net = Math.round((amt - comm) * 100) / 100;
+    var effRate = amt > 0 ? comm / amt : 0;
     var nx = tr ? nextTier(STATE.tiers, seg, tr.level) : null;
     var save = nx ?
-      '<div class="lzc-save">في المستوى التالي (عمولة ' + pct(nx.rate, seg) + ") ستدفع على نفس المبلغ عمولة أقل بـ <b>" +
-      money2(Math.round(amt * (rate - nx.rate) * 100) / 100) + " ر</b>.</div>"
+      '<div class="lzc-save">لو بدأت هذا الطلب من المستوى التالي لدفعت على نفس المبلغ عمولة أقل بـ <b>' +
+      money2(Math.max(0, Math.round((comm - bracketCommission(STATE.tiers, seg, nx.min_sales, amt)) * 100) / 100)) + " ر</b>.</div>"
       : '<div class="lzc-save"><b>أنت في أعلى مستوى</b> — تتمتع بأقل عمولة ممكنة.</div>';
     return '<div class="lzc-seg"><button data-seg="retail" class="' + (seg === "retail" ? "on" : "") + '">تجزئة</button>' +
       '<button data-seg="wholesale" class="' + (seg === "wholesale" ? "on" : "") + '">جملة</button></div>' +
       '<label class="lzc-fld">قيمة البضاعة (بدون رسوم التوصيل)</label>' +
       '<div class="lzc-inp"><span class="cur">ريال</span><input id="lzc-amt" inputmode="numeric" value="' + grp(amt) + '"></div>' +
       '<div class="lzc-tag ' + (seg === "wholesale" ? "w" : "") + '"><span>مستواك الحالي: ' + (tr ? "مستوى " + AR(tr.level) + " من ٧" : "—") +
-      "</span><span>" + (tr ? pct(tr.rate, seg) : "—") + "</span></div>" +
+      "</span><span>النسبة الفعلية " + (amt > 0 ? pct(effRate, seg) : "—") + "</span></div>" +
       '<div class="lzc-res"><div class="lzc-row"><span class="k">قيمة البضاعة</span><span class="v">' + money2(amt) + ' ر</span></div>' +
       '<div class="lzc-row c"><span class="k">عمولة لوزي</span><span class="v">− ' + money2(comm) + ' ر</span></div>' +
       '<div class="lzc-row n"><span class="k">صافي لك</span><span class="v">' + money2(net) + " ر</span></div></div>" + save +
-      '<div class="lzc-save" style="border-style:solid;border-color:#ecd9b8;background:#f7f9f7;color:#6c7d73;margin-top:10px;">المستوى يُحدَّد من مبيعاتك التراكمية لا من مبلغ الطلب — المبلغ هنا فقط لحساب العمولة بنسبتك الحالية.</div>';
+      '<div class="lzc-save" style="border-style:solid;border-color:#ecd9b8;background:#f7f9f7;color:#6c7d73;margin-top:10px;">العمولة تُحسب تصاعدياً على شرائح مبيعاتك التراكمية — كل شريحة بنسبتها، تماماً كشرائح الضريبة. لذلك النسبة الفعلية قد تقل عن نسبة مستواك الحالي.</div>';
   }
   function wireCalc(ov) {
     var inp = ov.querySelector("#lzc-amt");
