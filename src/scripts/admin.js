@@ -298,11 +298,21 @@ function SettingsTab() {
   const [rfqLaunch, setRfqLaunch] = useState('');
   const [rlMsg, setRlMsg] = useState('');
   const [rlUpdated, setRlUpdated] = useState(null);
+  const [hubAddr, setHubAddr] = useState('');
+  const [haMsg, setHaMsg] = useState('');
+  const [haUpdated, setHaUpdated] = useState(null);
   useEffect(() => {
     SB.from('settings').select('value,updated_at').eq('key', 'support_wa').maybeSingle().then(({ data }) => { if (data) { setWa(data.value || ''); setWaUpdated(data.updated_at || null); } });
     SB.from('settings').select('value,updated_at').eq('key', 'retail_bundle_limit').maybeSingle().then(({ data }) => { if (data && data.value != null && data.value !== '') { setBundleLimit(String(data.value)); setBlUpdated(data.updated_at || null); } });
     SB.from('settings').select('value,updated_at').eq('key', 'rfq_launch_date').maybeSingle().then(({ data }) => { if (data && data.value != null && data.value !== '') { setRfqLaunch(String(data.value).replace(/"/g, '').slice(0, 10)); setRlUpdated(data.updated_at || null); } });
+    SB.from('settings').select('value,updated_at').eq('key', 'hub_address').maybeSingle().then(({ data }) => { if (data && data.value != null) { setHubAddr(data.value); setHaUpdated(data.updated_at || null); } });
   }, []);
+  const saveHubAddr = async () => {
+    const now = new Date().toISOString();
+    const { error } = await SB.from('settings').upsert({ key: 'hub_address', value: hubAddr.trim(), updated_at: now }, { onConflict: 'key' });
+    if (!error) setHaUpdated(now);
+    setHaMsg(error ? 'خطأ: ' + error.message : 'تم الحفظ ✓ · 🕒 ' + nowStamp()); setTimeout(() => setHaMsg(''), 3000);
+  };
   const saveWa = async () => {
     const now = new Date().toISOString();
     const { error } = await SB.from('settings').upsert({ key: 'support_wa', value: wa, updated_at: now }, { onConflict: 'key' });
@@ -332,6 +342,15 @@ function SettingsTab() {
         <button className="btn sm" onClick={saveWa}>حفظ الرقم</button>
         {waUpdated && <Stamp at={waUpdated} label="آخر تحديث" />}
         {waMsg && <div className={waMsg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{waMsg}</div>}
+      </div>
+      <div className="card">
+        <div className="secttl">عنوان مركز الاستلام (المركز الرئيسي)</div>
+        <div className="kv" style={{ marginBottom: 8, color: 'var(--muted)' }}>العنوان الذي يُطلب من البائعين إيصال بضاعتهم إليه. يظهر في رسائل التوريد بتبويب «الاستلام والتوريد».</div>
+        <label className="fld"><span>العنوان</span>
+          <input value={hubAddr} onChange={(e) => setHubAddr(e.target.value)} placeholder="مثال: بيت المكسرات" /></label>
+        <button className="btn sm" onClick={saveHubAddr}>حفظ العنوان</button>
+        {haUpdated && <Stamp at={haUpdated} label="آخر تحديث" />}
+        {haMsg && <div className={haMsg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{haMsg}</div>}
       </div>
       <div className="card">
         <div className="secttl">حد العروض المشكّلة للتجزئة</div>
@@ -1251,6 +1270,310 @@ function OrdersAdmin() {
   );
 }
 
+// ---- Hub & Spoke fulfillment / direct payout (الاستلام والتوريد) ----
+// Per-SELLER-GROUP supply lifecycle: confirm the customer paid → the seller
+// brings goods to the central hub → admin inspects & pays (cash/transfer) →
+// last-mile delivery to the customer. Orders can span multiple sellers, so the
+// whole flow is per seller-group (one card per seller), never per order.
+//
+// NOTE: there is no live payment gateway yet, so "paid_by_customer" is confirmed
+// manually here (replaces the deferred Cloudflare Worker in the spec). The
+// commission shown is a READ-ONLY snapshot — the authoritative commission
+// accounting stays on the order-level engine (charged when status='delivered').
+const FUL_STAGES = [
+  ['paid_by_customer', 'بانتظار تأكيد الدفع'],
+  ['pending_hub_delivery', 'بانتظار التوريد'],
+  ['out_for_delivery', 'قيد التوصيل للعميل'],
+  ['done', 'منجزة / مرفوضة'],
+];
+const FUL_META = {
+  paid_by_customer:       ['بانتظار تأكيد الدفع', 'pending'],
+  pending_hub_delivery:   ['بانتظار توريد البضاعة', 'pending'],
+  inspected_and_received: ['تم الاستلام والمحاسبة', 'approved'],
+  rejected_at_hub:        ['مرفوضة في المركز', 'rejected'],
+  out_for_delivery:       ['قيد التوصيل للعميل', 'pending'],
+  delivered_to_customer:  ['تم التسليم للعميل', 'approved'],
+  returned_by_customer:   ['مرتجعة من العميل', 'rejected'],
+  disputed:               ['نزاع', 'rejected'],
+};
+const PAYOUT_META = {
+  pending:           ['بانتظار الدفع', 'pending'],
+  paid_cash:         ['مدفوع نقداً', 'approved'],
+  paid_transfer:     ['مدفوع عبر حوالة', 'approved'],
+  withheld_disputed: ['محجوز (نزاع)', 'rejected'],
+};
+const DONE_STATES = ['rejected_at_hub', 'delivered_to_customer', 'returned_by_customer', 'disputed'];
+const isIOS = () => /iP(hone|ad|od)/.test((typeof navigator !== 'undefined' && navigator.userAgent) || '');
+const phoneDigits = (p) => String(p || '').replace(/[^0-9]/g, '');
+// Arabic supply message built dynamically from THIS seller's items only.
+const buildSupplyMsg = (orderNo, items, hubAddr) => {
+  const lines = (items || []).map((it) => {
+    const q = Number(it.q) || 0;
+    const w = it.weight ? ' ' + it.weight : '';
+    return '- ' + q + w + ' ' + (it.name || 'صنف');
+  }).join('\n');
+  return 'مرحباً، لديك طلب جديد (رقم #' + orderNo + ') جاهز للتوريد.\n'
+    + 'الأصناف المطلوبة:\n' + lines + '\n'
+    + 'الرجاء إيصال البضاعة إلى مركز ' + (hubAddr || '—')
+    + '. سيتم تسليمك قيمة البضاعة نقداً أو عبر حوالة فور مطابقتها.';
+};
+
+function GroupCard({ grp, items, seller, tiers, hubAddr, onPatch }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [method, setMethod] = useState('cash');
+  const [ref, setRef] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const o = grp.orders || {};
+  const cust = o.customer || {};
+  const fs = grp.fulfillment_status;
+  const meta = FUL_META[fs] || [fs, 'pending'];
+  const subtotal = Number(grp.subtotal_amount) || 0;
+  const channel = o.segment === 'wholesale' ? 'wholesale' : 'retail';
+  const cum = channel === 'wholesale'
+    ? Number(seller.wholesale_cumulative_sales) || 0
+    : Number(seller.retail_cumulative_sales) || 0;
+  // Read-only commission preview mirrors the DB trigger (get_tier on the current
+  // counter). The real snapshot is written server-side on inspection.
+  const tr = tierOf(tiers, channel, cum);
+  const previewRate = tr ? Number(tr.rate) : 0;
+  const previewComm = Math.round(subtotal * previewRate * 100) / 100;
+  const previewNet = Math.round((subtotal - previewComm) * 100) / 100;
+
+  const digits = phoneDigits(grp.seller_phone || seller.phone);
+  const message = buildSupplyMsg(o.order_no, items, hubAddr);
+  const enc = encodeURIComponent(message);
+  const waHref = 'https://wa.me/' + digits + '?text=' + enc;
+  const smsHref = 'sms:' + digits + (isIOS() ? '&' : '?') + 'body=' + enc;
+
+  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 2600); };
+
+  // paid_by_customer → pending_hub_delivery (manual "confirm payment").
+  const confirmPay = async () => {
+    if (!window.confirm('تأكيد استلام دفعة العميل ونقل الطلب إلى «بانتظار التوريد»؟')) return;
+    setBusy(true); setErr('');
+    const { error } = await SB.from('order_seller_groups')
+      .update({ fulfillment_status: 'pending_hub_delivery' }).eq('id', grp.id);
+    setBusy(false);
+    if (error) { setErr('خطأ: ' + error.message); return; }
+    onPatch(grp.id, { fulfillment_status: 'pending_hub_delivery' });
+  };
+
+  // Accept & pay: the DB trigger fills commission/net/fee and auto-advances to
+  // out_for_delivery. We patch the row optimistically to the post-trigger state.
+  const acceptPay = async () => {
+    if (method === 'transfer' && !ref.trim()) { setErr('أدخل مرجع الحوالة'); return; }
+    if (!window.confirm('تأكيد استلام البضاعة ومحاسبة البائع؟ سيتم احتساب العمولة ورسوم التوصيل وتحويل الطلب إلى «قيد التوصيل».')) return;
+    setBusy(true); setErr('');
+    const payout = method === 'transfer' ? 'paid_transfer' : 'paid_cash';
+    const refVal = method === 'transfer' ? ref.trim() : null;
+    const noteVal = notes.trim() || null;
+    const { error } = await SB.from('order_seller_groups').update({
+      fulfillment_status: 'inspected_and_received',
+      seller_payout_status: payout,
+      payout_reference: refVal,
+      inspector_notes: noteVal,
+    }).eq('id', grp.id);
+    setBusy(false);
+    if (error) { setErr('خطأ: ' + error.message); return; }
+    onPatch(grp.id, {
+      fulfillment_status: 'out_for_delivery', seller_payout_status: payout,
+      payout_reference: refVal, inspector_notes: noteVal,
+      platform_commission: previewComm, seller_net_amount: previewNet, delivery_fee_yer: 1000,
+    });
+    flash('تم الاستلام والمحاسبة ✓ · 🕒 ' + nowStamp());
+  };
+
+  // Reject at hub — terminal, no commission/payout math runs.
+  const reject = async () => {
+    if (!window.confirm('تأكيد رفض البضاعة؟ لن تُحتسب أي عمولة أو دفعة، ويحتاج الطلب إلى متابعة يدوية.')) return;
+    setBusy(true); setErr('');
+    const noteVal = notes.trim() || null;
+    const { error } = await SB.from('order_seller_groups')
+      .update({ fulfillment_status: 'rejected_at_hub', inspector_notes: noteVal }).eq('id', grp.id);
+    setBusy(false);
+    if (error) { setErr('خطأ: ' + error.message); return; }
+    onPatch(grp.id, { fulfillment_status: 'rejected_at_hub', inspector_notes: noteVal });
+  };
+
+  // Last-mile completion (Step 5).
+  const markDelivered = async () => {
+    if (!window.confirm('تأكيد تسليم الطلب للعميل؟')) return;
+    setBusy(true); setErr('');
+    const { error } = await SB.from('order_seller_groups')
+      .update({ fulfillment_status: 'delivered_to_customer' }).eq('id', grp.id);
+    setBusy(false);
+    if (error) { setErr('خطأ: ' + error.message); return; }
+    onPatch(grp.id, { fulfillment_status: 'delivered_to_customer' });
+  };
+
+  const nItems = (items || []).reduce((a, it) => a + (Number(it.q) || 0), 0);
+  const showComm = grp.platform_commission != null;
+
+  return (
+    <div className="card">
+      <div className="v-head">
+        <strong style={{ flex: 1 }}>{(seller.name) || 'بائع'}</strong>
+        <span className="tag" style={{ background: 'var(--sand)' }}>طلب #{o.order_no}</span>
+        <span className={`tag ${meta[1]}`}>{meta[0]}</span>
+      </div>
+      <div className="kv"><b>هاتف البائع:</b> {grp.seller_phone || seller.phone || '—'}</div>
+      <div className="kv"><b>الدور:</b> {ROLE_AR[seller.role] || seller.role || '—'}</div>
+      <div className="kv"><b>المشتري:</b> {cust.name || '—'}{cust.phone ? ' · ' + cust.phone : ''}</div>
+      <div className="kv"><b>نوع البيع:</b> {SEG_AR[channel]} · <b>عدد الأصناف:</b> {AR(nItems)}</div>
+      <Stamp at={o.created_at} label="تاريخ الطلب" />
+
+      <div className="secttl" style={{ margin: '10px 0 4px', fontSize: 13 }}>📦 أصناف هذا البائع</div>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="od-table">
+          <thead><tr><th>الصنف</th><th className="num">الكمية</th><th className="num">سعر الوحدة</th><th className="num">الإجمالي</th></tr></thead>
+          <tbody>
+            {(items || []).length === 0
+              ? <tr><td colSpan="4" style={{ color: 'var(--muted)' }}>لا توجد أصناف.</td></tr>
+              : items.map((it, i) => (
+                <tr key={i}>
+                  <td>{it.name || 'صنف'}{it.weight ? ' · ' + it.weight : ''}</td>
+                  <td className="num">{Number(it.q) || 0}</td>
+                  <td className="num">{orderMoney(it.price)}</td>
+                  <td className="num">{orderMoney((Number(it.price) || 0) * (Number(it.q) || 0))}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="od-total grand"><span>إجمالي بضاعة البائع</span><span>{orderMoney(subtotal)}</span></div>
+
+      {/* ── paid_by_customer: manual confirm-payment ── */}
+      {fs === 'paid_by_customer' &&
+        <div className="acts" style={{ marginTop: 10 }}>
+          <button className="btn sm" disabled={busy} onClick={confirmPay}>💳 تأكيد الدفع واستلام الطلب</button>
+        </div>}
+
+      {/* ── pending_hub_delivery: communicate + inspect + pay/reject ── */}
+      {fs === 'pending_hub_delivery' && <>
+        <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13 }}>📨 مراسلة البائع</div>
+        <div className="acts" style={{ flexWrap: 'wrap' }}>
+          <a className="btn sm" href={waHref} target="_blank" rel="noopener noreferrer" style={{ background: '#25D366', color: '#fff' }}>📱 مراسلة واتساب</a>
+          <a className="btn sm ghost" href={smsHref}>💬 إرسال SMS</a>
+        </div>
+
+        <div className="secttl" style={{ margin: '14px 0 4px', fontSize: 13 }}>🔎 الفحص والمحاسبة</div>
+        <div className="od-comm" style={{ marginBottom: 10 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <span className="tag">مستوى البائع: {tr ? AR(tr.level) : '—'}</span>
+            <span className="tag">نسبة العمولة: {pct(previewRate, channel)}</span>
+            <span className="tag">العمولة التقديرية: {money2(previewComm)} ر</span>
+            <span className="tag">صافي البائع: {money2(previewNet)} ر</span>
+            <span className="tag">رسوم التوصيل: {orderMoney(1000)}</span>
+          </div>
+          <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>قيمة تقديرية للعرض فقط؛ تُحتسب العمولة النهائية تلقائياً عند الحفظ.</div>
+        </div>
+        <label className="fld"><span>طريقة الدفع للبائع</span>
+          <select value={method} onChange={(e) => setMethod(e.target.value)}>
+            <option value="cash">تسليم نقدي</option>
+            <option value="transfer">تحويل</option>
+          </select></label>
+        {method === 'transfer' &&
+          <label className="fld"><span>مرجع الحوالة</span>
+            <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="رقم/مرجع الحوالة" /></label>}
+        <label className="fld"><span>ملاحظات الفحص</span>
+          <textarea rows="2" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ملاحظات المفتّش (اختياري)" /></label>
+        <div className="acts" style={{ flexWrap: 'wrap' }}>
+          <button className="btn sm" disabled={busy} onClick={acceptPay}>✔️ تم استلام البضاعة ومحاسبة البائع</button>
+          <button className="btn sm danger" disabled={busy} onClick={reject}>رفض البضاعة</button>
+        </div>
+      </>}
+
+      {/* ── read-only payout snapshot once inspected ── */}
+      {showComm &&
+        <div className="od-comm" style={{ marginTop: 10 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <span className="tag">العمولة: {money2(grp.platform_commission)} ر</span>
+            <span className="tag">صافي البائع: {money2(grp.seller_net_amount)} ر</span>
+            <span className="tag">رسوم التوصيل: {orderMoney(grp.delivery_fee_yer)}</span>
+            <span className={`tag ${(PAYOUT_META[grp.seller_payout_status] || PAYOUT_META.pending)[1]}`}>{(PAYOUT_META[grp.seller_payout_status] || PAYOUT_META.pending)[0]}</span>
+          </div>
+          {grp.payout_reference && <div className="kv" style={{ marginTop: 6 }}><b>مرجع الحوالة:</b> {grp.payout_reference}</div>}
+          {grp.inspector_notes && <div className="kv"><b>ملاحظات الفحص:</b> {grp.inspector_notes}</div>}
+        </div>}
+
+      {/* ── out_for_delivery: last-mile completion ── */}
+      {fs === 'out_for_delivery' &&
+        <div className="acts" style={{ marginTop: 10 }}>
+          <button className="btn sm" disabled={busy} onClick={markDelivered}>✔️ تم التسليم للعميل</button>
+        </div>}
+
+      {/* ── terminal rejected: notes only ── */}
+      {fs === 'rejected_at_hub' &&
+        <div className="kv" style={{ marginTop: 8, color: 'var(--danger)' }}>
+          <b>مرفوضة في المركز</b> — تحتاج متابعة يدوية.{grp.inspector_notes ? ' · ' + grp.inspector_notes : ''}
+        </div>}
+
+      {err && <div className="err">{err}</div>}
+      {msg && <div className="ok">{msg}</div>}
+    </div>
+  );
+}
+
+function FulfillmentAdmin() {
+  const [groups, setGroups] = useState(null);
+  const [prof, setProf] = useState({});
+  const [prodVendor, setProdVendor] = useState({});
+  const [hubAddr, setHubAddr] = useState('');
+  const [tiers, setTiers] = useState([]);
+  const [stage, setStage] = useState('pending_hub_delivery');
+  const load = async () => {
+    setGroups(null);
+    const [g, pr, pv, t, hs] = await Promise.all([
+      SB.from('order_seller_groups')
+        .select('*, orders!inner(order_no, items, customer, seller_vendor_id, created_at, segment)')
+        .order('created_at', { ascending: false }),
+      SB.from('profiles').select('user_id,name,phone,role,retail_cumulative_sales,wholesale_cumulative_sales'),
+      SB.from('products').select('id,vendor_id'),
+      getTiers(),
+      SB.from('settings').select('value').eq('key', 'hub_address').maybeSingle(),
+    ]);
+    const pm = {}; (pr.data || []).forEach((r) => { pm[r.user_id] = r; });
+    const vm = {}; (pv.data || []).forEach((r) => { vm[r.id] = r.vendor_id; });
+    setProf(pm); setProdVendor(vm); setTiers(t || []);
+    setHubAddr((hs && hs.data && hs.data.value) || 'بيت المكسرات');
+    setGroups(g.error ? [] : (g.data || []));
+  };
+  useEffect(() => { load(); }, []);
+  const patch = (id, p) => setGroups((gs) => (gs || []).map((x) => x.id === id ? { ...x, ...p } : x));
+  // Items belonging to a seller-group: resolve each line's vendor (product →
+  // vendor, else the order's seller) and keep only this group's seller's lines.
+  const groupItems = (grp) => {
+    const o = grp.orders || {};
+    const its = Array.isArray(o.items) ? o.items : [];
+    return its.filter((it) => (prodVendor[it.p] || o.seller_vendor_id) === grp.seller_id);
+  };
+  const inStage = (grp) => stage === 'done'
+    ? DONE_STATES.indexOf(grp.fulfillment_status) >= 0
+    : grp.fulfillment_status === stage;
+  const shown = (groups || []).filter(inStage);
+  return (
+    <div>
+      <div className="muted" style={{ fontSize: 12.5, marginBottom: 10, lineHeight: 1.7 }}>
+        مركز الاستلام والتوريد — بطاقة لكل بائع في الطلب. أكّد الدفع، راسل البائع لتوريد بضاعته إلى المركز
+        ({hubAddr})، ثم افحص وحاسِب البائع نقداً أو عبر حوالة، وأخيراً سلّم الطلب للعميل.
+      </div>
+      <div className="tabs" style={{ position: 'static', padding: '0 0 12px' }}>
+        {FUL_STAGES.map(([id, label]) =>
+          <button key={id} className={stage === id ? 'on' : ''} onClick={() => setStage(id)}>{label}</button>)}
+      </div>
+      {groups === null ? <div className="empty">جارٍ التحميل…</div>
+        : !shown.length ? <div className="empty">لا توجد طلبات في هذه المرحلة.</div>
+          : shown.map((grp) => (
+            <GroupCard key={grp.id} grp={grp} items={groupItems(grp)}
+              seller={prof[grp.seller_id] || {}} tiers={tiers} hubAddr={hubAddr} onPatch={patch} />
+          ))}
+    </div>
+  );
+}
+
 // ---- Seller commission levels ----
 function SellerLevels() {
   const [rows, setRows] = useState(null);
@@ -1684,7 +2007,7 @@ function Admin() {
   }, []);
   if (user === undefined) return <div className="empty">جارٍ التحميل…</div>;
   if (!user) return <Login onIn={setUser} />;
-  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['chats', 'الدردشات'], ['rfq', 'الطلبات المسبقة'], ['levels', 'مستويات البائعين'], ['trust', 'شارات الثقة'], ['lozisave', 'خانة التوفير'], ['vip', 'سوق VIP'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
+  const TABS = [['verif', 'التحقق من البائعين'], ['users', 'المستخدمون'], ['orders', 'الطلبات'], ['fulfil', 'الاستلام والتوريد'], ['chats', 'الدردشات'], ['rfq', 'الطلبات المسبقة'], ['levels', 'مستويات البائعين'], ['trust', 'شارات الثقة'], ['lozisave', 'خانة التوفير'], ['vip', 'سوق VIP'], ['shahti', 'شارة المرارة'], ['reports', 'البلاغات'], ['reviews', 'التقييمات'], ['numbers', 'تفعيل الأرقام'], ['del', 'طلبات الحذف'], ['settings', 'الإعدادات']];
   return (
     <div>
       <div className="topbar"><h1>لوزي · لوحة الإدارة</h1><button onClick={() => { SB.auth.signOut(); setUser(null); }}>خروج</button></div>
@@ -1693,6 +2016,7 @@ function Admin() {
         {tab === 'verif' && <Verifications />}
         {tab === 'users' && <Users />}
         {tab === 'orders' && <OrdersAdmin />}
+        {tab === 'fulfil' && <FulfillmentAdmin />}
         {tab === 'chats' && <ChatsAdmin me={user} />}
         {tab === 'rfq' && <RfqAdmin me={user} />}
         {tab === 'levels' && <SellerLevels />}
