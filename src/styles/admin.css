@@ -78,3 +78,19 @@
   .bub .who{font-size:11px;font-weight:800;color:var(--green-deep);margin-bottom:3px;}
   .bub .tm{font-size:10.5px;color:var(--muted);margin-top:4px;}
   .bub .reasons{margin-top:5px;display:flex;gap:5px;flex-wrap:wrap;}
+  /* ---- Order Details (تفاصيل الطلب) ---- */
+  .od-back{background:var(--sand);border:none;border-radius:10px;padding:8px 12px;font-weight:800;font-size:13px;cursor:pointer;color:var(--ink);flex-shrink:0;}
+  .od-table{width:100%;border-collapse:collapse;font-size:13px;min-width:320px;}
+  .od-table th,.od-table td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:start;}
+  .od-table th{font-size:11.5px;color:var(--muted);font-weight:800;}
+  .od-table td.num,.od-table th.num{text-align:end;direction:ltr;white-space:nowrap;}
+  .od-total{display:flex;justify-content:space-between;align-items:center;padding:5px 2px;font-size:14px;}
+  .od-total.grand{font-weight:900;font-size:17px;color:var(--green-deep);border-top:2px solid var(--line);margin-top:4px;padding-top:10px;}
+  .od-comm{margin:12px 0;background:var(--sand);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+  .od-stepper{display:flex;gap:6px;margin:4px 0 12px;}
+  .od-stepper .st{flex:1;text-align:center;font-size:11px;font-weight:800;padding:8px 4px;border-radius:10px;background:var(--sand);color:var(--muted);}
+  .od-stepper .st.on{background:var(--green-soft);color:var(--green-deep);}
+  .od-stepper .st.cur{background:var(--green-deep);color:#fff;}
+  .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:60;padding:20px;}
+  .modal-card{background:var(--surface);border-radius:16px;padding:16px;max-width:480px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.25);}
+  .modal-card img{width:100%;border-radius:12px;display:block;}
