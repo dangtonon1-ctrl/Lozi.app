@@ -326,9 +326,11 @@ function SettingsTab() {
     SB.from('settings').select('value,updated_at').eq('key', 'hub_address').maybeSingle().then(({ data }) => { if (data && data.value != null) { setHubAddr(data.value); setHaUpdated(data.updated_at || null); } });
   }, []);
   const saveHubAddr = async () => {
+    const v = hubAddr.trim();
+    if (!v) { setHaMsg('خطأ: لا يمكن ترك العنوان فارغاً'); setTimeout(() => setHaMsg(''), 3000); return; }
     const now = new Date().toISOString();
-    const { error } = await SB.from('settings').upsert({ key: 'hub_address', value: hubAddr.trim(), updated_at: now }, { onConflict: 'key' });
-    if (!error) setHaUpdated(now);
+    const { error } = await SB.from('settings').upsert({ key: 'hub_address', value: v, updated_at: now }, { onConflict: 'key' });
+    if (!error) { setHubAddr(v); setHaUpdated(now); }
     setHaMsg(error ? 'خطأ: ' + error.message : 'تم الحفظ ✓ · 🕒 ' + nowStamp()); setTimeout(() => setHaMsg(''), 3000);
   };
   const saveWa = async () => {
@@ -365,7 +367,7 @@ function SettingsTab() {
         <div className="secttl">عنوان مركز الاستلام (المركز الرئيسي)</div>
         <div className="kv" style={{ marginBottom: 8, color: 'var(--muted)' }}>العنوان الذي يُطلب من البائعين إيصال بضاعتهم إليه. يظهر في رسائل التوريد بتبويب «الاستلام والتوريد».</div>
         <label className="fld"><span>العنوان</span>
-          <input value={hubAddr} onChange={(e) => setHubAddr(e.target.value)} placeholder="مثال: بيت المكسرات" /></label>
+          <input value={hubAddr} onChange={(e) => setHubAddr(e.target.value)} placeholder="مثال: شارع خولان - أمام المطعم الملكي - وكالة بيت المكسرات" /></label>
         <button className="btn sm" onClick={saveHubAddr}>حفظ العنوان</button>
         {haUpdated && <Stamp at={haUpdated} label="آخر تحديث" />}
         {haMsg && <div className={haMsg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{haMsg}</div>}
@@ -1328,16 +1330,19 @@ const DONE_STATES = ['rejected_at_hub', 'delivered_to_customer', 'returned_by_cu
 const isIOS = () => /iP(hone|ad|od)/.test((typeof navigator !== 'undefined' && navigator.userAgent) || '');
 const phoneDigits = (p) => String(p || '').replace(/[^0-9]/g, '');
 // Arabic supply message built dynamically from THIS seller's items only.
+// Each item line is a numbered entry with the quantity separated from the
+// sequence number by the item name and a "×" — never two bare adjacent digits,
+// so "item ١, qty ١٥" can't be misread as "١١٥".
 const buildSupplyMsg = (orderNo, items, hubAddr) => {
-  const lines = (items || []).map((it) => {
+  const lines = (items || []).map((it, i) => {
     const q = Number(it.q) || 0;
     const w = it.weight ? ' ' + it.weight : '';
-    return '- ' + q + w + ' ' + (it.name || 'صنف');
+    return AR(i + 1) + '. ' + (it.name || 'صنف') + w + ' × ' + q;
   }).join('\n');
   return 'مرحباً، لديك طلب جديد (رقم #' + orderNo + ') جاهز للتوريد.\n'
     + 'الأصناف المطلوبة:\n' + lines + '\n'
-    + 'الرجاء إيصال البضاعة إلى مركز ' + (hubAddr || '—')
-    + '. سيتم تسليمك قيمة البضاعة نقداً أو عبر حوالة فور مطابقتها.';
+    + 'الرجاء إيصال البضاعة إلى مركز الاستلام:\n' + (hubAddr || '—') + '\n'
+    + 'سيتم تسليمك قيمة البضاعة نقداً أو عبر حوالة فور مطابقتها.';
 };
 
 function GroupCard({ grp, items, seller, tiers, hubAddr, onPatch }) {
@@ -1562,7 +1567,7 @@ function FulfillmentAdmin() {
     const pm = {}; (pr.data || []).forEach((r) => { pm[r.user_id] = r; });
     const vm = {}; (pv.data || []).forEach((r) => { vm[r.id] = r.vendor_id; });
     setProf(pm); setProdVendor(vm); setTiers(t || []);
-    setHubAddr((hs && hs.data && hs.data.value) || 'بيت المكسرات');
+    setHubAddr((hs && hs.data && hs.data.value) || 'شارع خولان - أمام المطعم الملكي - وكالة بيت المكسرات');
     setGroups(g.error ? [] : (g.data || []));
   };
   useEffect(() => { load(); }, []);
