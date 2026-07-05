@@ -38,6 +38,24 @@ const tierOf = (tiers, segment, cum) => {
   }
   return rows[rows.length - 1] || null;
 };
+// Progressive/marginal commission across cumulative-sales tier bands — mirrors
+// the DB commission_bracket(). The order pushes the seller's counter from
+// `before` to `before + goods`; each slice of that span is charged at the rate
+// of the band it lands in (band upper bound = next tier's min_sales, so the
+// stored max_sales off-by-one leaves no un-charged gap).
+const bracketCommission = (tiers, segment, before, goods) => {
+  const rows = (tiers || []).filter((t) => t.segment === segment).sort((a, b) => a.level - b.level);
+  const start = Math.max(0, Number(before) || 0);
+  const end = start + Math.max(0, Number(goods) || 0);
+  let comm = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const lo = Number(rows[i].min_sales);
+    const hi = i + 1 < rows.length ? Number(rows[i + 1].min_sales) : Infinity;
+    const from = Math.max(start, lo), to = Math.min(end, hi);
+    if (to > from) comm += (to - from) * Number(rows[i].rate);
+  }
+  return Math.round(comm * 100) / 100;
+};
 const AR = (s) => String(s).replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d]);
 const pct = (rate, seg) => (Number(rate) * 100).toFixed(seg === 'wholesale' ? 1 : 2) + '%';
 const money2 = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: (Number(n) % 1 !== 0 ? 2 : 0), maximumFractionDigits: 2 });
@@ -1019,7 +1037,11 @@ function OrderDetails({ order, seller, storeName, isPlatform, platformLabel, sho
     flash('تم تحديث رسوم التوصيل ✓ · 🕒 ' + nowStamp());
   };
 
-  const commTier = ord.commission_amount != null ? tierOf(tiers, ord.segment, ord.cumulative_before) : null;
+  // Level reflects where the counter landed AFTER this order (cumulative_before
+  // + goods), not the stale pre-order tier.
+  const commTier = ord.commission_amount != null
+    ? tierOf(tiers, ord.segment, (Number(ord.cumulative_before) || 0) + (Number(ord.goods_subtotal) || 0))
+    : null;
   const commReversed = ord.commission_state === 'reversed' || ord.commission_state === 'partially_reversed';
   const grand = ord.total != null ? ord.total : subtotal + (Number(ord.delivery_fee) || 0);
 
@@ -1088,7 +1110,7 @@ function OrderDetails({ order, seller, storeName, isPlatform, platformLabel, sho
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 9 }}>
             <span className="tag">نوع البيع: {SEG_AR[ord.segment] || ord.segment || '—'}</span>
             {commTier && <span className="tag">مستوى التاجر: {AR(commTier.level)}</span>}
-            <span className="tag">نسبة العمولة: {pct(ord.commission_rate_applied, ord.segment)}</span>
+            <span className="tag">النسبة الفعلية: {pct(ord.commission_rate_applied, ord.segment)}</span>
             <span className="tag">الأساس المالي: {money2(ord.goods_subtotal)} ر</span>
           </div>
           <div className="kv" style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between' }}>
@@ -1335,12 +1357,14 @@ function GroupCard({ grp, items, seller, tiers, hubAddr, onPatch }) {
   const cum = channel === 'wholesale'
     ? Number(seller.wholesale_cumulative_sales) || 0
     : Number(seller.retail_cumulative_sales) || 0;
-  // Read-only commission preview mirrors the DB trigger (get_tier on the current
-  // counter). The real snapshot is written server-side on inspection.
-  const tr = tierOf(tiers, channel, cum);
-  const previewRate = tr ? Number(tr.rate) : 0;
-  const previewComm = Math.round(subtotal * previewRate * 100) / 100;
+  // Read-only commission preview mirrors the DB trigger: progressive brackets
+  // over [cum, cum + subtotal]. The real snapshot is written server-side on
+  // inspection. Level shown = the tier the counter lands in AFTER this order;
+  // rate shown = the blended effective rate, since no single tier rate applies.
+  const previewComm = bracketCommission(tiers, channel, cum, subtotal);
   const previewNet = Math.round((subtotal - previewComm) * 100) / 100;
+  const tr = tierOf(tiers, channel, cum + subtotal);
+  const previewRate = subtotal > 0 ? previewComm / subtotal : 0;
 
   const digits = phoneDigits(grp.seller_phone || seller.phone);
   const message = buildSupplyMsg(o.order_no, items, hubAddr);
@@ -1463,7 +1487,7 @@ function GroupCard({ grp, items, seller, tiers, hubAddr, onPatch }) {
         <div className="od-comm" style={{ marginBottom: 10 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             <span className="tag">مستوى البائع: {tr ? AR(tr.level) : '—'}</span>
-            <span className="tag">نسبة العمولة: {pct(previewRate, channel)}</span>
+            <span className="tag">النسبة الفعلية: {pct(previewRate, channel)}</span>
             <span className="tag">العمولة التقديرية: {money2(previewComm)} ر</span>
             <span className="tag">صافي البائع: {money2(previewNet)} ر</span>
             <span className="tag">رسوم التوصيل: {orderMoney(1000)}</span>
