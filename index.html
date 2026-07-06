@@ -31,7 +31,17 @@
 
 
 
-<script src="/src/scripts/app.core.js"></script>
+<!-- app.core.js was split into focused modules (each < 150KB). They are plain
+     classic scripts sharing one global scope, so LOAD ORDER MUST BE PRESERVED:
+     storage → data → ui → catalog → shop → account → seller → main (bootstrap). -->
+<script src="/src/scripts/app.storage.js"></script>
+<script src="/src/scripts/app.data.js"></script>
+<script src="/src/scripts/app.ui.js"></script>
+<script src="/src/scripts/app.catalog.js"></script>
+<script src="/src/scripts/app.shop.js"></script>
+<script src="/src/scripts/app.account.js"></script>
+<script src="/src/scripts/app.seller.js"></script>
+<script src="/src/scripts/app.main.js"></script>
 <!-- ===== Lozi Commission Center (cumulative-commission seller UI) ===== -->
 <script src="/src/scripts/seller-levels.js"></script>
 <script src="/src/scripts/chat.js"></script>
