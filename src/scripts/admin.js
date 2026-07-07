@@ -540,13 +540,21 @@ function SavingsAdmin() {
   const [editId, setEditId] = useState(null);
   const [msg, setMsg] = useState('');
   const [view, setView] = useState('products');
+  const [loOn, setLoOn] = useState(false);
+  const [loEnds, setLoEnds] = useState('');
+  const toLocalDT = (iso) => {
+    try {
+      const d = new Date(iso), z = (n) => (n < 10 ? '0' : '') + n;
+      return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + 'T' + z(d.getHours()) + ':' + z(d.getMinutes());
+    } catch (e) { return ''; }
+  };
   const load = async () => {
     setRows(null);
     const { data, error } = await SB.from('products').select('*').eq('category', 'savings').order('pinned', { ascending: false }).order('created_at', { ascending: false });
     setRows(error ? [] : (data || []));
   };
   useEffect(() => { load(); }, []);
-  const reset = () => { setName(''); setDesc(''); setWeight(''); setPrice(''); setOldPrice(''); setPub(true); setImgUrl(''); setEditId(null); };
+  const reset = () => { setName(''); setDesc(''); setWeight(''); setPrice(''); setOldPrice(''); setPub(true); setImgUrl(''); setEditId(null); setLoOn(false); setLoEnds(''); };
   const pickImg = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
@@ -575,6 +583,8 @@ function SavingsAdmin() {
       vendor_id: uid, vendor_role: 'retail', category: 'savings',
       name: name.trim(), description: desc.trim() || null,
       price: Number(price), status: pub ? 'available' : 'hidden', data: data,
+      limited_offer_enabled: !!(loOn && loEnds),
+      limited_offer_ends_at: loOn && loEnds ? new Date(loEnds).toISOString() : null,
     };
     const res = editId ? await SB.from('products').update(row).eq('id', editId) : await SB.from('products').insert(row);
     setBusy(false);
@@ -587,6 +597,8 @@ function SavingsAdmin() {
     setDesc((d.desc && d.desc.ar) || r.description || ''); setWeight((d.weight && d.weight.ar) || '');
     setPrice(String(r.price || d.price || '')); setOldPrice(d.old ? String(d.old) : '');
     setPub(r.status !== 'hidden'); setImgUrl(d.img || '');
+    setLoOn(!!(r.limited_offer_enabled && r.limited_offer_ends_at));
+    setLoEnds(r.limited_offer_ends_at ? toLocalDT(r.limited_offer_ends_at) : '');
     window.scrollTo(0, 0);
   };
   const toggle = async (r) => { const { error } = await SB.from('products').update({ status: r.status === 'hidden' ? 'available' : 'hidden' }).eq('id', r.id); if (!error) load(); };
@@ -626,6 +638,13 @@ function SavingsAdmin() {
           <span className="sr-name">نشر المنتج (ظاهر للعملاء)</span>
           <div className={`switch ${pub ? 'on' : ''}`} onClick={() => setPub(!pub)}><i></i></div>
         </div>
+        <div className="store-row" style={{ borderTop: 'none', padding: '0 0 10px' }}>
+          <span className="sr-name">⏳ عرض محدود (عدّاد تنازلي)</span>
+          <div className={`switch ${loOn ? 'on' : ''}`} onClick={() => setLoOn(!loOn)}><i></i></div>
+        </div>
+        {loOn && <label className="fld"><span>ينتهي العرض في</span>
+          <input type="datetime-local" value={loEnds} min={toLocalDT(new Date().toISOString())} onChange={(e) => setLoEnds(e.target.value)} />
+          <small style={{ color: 'var(--muted)', display: 'block', marginTop: 4 }}>تختفي الشارة تلقائياً عند انتهاء الوقت — السعر لا يتغيّر.</small></label>}
         <div className="row2">
           <button className="btn sm" disabled={busy} onClick={save}>{busy ? 'جارٍ…' : (editId ? 'حفظ التعديل' : 'إضافة المنتج')}</button>
           {editId && <button className="btn sm ghost" onClick={reset}>إلغاء</button>}
@@ -643,6 +662,7 @@ function SavingsAdmin() {
                   {d.img && <img src={d.img} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 10 }} />}
                   <strong style={{ flex: 1 }}>{r.pinned && <span title="مثبّت">📌 </span>}{r.name}</strong>
                   {r.pinned && <span className="tag approved">مثبّت</span>}
+                  {r.limited_offer_enabled && r.limited_offer_ends_at && new Date(r.limited_offer_ends_at) > new Date() && <span className="tag pending">⏳ عرض محدود</span>}
                   {r.status === 'hidden' && <span className="tag rejected">مخفي</span>}
                 </div>
                 <div className="kv"><b>السعر:</b> <span style={{ color: 'var(--green-deep)', fontWeight: 800 }}>{r.price} ريال</span>{d.old && <span style={{ textDecoration: 'line-through', color: 'var(--muted)', marginInlineStart: 8 }}>{d.old} ريال</span>}</div>

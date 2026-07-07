@@ -1,0 +1,119 @@
+/* ============================================================================
+   LOZI · compact.css
+   1) GLOBAL 15% UI SIZE REDUCTION (single token, reversible)
+   2) Touch-target floors (keep tappable area ≥ ~40px effective)
+   3) Product-detail redesign (quarter-height image, no-scroll Add-to-Cart)
+   4) Home premium redesign (signature strip, eyebrow heads, category tiles,
+      offers rail + pagination dots)
+   5) "تم البيع X مرة" / "الأكثر مبيعاً" / "عرض محدود" badge styles
+   6) color-scheme lock (OS dark mode must not invert the cream theme)
+   ========================================================================= */
+
+/* ── 1. Global exactly-15% reduction ─────────────────────────────────────────
+   Sizing in this codebase is scattered (hardcoded px across a minified
+   app.css AND inline styles / SVG icon sizes inside the JS bundles), so a
+   per-value rewrite could never stay consistent. Instead the whole app root
+   is scaled with the standardized CSS `zoom`, which reflows layout: every
+   button, card, icon, font and gap shrinks by exactly 15% and the extra
+   space is reused by content (percentage sizes auto-compensate under the
+   standardized zoom, so the root still fills the phone frame / viewport).
+   To revert or re-tune: change these three lines only. */
+.app-root{zoom:.85;border-radius:52px}
+@media(max-width:560px){.app-root{border-radius:0}}
+
+/* ── 2. Touch-target floors ──────────────────────────────────────────────────
+   Small interactive elements keep their (reduced) visual size but get an
+   invisible expanded hit area so the tappable box stays ≥ ~40px effective.
+   Inputs are floored at 48px pre-zoom (≈41px effective). Segmented buttons
+   are floored at 47px pre-zoom (≈40px effective) — the one visual cap. */
+.bell-btn,.icon-btn,.hero-back,.pd-fav,.fav-btn,.add-mini,.stepper button,
+.chip,.photo-del,.bundle-item-del,.myp-clear,.checkbox,.sec-action{position:relative}
+.bell-btn::after,.icon-btn::after,.hero-back::after,.pd-fav::after,
+.fav-btn::after,.add-mini::after,.stepper button::after,.chip::after,
+.photo-del::after,.bundle-item-del::after,.myp-clear::after,
+.checkbox::after,.sec-action::after{content:"";position:absolute;inset:-7px;border-radius:inherit}
+.field-input,.phone-cc,.flt-input{min-height:48px}
+.field-input.area{min-height:84px}
+.field-input.area.lg{min-height:120px}
+.seg button{height:47px}
+
+/* ── 3. Product detail — compact layout, Add-to-Cart always on screen ───────
+   Image ≈ quarter of the (pre-zoom 992px-high) screen; the body scrolls
+   internally; the footer with أضف إلى السلة is pinned and always visible. */
+.pd-gallery{height:248px}
+.screen.product{height:100%;overflow:hidden}
+.pd-body{overflow-y:auto;min-height:0;padding-top:16px}
+.pd-body::-webkit-scrollbar{width:0}
+/* «زيارة المتجر» pill moves to the LEFT side (inline-end in RTL) */
+.pd-store{display:flex;width:fit-content;margin-inline-start:auto;margin-inline-end:0}
+/* hairline dividers between content sections */
+.pd-price-row{margin:12px 0 0;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.pd-price-row+.pd-sec-title,.limited-tag.lg+.pd-sec-title{margin-top:12px}
+.screen.product .buy-mode{border-top:1px solid var(--line);margin-top:12px;padding-top:12px!important}
+/* by-weight / by-amount toggle centred as a pair */
+.screen.product .buy-mode .chip-wrap{justify-content:center}
+/* amount field: fully rounded pill input, centred text + notes */
+.screen.product .buy-mode .field{text-align:center}
+.screen.product .buy-mode .field-label{text-align:center}
+.inp{width:100%;height:48px;min-height:48px;border-radius:26px;border:1.5px solid var(--line);background:var(--surface);padding:0 18px;font-family:inherit;font-size:15px;font-weight:700;color:var(--ink);text-align:center;outline:none;box-shadow:var(--shadow);transition:border-color .2s}
+.inp:focus{border-color:var(--green-deep)}
+.pd-sec-title{margin-top:12px}
+
+/* ── 4. Home premium redesign ──────────────────────────────────────────── */
+/* signature strip: dark-green gradient + gold radial glow + trophy coin */
+.sig-strip{position:relative;display:flex;align-items:center;gap:11px;margin:14px 0 2px;padding:11px 14px;border-radius:16px;background:linear-gradient(120deg,#1F3D2A,#2F5E3E);color:#F7F2E9;overflow:hidden;box-shadow:0 10px 22px rgba(31,61,42,.30)}
+.sig-strip::before{content:"";position:absolute;inset:0;background:radial-gradient(90% 150% at 10% 0%,rgba(217,168,94,.38),transparent 55%);pointer-events:none}
+.sig-ic{position:relative;width:36px;height:36px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#EAC98B,#C08A43);box-shadow:0 4px 10px rgba(192,138,67,.45)}
+.sig-txt{position:relative;display:flex;flex-direction:column;gap:2px;min-width:0}
+.sig-txt strong{font-size:13.5px;font-weight:900;letter-spacing:.2px}
+.sig-txt span{font-size:11px;font-weight:600;color:#EADFC8;opacity:.92}
+
+/* gold eyebrow labels above section titles */
+.sec-head-t{display:flex;flex-direction:column;gap:1px;min-width:0}
+.sec-eyebrow{font-size:10.5px;font-weight:800;color:var(--gold-deep);letter-spacing:.4px}
+.home .sec-head{margin:18px 2px 11px}
+
+/* premium category tiles: diagonal gradients + sheen + soft shadow */
+.cat-row{margin:12px 0 2px;gap:10px}
+.cat-ic{width:58px;height:58px;border-radius:20px;position:relative;overflow:hidden;box-shadow:0 8px 16px rgba(74,59,40,.22)}
+.cat-ic::before{content:"";position:absolute;inset:0;background:linear-gradient(145deg,rgba(255,255,255,.35),transparent 45%)}
+.cat-ic svg{position:relative}
+.cat-savings .cat-ic{background:linear-gradient(140deg,#D9A85E,#B9822F)}
+.cat-retail .cat-ic{background:linear-gradient(140deg,#3C6B4A,#26492F)}
+.cat-raisin .cat-ic{background:linear-gradient(140deg,#7E4A69,#5A3049)}
+.cat-almond .cat-ic{background:linear-gradient(140deg,#C89B54,#9A6E2F)}
+
+/* offers rail: ~46%-wide cards, horizontal snap scroll, pagination dots */
+.offers-rail-wrap{margin:0 -18px}
+.offers-rail{display:flex;gap:11px;overflow-x:auto;padding:2px 18px 6px;scroll-snap-type:x mandatory;scrollbar-width:none}
+.offers-rail::-webkit-scrollbar{display:none}
+.offers-rail .prod-card{flex:0 0 46%;scroll-snap-align:start}
+.rail-dots{display:flex;justify-content:center;align-items:center;gap:5px;padding:8px 0 0}
+.rail-dots i{width:6px;height:6px;border-radius:4px;background:var(--sand-2);cursor:pointer;transition:all .25s ease}
+.rail-dots i.on{width:18px;background:var(--gold-deep)}
+
+/* ── 5. Social-proof & offer badges ────────────────────────────────────── */
+.pc-badges{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px}
+.pc-badges:empty{display:none}
+.best-tag{display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;color:#7A4F12;background:linear-gradient(135deg,#F2DCA6,#E2B96E);padding:3px 8px;border-radius:10px;white-space:nowrap}
+.best-tag.lg{font-size:11.5px;padding:4px 10px}
+.limited-tag{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:800;color:#8C4A18;background:#FBF1DE;border:1px solid #E8CFA4;padding:3px 8px;border-radius:10px;white-space:nowrap}
+.app-root[data-theme=dark] .limited-tag{background:#342B1D;border-color:#5b4a2c;color:#EAC98B}
+.limited-tag b{font-weight:900}
+.limited-tag .lt-count{font-weight:800;font-variant-numeric:tabular-nums}
+.limited-tag.lg{display:flex;width:fit-content;font-size:12.5px;padding:7px 13px;border-radius:12px;margin-top:12px;gap:6px}
+.sold-times{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--muted);margin-inline-start:7px;white-space:nowrap}
+.sold-times.lg{font-size:12.5px;margin-inline-start:10px;color:var(--ink-soft)}
+
+/* vendor sheet: عرض محدود toggle + end-time picker */
+.lo-toggle{display:flex;align-items:center;gap:11px;width:100%;background:var(--surface);border:1.5px solid var(--line);border-radius:15px;padding:11px 13px;text-align:start;box-shadow:var(--shadow)}
+.lo-ic{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--gold),var(--gold-deep));display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.lo-txt{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.lo-txt strong{font-size:14px;font-weight:900;color:var(--ink)}
+.lo-txt span{font-size:11.5px;color:var(--muted);font-weight:600}
+.lo-when{margin-top:9px;display:flex;flex-direction:column;gap:6px}
+
+/* ── 6. Theme lock: the in-app توهج day/night toggle stays the only theme
+   authority — OS/browser dark mode must not auto-invert the cream UI. ── */
+html{color-scheme:light}
+.app-root[data-theme=dark]{color-scheme:dark}

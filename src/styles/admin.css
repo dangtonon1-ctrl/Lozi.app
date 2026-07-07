@@ -94,3 +94,13 @@
   .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:60;padding:20px;}
   .modal-card{background:var(--surface);border-radius:16px;padding:16px;max-width:480px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.25);}
   .modal-card img{width:100%;border-radius:12px;display:block;}
+
+/* ===== Global 15% size reduction (matches the customer app's compact.css).
+   One token: the whole admin UI is scaled with CSS zoom; max-width is
+   compensated so the dashboard keeps its 760px visual column. Buttons and
+   inputs are floored so tappable areas stay ≥ ~40px effective on phones. ===== */
+#root{zoom:.85;max-width:894px}
+.btn{min-height:47px}
+.btn.sm{min-height:47px}
+input,select,textarea{min-height:47px}
+.topbar button,.od-back,.tabs button{min-height:40px}
