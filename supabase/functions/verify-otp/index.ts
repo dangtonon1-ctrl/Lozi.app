@@ -13,7 +13,7 @@ async function sha256(t: string) { const b = await crypto.subtle.digest("SHA-256
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    const { phone, code, purpose = "register" } = await req.json();
+    const { phone, code, purpose = "register", default_crop } = await req.json();
     const to = normalizePhone(phone);
     if (!to || !code) return json({ ok: false, reason: "missing" }, 400);
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -53,7 +53,10 @@ Deno.serve(async (req) => {
       const { data: existing } = await admin.rpc("get_user_id_by_phone", { p: to });
       userId = (existing as string) ?? null;
       if (!userId) {
-        const { data: created, error } = await admin.auth.admin.createUser({ phone: to, phone_confirm: true, user_metadata: { role } });
+        const cropOk = default_crop === "almond" || default_crop === "raisin";
+        const meta: Record<string, unknown> = { role };
+        if (role === "farmer" && cropOk) meta.default_crop = default_crop;
+        const { data: created, error } = await admin.auth.admin.createUser({ phone: to, phone_confirm: true, user_metadata: meta });
         if (error) return json({ ok: false, reason: "create_failed", detail: error.message }, 500);
         userId = created.user!.id;
         const table = role === "farmer" ? "farmers" : role === "retail" ? "retail_stores" : "wholesale_stores";
