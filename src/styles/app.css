@@ -162,3 +162,13 @@
 .rfq-offer-line-img{cursor:pointer}
 .rfq-offer-thumb{cursor:pointer}
 .rfq-gate strong{color:var(--gold-deep)}
+/* Change-password section (settings) */
+.pw-group{padding-bottom:14px}
+.pw-title{display:flex;align-items:center;gap:11px;padding:10px 10px 4px;font-size:15px;font-weight:800;color:var(--ink)}
+.pw-form{display:flex;flex-direction:column;gap:13px;padding:6px 12px 2px}
+.pw-wrap{position:relative;display:flex}
+.field-input.pw-input{padding-right:46px}
+.pw-eye{position:absolute;right:6px;top:0;bottom:0;width:36px;display:flex;align-items:center;justify-content:center;color:var(--muted);background:none;border:none;padding:0;cursor:pointer;border-radius:11px}
+.pw-eye:hover{color:var(--green-deep)}
+.pw-form .btn-green{margin-top:2px}
+.pw-ok{display:flex;align-items:center;gap:7px;color:var(--green-deep);font-size:13px;font-weight:800;background:var(--green-soft);padding:11px 13px;border-radius:13px;line-height:1.5}
