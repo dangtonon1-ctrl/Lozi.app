@@ -1248,10 +1248,11 @@ function OrdersAdmin() {
     const role = (prof[o.seller_vendor_id] || {}).role || '';
     if (role.indexOf('almond') >= 0) return 'almond';
     if (role.indexOf('raisin') >= 0) return 'raisin';
+    if (role === 'farmer') return 'farmer';
     if (role === 'retail' || role === 'wholesale') return role;
     return 'other';
   };
-  const bucketOf = (c) => (c === 'savings' ? 'savings' : c === 'vip' ? 'vip' : (c === 'almond' || c === 'raisin') ? 'farmer' : (c === 'retail' || c === 'wholesale') ? c : 'other');
+  const bucketOf = (c) => (c === 'savings' ? 'savings' : c === 'vip' ? 'vip' : (c === 'almond' || c === 'raisin' || c === 'farmer') ? 'farmer' : (c === 'retail' || c === 'wholesale') ? c : 'other');
 
   // Details view takes over the whole tab when an order is open.
   if (openNo != null) {
