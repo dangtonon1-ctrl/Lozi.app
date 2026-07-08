@@ -163,8 +163,11 @@
 .rfq-offer-thumb{cursor:pointer}
 .rfq-gate strong{color:var(--gold-deep)}
 /* Change-password section (settings) */
-.pw-group{padding-bottom:14px}
-.pw-title{display:flex;align-items:center;gap:11px;padding:10px 10px 4px;font-size:15px;font-weight:800;color:var(--ink)}
+.pw-group.open{padding-bottom:10px}
+.pw-chev{display:inline-flex;transition:transform .25s ease}
+.pw-chev.open{transform:rotate(-90deg)}
+.pw-collapse{max-height:0;opacity:0;overflow:hidden;transition:max-height .3s ease,opacity .25s ease}
+.pw-collapse.open{max-height:520px;opacity:1}
 .pw-form{display:flex;flex-direction:column;gap:13px;padding:6px 12px 2px}
 .pw-wrap{position:relative;display:flex}
 .field-input.pw-input{padding-right:46px}
