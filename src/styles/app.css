@@ -175,3 +175,7 @@
 .pw-eye:hover{color:var(--green-deep)}
 .pw-form .btn-green{margin-top:2px}
 .pw-ok{display:flex;align-items:center;gap:7px;color:var(--green-deep);font-size:13px;font-weight:800;background:var(--green-soft);padding:11px 13px;border-radius:13px;line-height:1.5}
+/* Dark mode: product-detail buttons keep a dark surface so the light --ink icon stays visible (light mode unchanged) */
+.app-root[data-theme=dark] .pd-gallery .hero-back,
+.app-root[data-theme=dark] .pd-gallery .pd-fav:not(.on){background:#262019eb}
+.app-root[data-theme=dark] .pd-footer .stepper button{background:var(--sand-2)}
