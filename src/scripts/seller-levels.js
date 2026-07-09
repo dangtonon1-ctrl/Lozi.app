@@ -106,6 +106,13 @@
       ".lzc-rfq-slot:empty{display:none;}",
       ".lzc-compact{display:inline-flex;align-items:center;gap:6px;max-width:100%;background:linear-gradient(135deg,#eef5f0,#fbf3e4);border:1px solid #dbe7de;border-radius:20px;padding:3px 10px 3px 6px;line-height:1.2;font-family:'Tajawal',sans-serif;}",
       ".lzc-mini-badge{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#2F5E3E,#234a30);color:#fff;font-weight:800;font-size:11px;padding:3px 9px;border-radius:12px;white-space:nowrap;box-shadow:0 1px 3px rgba(35,74,48,.25);}",
+      // tappable variant of the mini badge (RFQ header only) — opens the حسابي level tab
+      ".lzc-mini-badge-btn{position:relative;border:0;font-family:'Tajawal',sans-serif;cursor:pointer;padding:4px 9px;-webkit-tap-highlight-color:transparent;transition:transform .08s ease,filter .15s ease,box-shadow .15s ease;}",
+      ".lzc-mini-badge-btn::after{content:'';position:absolute;inset:-9px -7px;}",  // enlarge touch target without growing the badge
+      ".lzc-mini-badge-btn:hover{filter:brightness(1.07);}",
+      ".lzc-mini-badge-btn:active{transform:scale(.95);box-shadow:0 1px 2px rgba(35,74,48,.35);}",
+      ".lzc-mini-badge-btn:focus-visible{outline:2px solid #C08A43;outline-offset:2px;}",
+      ".lzc-mini-chev{flex:none;opacity:.85;margin-inline-start:1px;}",
       ".lzc-compact .lzc-cd{font-size:11px;font-weight:800;color:#234a30;font-variant-numeric:tabular-nums;white-space:nowrap;}",
       ".lzc-compact .lzc-cd.open{color:#6c7d73;font-weight:700;}",
       ".lzc-compact .lzc-cd.ended{color:#b4452f;white-space:normal;}",
@@ -262,6 +269,9 @@
     var tr = tierOf(STATE.tiers, seg, cum);
     return { seg: seg, cum: cum, level: tr ? tr.level : 1, l5: l5Status(p) };
   }
+  // Reuse the app's own navigation: App exposes its `go` router as window.LOZI_GO.
+  // Tapping the mini badge opens the "sellerlevel" screen — the full level tab in حسابي.
+  function gotoLevel() { if (typeof window.LOZI_GO === "function") window.LOZI_GO("sellerlevel"); }
   function fillCompact(slot) {
     slot.setAttribute("data-lzc-filled", "1");
     if (!STATE.profile || !isSeller(STATE.profile)) { slot.innerHTML = ""; return; }
@@ -269,7 +279,12 @@
     var tail = info.l5.qualified
       ? '<span class="lzc-cd-perma">وصول دائم</span>'
       : '<span class="lzc-cd"></span>';
-    slot.innerHTML = '<span class="lzc lzc-compact"><span class="lzc-mini-badge">مستوى ' + AR(info.level) + "</span>" + tail + "</span>";
+    // Only the badge is tappable (a ticking countdown is a poor tap affordance); the
+    // chevron cues the navigation, and the enlarged ::after hit area keeps the target usable.
+    var chev = '<svg class="lzc-mini-chev" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    slot.innerHTML = '<span class="lzc lzc-compact"><button type="button" class="lzc-mini-badge lzc-mini-badge-btn" aria-label="عرض تفاصيل المستوى">مستوى ' + AR(info.level) + chev + "</button>" + tail + "</span>";
+    var btn = slot.querySelector(".lzc-mini-badge-btn");
+    if (btn) btn.addEventListener("click", gotoLevel);
     if (!info.l5.qualified) ensureCountdown();        // qualified => permanent access, no timer
   }
   // Full Level-5 badge (reused verbatim from the old chip): progress bar toward
