@@ -346,13 +346,22 @@ function SettingsTab() {
     if (!error) { setBundleLimit(String(n)); setBlUpdated(now); }
     setBlMsg(error ? 'خطأ: ' + error.message : 'تم الحفظ ✓ · 🕒 ' + nowStamp()); setTimeout(() => setBlMsg(''), 3000);
   };
-  const saveRfqLaunch = async () => {
+  // Persist whatever the field currently holds. An empty value means "always
+  // open": we upsert the empty string (never skip it) so the cleared state
+  // actually reaches the DB. The read side (seller countdown) and the server
+  // gate both treat missing/empty/NULL identically. We upsert '' rather than
+  // DELETE because `settings` has no RLS delete policy, so a delete would be
+  // silently blocked and the old date would survive.
+  const persistRfqLaunch = async (val) => {
     const now = new Date().toISOString();
-    const { error } = await SB.from('settings').upsert({ key: 'rfq_launch_date', value: rfqLaunch || '', updated_at: now }, { onConflict: 'key' });
+    const { error } = await SB.from('settings').upsert({ key: 'rfq_launch_date', value: val || '', updated_at: now }, { onConflict: 'key' });
     if (!error) setRlUpdated(now);
-    setRlMsg(error ? 'خطأ: ' + error.message : (rfqLaunch ? 'تم الحفظ ✓ · 🕒 ' : 'أُلغي التاريخ ✓ · 🕒 ') + nowStamp()); setTimeout(() => setRlMsg(''), 3000);
+    setRlMsg(error ? 'خطأ: ' + error.message : (val ? 'تم الحفظ ✓ · 🕒 ' : 'أُلغي التاريخ ✓ · 🕒 ') + nowStamp()); setTimeout(() => setRlMsg(''), 3000);
   };
-  const clearRfqLaunch = () => { setRfqLaunch(''); };
+  const saveRfqLaunch = () => persistRfqLaunch(rfqLaunch);
+  // "مسح" clears the field AND persists the cleared state, so the launch date is
+  // actually removed instead of lingering in the DB while the field looks empty.
+  const clearRfqLaunch = () => { setRfqLaunch(''); persistRfqLaunch(''); };
   return (
     <div>
       <div className="card">
