@@ -37,7 +37,7 @@
     return Math.round(comm * 100) / 100;
   };
 
-  var SB = null, STATE = { uid: null, profile: null, tiers: [], orders: null, calcSeg: "retail", calcAmt: 4500, tab: "level" };
+  var SB = null, STATE = { uid: null, profile: null, tiers: [], orders: null, calcSeg: "retail", calcAmt: 4500, tab: "level", loaded: false };
 
   // ---------- styling ----------
   function injectCss() {
@@ -50,30 +50,6 @@
     var css = document.createElement("style"); css.id = "lzc-css";
     css.textContent = [
       ".lzc{--g:#2F5E3E;--gd:#234a30;--gs:#eef5f0;--gl:#cfe2d6;--go:#C08A43;--gos:#fbf3e4;--gol:#ecd9b8;--ink:#23302a;--mut:#6c7d73;--red:#b4452f;font-family:'Tajawal',sans-serif;}",
-      ".lzc-chip{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);inset-inline-end:14px;bottom:auto;inset-inline-start:auto;z-index:99990;display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#2F5E3E,#234a30);color:#fff;border:none;border-radius:30px;padding:8px 14px 8px 12px;box-shadow:0 8px 22px rgba(35,74,48,.34);cursor:pointer;font-family:'Tajawal',sans-serif;}",
-      ".lzc-chip .rg{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:900;color:#fff;background:conic-gradient(#C08A43 var(--p,30%),rgba(255,255,255,.28) 0);}",
-      ".lzc-chip .rg i{width:16px;height:16px;border-radius:50%;background:#234a30;display:grid;place-items:center;font-style:normal;}",
-      ".lzc-chip .ct{display:flex;flex-direction:column;line-height:1.15;text-align:start;}",
-      ".lzc-chip .ct b{font-size:12.5px;font-weight:800;}",
-      ".lzc-chip .ct s{font-size:10px;text-decoration:none;color:#d6e7db;font-weight:600;}",
-      ".lzc-chip{max-width:92vw;}",
-      ".lzc-chip .ct{min-width:0;}",
-      ".lzc-chip .lzc-p5{display:flex;flex-direction:column;gap:3px;margin-top:5px;max-width:230px;}",
-      ".lzc-chip .lzc-p5b{height:4px;border-radius:30px;background:rgba(255,255,255,.28);overflow:hidden;}",
-      ".lzc-chip .lzc-p5b i{display:block;height:100%;border-radius:30px;background:linear-gradient(90deg,#e0b574,#C08A43);transition:width .3s ease;}",
-      ".lzc-chip .lzc-p5t{font-size:9.5px;font-weight:700;line-height:1.3;color:#e7efe9;}",
-      ".lzc-chip .lzc-p5t.ok{color:#f0d9a8;font-weight:800;}",
-      ".lzc-chip .lzc-cd{font-size:9.5px;font-weight:800;line-height:1.3;font-variant-numeric:tabular-nums;}",
-      ".lzc-chip .lzc-cd.live{color:#fff;}",
-      ".lzc-chip .lzc-cd.open{color:#cfe2d6;font-weight:700;}",
-      ".lzc-chip .lzc-cd.ended{color:#f3b0a0;font-weight:800;}",
-      ".lzc-ov{position:fixed;inset:0;z-index:99991;background:rgba(20,30,24,.5);display:flex;align-items:flex-end;justify-content:center;}",
-      ".lzc-sheet{background:#fff;width:100%;max-width:460px;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.25);}",
-      "@media(min-width:520px){.lzc-ov{align-items:center;}.lzc-sheet{border-radius:22px;}}",
-      ".lzc-hd{background:linear-gradient(135deg,#2F5E3E,#234a30);color:#fff;padding:16px 18px;position:relative;display:flex;justify-content:space-between;align-items:center;}",
-      ".lzc-hd::after{content:'';position:absolute;inset-inline:0;bottom:0;height:4px;background:linear-gradient(90deg,#C08A43,#e0b574,#C08A43);}",
-      ".lzc-hd h3{font-size:18px;font-weight:900;margin:0;}",
-      ".lzc-x{background:rgba(255,255,255,.16);border:none;color:#fff;width:32px;height:32px;border-radius:10px;font-size:18px;cursor:pointer;}",
       ".lzc-tabs{display:flex;gap:6px;padding:12px 14px 0;flex-wrap:wrap;}",
       ".lzc-tabs button{flex:1;min-width:74px;border:1px solid #e3e9e3;background:#f7f9f7;color:#4a5a50;font-family:inherit;font-size:12.5px;font-weight:800;padding:9px 6px;border-radius:10px;cursor:pointer;}",
       ".lzc-tabs button.on{background:#2F5E3E;color:#fff;border-color:#2F5E3E;}",
@@ -123,7 +99,33 @@
       ".lzc-ord .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}",
       ".lzc-ord .chips span{font-size:11px;font-weight:800;background:#fbf3e4;border:1px solid #ecd9b8;color:#9a6a25;padding:3px 9px;border-radius:20px;}",
       ".lzc-ord .rev{margin-top:7px;font-size:12px;font-weight:800;color:var(--red);}",
-      ".lzc-empty{text-align:center;color:var(--mut);font-weight:700;padding:26px 10px;}"
+      ".lzc-empty{text-align:center;color:var(--mut);font-weight:700;padding:26px 10px;}",
+      // ---- relocated: compact indicator in the RFQ (طلبات الأسعار) header ----
+      ".rfq-head-main{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;}",
+      ".lzc-rfq-slot{display:flex;min-width:0;max-width:100%;}",
+      ".lzc-rfq-slot:empty{display:none;}",
+      ".lzc-compact{display:inline-flex;align-items:center;gap:6px;max-width:100%;background:linear-gradient(135deg,#eef5f0,#fbf3e4);border:1px solid #dbe7de;border-radius:20px;padding:3px 10px 3px 6px;line-height:1.2;font-family:'Tajawal',sans-serif;}",
+      ".lzc-mini-badge{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#2F5E3E,#234a30);color:#fff;font-weight:800;font-size:11px;padding:3px 9px;border-radius:12px;white-space:nowrap;box-shadow:0 1px 3px rgba(35,74,48,.25);}",
+      ".lzc-compact .lzc-cd{font-size:11px;font-weight:800;color:#234a30;font-variant-numeric:tabular-nums;white-space:nowrap;}",
+      ".lzc-compact .lzc-cd.open{color:#6c7d73;font-weight:700;}",
+      ".lzc-compact .lzc-cd.ended{color:#b4452f;white-space:normal;}",
+      ".lzc-cd-perma{font-size:11px;font-weight:800;color:#9a6a25;white-space:nowrap;}",
+      // ---- relocated: full level panel as a حسابي (account) tab ----
+      ".lzc-panel-slot{display:block;}",
+      ".lzc-panel{font-family:'Tajawal',sans-serif;}",
+      ".lzc-l5card{border:1px solid #ecd9b8;background:linear-gradient(135deg,#fbf3e4,#f4faf5);border-radius:16px;padding:14px 15px;margin-bottom:14px;}",
+      ".lzc-l5card.ok{border-color:#cfe2d6;background:linear-gradient(135deg,#eef5f0,#f4faf5);}",
+      ".lzc-l5top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}",
+      ".lzc-l5perma{font-size:12px;font-weight:900;color:#9a6a25;}",
+      ".lzc-l5card .lzc-cd{font-size:12.5px;font-weight:800;color:#234a30;font-variant-numeric:tabular-nums;}",
+      ".lzc-l5card .lzc-cd.open{color:#6c7d73;font-weight:700;}",
+      ".lzc-l5card .lzc-cd.ended{color:#b4452f;}",
+      ".lzc-panel .lzc-p5b{height:8px;border-radius:30px;background:#e7efe9;overflow:hidden;margin-bottom:7px;}",
+      ".lzc-panel .lzc-p5b i{display:block;height:100%;border-radius:30px;background:linear-gradient(90deg,#e0b574,#C08A43);transition:width .3s ease;}",
+      ".lzc-panel .lzc-p5t{font-size:12.5px;font-weight:800;color:#234a30;line-height:1.4;}",
+      ".lzc-panel .lzc-p5t.ok{color:#9a6a25;font-weight:900;}",
+      ".lzc-panel .lzc-tabs{padding:0 0 12px;}",
+      ".lzc-panel .lzc-bd{padding:0;}"
     ].join("\n");
     document.head.appendChild(css);
   }
@@ -185,13 +187,11 @@
 
   // ---------- countdown (single shared interval) ----------
   // Access window = launch_date + 6 months. The launch date lives in the admin
-  // setting `rfq_launch_date` (public-readable). Empty = always open. One
-  // setInterval drives the single floating chip; a re-render clears it first.
-  var CD = { timer: null, el: null, end: 0 };
-  function clearCountdown() {
-    if (CD.timer) { clearInterval(CD.timer); CD.timer = null; }
-    CD.el = null; CD.end = 0;
-  }
+  // setting `rfq_launch_date` (public-readable). Empty = always open. ONE
+  // setInterval drives every mounted countdown (the compact RFQ-header indicator
+  // and the full حسابي panel share it — they are never on screen at once, but the
+  // single interval writes to all `.lzc-cd` nodes regardless).
+  var CD = { timer: null, end: 0, state: "loading" };  // state: loading|open|live|ended
   function loadLaunch() {
     if (typeof STATE.launch === "string") return Promise.resolve(STATE.launch);
     return SB.from("settings").select("value").eq("key", "rfq_launch_date").maybeSingle()
@@ -202,125 +202,114 @@
       }, function () { STATE.launch = ""; return ""; });
   }
   function pad2(n) { return n < 10 ? "0" + n : "" + n; }
-  function cdTick() {
-    if (!CD.el || !CD.el.isConnected) { clearCountdown(); return; }
+  function cdText() {
+    if (CD.state === "open") return { cls: "lzc-cd open", txt: "مفتوح دائماً" };
+    if (CD.state === "ended") return { cls: "lzc-cd ended", txt: "انتهت مهلة الوصول · مقتصر على المستوى ٥" };
     var ms = CD.end - Date.now();
-    if (ms <= 0) {
-      if (CD.timer) { clearInterval(CD.timer); CD.timer = null; }
-      CD.el.className = "lzc-cd ended";
-      CD.el.textContent = "انتهت مهلة الوصول · مقتصر على المستوى ٥";
-      return;
-    }
+    if (ms <= 0) { CD.state = "ended"; return { cls: "lzc-cd ended", txt: "انتهت مهلة الوصول · مقتصر على المستوى ٥" }; }
     var s = Math.floor(ms / 1000);
     var d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600),
         m = Math.floor((s % 3600) / 60), sec = s % 60;
-    CD.el.className = "lzc-cd live";
-    CD.el.textContent = (d > 0 ? d + " يوم " : "") + pad2(h) + " ساعة " + pad2(m) + " دقيقة " + pad2(sec) + " ثانية";
+    // Western digits, zero-padded HH/MM/SS, "يوم" hidden when days = 0.
+    return { cls: "lzc-cd live", txt: (d > 0 ? d + " يوم " : "") + pad2(h) + " ساعة " + pad2(m) + " دقيقة " + pad2(sec) + " ثانية" };
   }
-  function startCountdown(chip) {
-    var el = chip.querySelector(".lzc-cd");
-    if (!el) return;
+  function cdApply() {
+    var els = document.querySelectorAll(".lzc-cd");
+    if (!els.length) return false;
+    var info = cdText();
+    for (var i = 0; i < els.length; i++) { els[i].className = info.cls; els[i].textContent = info.txt; }
+    return true;
+  }
+  function cdTick() {
+    if (!cdApply()) { if (CD.timer) { clearInterval(CD.timer); CD.timer = null; } return; }  // nothing mounted → pause
+    if (CD.state !== "live" && CD.timer) { clearInterval(CD.timer); CD.timer = null; }        // reached open/ended → stop
+  }
+  // Resolve the access window once, paint every mounted countdown, and keep the
+  // single 1s interval alive only while it is genuinely counting down.
+  function ensureCountdown() {
     loadLaunch().then(function (launch) {
-      if (!el.isConnected) return;                  // chip replaced during fetch
-      if (CD.timer) { clearInterval(CD.timer); CD.timer = null; } // guard duplicates
-      if (!launch) { el.className = "lzc-cd open"; el.textContent = "مفتوح دائماً"; return; }
-      var base = new Date(launch + "T00:00:00");
-      if (isNaN(base.getTime())) { el.className = "lzc-cd open"; el.textContent = "مفتوح دائماً"; return; }
-      // launch_date + 6 calendar months (mirrors `+ interval '6 months'`).
-      var end = new Date(base.getFullYear(), base.getMonth() + 6, base.getDate(),
-        base.getHours(), base.getMinutes(), base.getSeconds());
-      CD.el = el; CD.end = end.getTime();
-      cdTick();
-      CD.timer = setInterval(cdTick, 1000);
+      if (!launch) { CD.state = "open"; CD.end = 0; }
+      else {
+        var base = new Date(launch + "T00:00:00");
+        if (isNaN(base.getTime())) { CD.state = "open"; CD.end = 0; }
+        else {
+          // launch_date + 6 calendar months (mirrors `+ interval '6 months'`).
+          var end = new Date(base.getFullYear(), base.getMonth() + 6, base.getDate(),
+            base.getHours(), base.getMinutes(), base.getSeconds());
+          CD.end = end.getTime();
+          CD.state = CD.end - Date.now() > 0 ? "live" : "ended";
+        }
+      }
+      if (!cdApply()) return;
+      if (CD.state === "live" && !CD.timer) CD.timer = setInterval(cdTick, 1000);
     });
   }
 
-  // ---------- chip ----------
-  function renderChip() {
-    clearCountdown();                                // guard: kill prior timer on re-render / nav away
-    var old = document.querySelector(".lzc-chip"); if (old) old.remove();
-    if (!STATE.profile || !isSeller(STATE.profile)) return;
-    var seg = primarySeg(STATE.profile);
-    var cum = Number(STATE.profile[seg + "_cumulative_sales"]) || 0;
+  // ---------- mounted indicators (no floating chip) ----------
+  // The seller badge no longer floats. Two React-owned anchors host it instead:
+  //   .lzc-rfq-slot   → compact mini-badge + countdown in the طلبات الأسعار header
+  //   .lzc-panel-slot → the full level detail as a حسابي (account) tab
+  // A MutationObserver fills these anchors whenever React (re)mounts them; the
+  // anchors carry no React children, so injected content survives re-renders.
+  function ensureLoaded(cb) {
+    if (STATE.loaded) { cb(); return; }
+    Promise.all([loadProfile(), loadTiers()]).then(function () { STATE.loaded = true; cb(); });
+  }
+  function levelInfo() {
+    var p = STATE.profile || {};
+    var seg = primarySeg(p);
+    var cum = Number(p[seg + "_cumulative_sales"]) || 0;
     var tr = tierOf(STATE.tiers, seg, cum);
-    if (!tr) return;
-    var nx = nextTier(STATE.tiers, seg, tr.level);
-    var prog = nx ? Math.max(0, Math.min(100, ((cum - tr.min_sales) / (nx.min_sales - tr.min_sales)) * 100)) : 100;
-
-    // Progress toward Level 5 (permanent preorder access) + descending window countdown.
-    var l5 = l5Status(STATE.profile);
-    var p5 = l5.qualified
-      ? '<span class="lzc-p5b"><i style="width:100%"></i></span>' +
-        '<span class="lzc-p5t ok">وصلت للمستوى ٥ · وصول دائم</span>'
-      : '<span class="lzc-p5b"><i style="width:' + l5.pct.toFixed(1) + '%"></i></span>' +
-        '<span class="lzc-p5t">متبقٍ ' + grp(l5.remaining) + " للوصول للمستوى ٥ (" + l5.label + ")</span>" +
-        '<span class="lzc-cd"></span>';
-
-    var btn = document.createElement("button");
-    btn.className = "lzc-chip lzc";
-    btn.style.setProperty("--p", prog.toFixed(0) + "%");
-    btn.innerHTML =
-      '<span class="rg"><i>' + AR(tr.level) + "</i></span>" +
-      '<span class="ct"><b>مستوى ' + AR(tr.level) + "</b><s>" + SEG_AR[seg] + " · " + pct(tr.rate, seg) + "</s>" +
-      '<span class="lzc-p5">' + p5 + "</span></span>";
-    document.body.appendChild(btn);
-    try {
-      var saved = JSON.parse(localStorage.getItem("lzc_chip_pos") || "null");
-      if (saved && typeof saved.left === "number") applyPos(btn, saved.left, saved.top);
-    } catch (e) {}
-    makeDraggable(btn, openSheet);
-    if (!l5.qualified) startCountdown(btn);          // qualified => no countdown
+    return { seg: seg, cum: cum, level: tr ? tr.level : 1, l5: l5Status(p) };
   }
-
-  // Drag the chip anywhere; a tap (no real movement) opens the sheet. Position persists.
-  function applyPos(el, left, top) {
-    var w = el.offsetWidth || 150, h = el.offsetHeight || 46;
-    left = Math.max(6, Math.min(window.innerWidth - w - 6, left));
-    top = Math.max(6, Math.min(window.innerHeight - h - 6, top));
-    el.style.left = left + "px"; el.style.top = top + "px";
-    el.style.right = "auto"; el.style.bottom = "auto"; el.style.insetInlineStart = "auto";
+  function fillCompact(slot) {
+    slot.setAttribute("data-lzc-filled", "1");
+    if (!STATE.profile || !isSeller(STATE.profile)) { slot.innerHTML = ""; return; }
+    var info = levelInfo();
+    var tail = info.l5.qualified
+      ? '<span class="lzc-cd-perma">وصول دائم</span>'
+      : '<span class="lzc-cd"></span>';
+    slot.innerHTML = '<span class="lzc lzc-compact"><span class="lzc-mini-badge">مستوى ' + AR(info.level) + "</span>" + tail + "</span>";
+    if (!info.l5.qualified) ensureCountdown();        // qualified => permanent access, no timer
   }
-  function makeDraggable(el, onTap) {
-    var sx = 0, sy = 0, ox = 0, oy = 0, moved = false, dragging = false, pid = null;
-    el.style.touchAction = "none";
-    el.addEventListener("pointerdown", function (e) {
-      dragging = true; moved = false; pid = e.pointerId;
-      var r = el.getBoundingClientRect();
-      sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
-      try { el.setPointerCapture(pid); } catch (_) {}
-    });
-    el.addEventListener("pointermove", function (e) {
-      if (!dragging) return;
-      var dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
-      if (moved) applyPos(el, ox + dx, oy + dy);
-    });
-    function end() {
-      if (!dragging) return; dragging = false;
-      try { el.releasePointerCapture(pid); } catch (_) {}
-      if (moved) {
-        var r = el.getBoundingClientRect();
-        try { localStorage.setItem("lzc_chip_pos", JSON.stringify({ left: r.left, top: r.top })); } catch (_) {}
-      } else { onTap(); }
+  // Full Level-5 badge (reused verbatim from the old chip): progress bar toward
+  // L5, remaining amount on the closest track, qualified/expired states.
+  function l5BlockHtml(info) {
+    var badge = '<span class="lzc-mini-badge">مستوى ' + AR(info.level) + "</span>";
+    if (info.l5.qualified) {
+      return '<div class="lzc-l5card ok"><div class="lzc-l5top">' + badge + '<span class="lzc-l5perma">وصول دائم</span></div>' +
+        '<div class="lzc-p5b"><i style="width:100%"></i></div>' +
+        '<div class="lzc-p5t ok">وصلت للمستوى ٥ · وصول دائم</div></div>';
     }
-    el.addEventListener("pointerup", end);
-    el.addEventListener("pointercancel", end);
+    return '<div class="lzc-l5card"><div class="lzc-l5top">' + badge + '<span class="lzc-cd"></span></div>' +
+      '<div class="lzc-p5b"><i style="width:' + info.l5.pct.toFixed(1) + '%"></i></div>' +
+      '<div class="lzc-p5t">متبقٍ ' + grp(info.l5.remaining) + " للوصول للمستوى ٥ (" + info.l5.label + ")</div></div>";
   }
-
-  // ---------- sheet ----------
-  function openSheet() {
-    Promise.all([loadProfile(), loadTiers()]).then(function () {
-      STATE.calcSeg = primarySeg(STATE.profile);
-      var ov = document.createElement("div");
-      ov.className = "lzc-ov lzc";
-      ov.addEventListener("click", function (e) { if (e.target === ov) ov.remove(); });
-      ov.innerHTML = '<div class="lzc-sheet"><div class="lzc-hd"><h3>مركز العمولة</h3><button class="lzc-x">×</button></div>' +
-        '<div class="lzc-tabs"></div><div class="lzc-bd"></div></div>';
-      ov.querySelector(".lzc-x").addEventListener("click", function () { ov.remove(); });
-      document.body.appendChild(ov);
-      buildTabs(ov); renderTab(ov);
+  function fillPanel(slot) {
+    slot.setAttribute("data-lzc-filled", "1");
+    if (!STATE.profile || !isSeller(STATE.profile)) { slot.innerHTML = '<div class="lzc lzc-empty">هذا القسم متاح للبائعين فقط.</div>'; return; }
+    STATE.calcSeg = primarySeg(STATE.profile);
+    var info = levelInfo();
+    slot.innerHTML = '<div class="lzc lzc-panel">' + l5BlockHtml(info) + '<div class="lzc-tabs"></div><div class="lzc-bd"></div></div>';
+    var panel = slot.querySelector(".lzc-panel");
+    buildTabs(panel); renderTab(panel);              // reuse the full commission-center tabs/logic
+    if (!info.l5.qualified) ensureCountdown();
+  }
+  function injectMounts() {
+    var pending = document.querySelector(".lzc-rfq-slot:not([data-lzc-filled]),.lzc-panel-slot:not([data-lzc-filled])");
+    if (!pending) return;                            // nothing new to fill (cheap fast-path)
+    ensureLoaded(function () {
+      document.querySelectorAll(".lzc-rfq-slot:not([data-lzc-filled])").forEach(fillCompact);
+      document.querySelectorAll(".lzc-panel-slot:not([data-lzc-filled])").forEach(fillPanel);
     });
   }
+  // Re-fill already-mounted anchors with fresh data (e.g. after auth change).
+  function refresh() {
+    document.querySelectorAll(".lzc-rfq-slot,.lzc-panel-slot").forEach(function (sl) { sl.removeAttribute("data-lzc-filled"); });
+    injectMounts();
+  }
+
+  // ---------- commission-center tabs (rendered inline inside the account panel) ----------
   function buildTabs(ov) {
     var tabs = [["level", "مستواي"], ["calc", "احسب"], ["system", "النظام"], ["mine", "عمولاتي"]];
     var box = ov.querySelector(".lzc-tabs"); box.innerHTML = "";
@@ -444,10 +433,18 @@
     SB = window.LOZI_SB;
     if (!SB) return;
     injectCss();
-    Promise.all([loadProfile(), loadTiers()]).then(renderChip);
+    // Warm the cache, then fill any anchors already on screen.
+    ensureLoaded(injectMounts);
+    // Fill React-owned anchors as they mount (RFQ header / account tab).
+    var obs = new MutationObserver(function () {
+      if (obs._t) return;
+      obs._t = setTimeout(function () { obs._t = null; injectMounts(); }, 60);
+    });
+    obs.observe(document.getElementById("root") || document.body, { childList: true, subtree: true });
     if (SB.auth && SB.auth.onAuthStateChange) {
       SB.auth.onAuthStateChange(function () {
-        Promise.all([loadProfile(), loadTiers()]).then(renderChip);
+        STATE.loaded = false; STATE.profile = null;
+        Promise.all([loadProfile(), loadTiers()]).then(function () { STATE.loaded = true; refresh(); });
       });
     }
   }
