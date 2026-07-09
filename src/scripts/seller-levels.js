@@ -56,6 +56,17 @@
       ".lzc-chip .ct{display:flex;flex-direction:column;line-height:1.15;text-align:start;}",
       ".lzc-chip .ct b{font-size:12.5px;font-weight:800;}",
       ".lzc-chip .ct s{font-size:10px;text-decoration:none;color:#d6e7db;font-weight:600;}",
+      ".lzc-chip{max-width:92vw;}",
+      ".lzc-chip .ct{min-width:0;}",
+      ".lzc-chip .lzc-p5{display:flex;flex-direction:column;gap:3px;margin-top:5px;max-width:230px;}",
+      ".lzc-chip .lzc-p5b{height:4px;border-radius:30px;background:rgba(255,255,255,.28);overflow:hidden;}",
+      ".lzc-chip .lzc-p5b i{display:block;height:100%;border-radius:30px;background:linear-gradient(90deg,#e0b574,#C08A43);transition:width .3s ease;}",
+      ".lzc-chip .lzc-p5t{font-size:9.5px;font-weight:700;line-height:1.3;color:#e7efe9;}",
+      ".lzc-chip .lzc-p5t.ok{color:#f0d9a8;font-weight:800;}",
+      ".lzc-chip .lzc-cd{font-size:9.5px;font-weight:800;line-height:1.3;font-variant-numeric:tabular-nums;}",
+      ".lzc-chip .lzc-cd.live{color:#fff;}",
+      ".lzc-chip .lzc-cd.open{color:#cfe2d6;font-weight:700;}",
+      ".lzc-chip .lzc-cd.ended{color:#f3b0a0;font-weight:800;}",
       ".lzc-ov{position:fixed;inset:0;z-index:99991;background:rgba(20,30,24,.5);display:flex;align-items:flex-end;justify-content:center;}",
       ".lzc-sheet{background:#fff;width:100%;max-width:460px;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.25);}",
       "@media(min-width:520px){.lzc-ov{align-items:center;}.lzc-sheet{border-radius:22px;}}",
@@ -141,8 +152,92 @@
     return Number(p.wholesale_cumulative_sales) > Number(p.retail_cumulative_sales) ? "wholesale" : "retail";
   }
 
+  // ---------- level-5 preorder-access qualification ----------
+  // Permanent RFQ/preorder access is granted on reaching Level 5 in EITHER
+  // track — retail (تجزئة) OR wholesale (جملة). Thresholds are read from config
+  // (commission_tiers), never hardcoded. Broadens public.rfq_can_browse(), which
+  // checks retail only, to accept either segment.
+  function level5Min(seg) {
+    var t = (STATE.tiers || []).find(function (x) { return x.segment === seg && Number(x.level) === 5; });
+    return t ? Number(t.min_sales) : (seg === "wholesale" ? 5000000 : 500000);
+  }
+  function l5Status(p) {
+    var role = String((p && p.role) || "");
+    var roleWs = /wholesale/i.test(role);           // role sells wholesale by default
+    var rc = Number(p && p.retail_cumulative_sales) || 0;
+    var wc = Number(p && p.wholesale_cumulative_sales) || 0;
+    var rMin = level5Min("retail"), wMin = level5Min("wholesale");
+    // A track is relevant if the role sells there or the seller has sales there.
+    var cand = [];
+    if (!roleWs || rc > 0) cand.push({ label: SEG_AR.retail, cum: rc, min: rMin });
+    if (roleWs || wc > 0) cand.push({ label: SEG_AR.wholesale, cum: wc, min: wMin });
+    if (!cand.length) cand.push({ label: SEG_AR.retail, cum: rc, min: rMin });
+    cand.forEach(function (c) { c.pct = c.min > 0 ? c.cum / c.min : 1; });
+    // Show progress on the track the seller is CLOSEST to qualifying on.
+    var disp = cand.reduce(function (a, b) { return b.pct > a.pct ? b : a; });
+    return {
+      qualified: rc >= rMin || wc >= wMin,          // L5 in EITHER track
+      label: disp.label,
+      remaining: Math.max(0, disp.min - disp.cum),
+      pct: Math.max(0, Math.min(100, disp.pct * 100))
+    };
+  }
+
+  // ---------- countdown (single shared interval) ----------
+  // Access window = launch_date + 6 months. The launch date lives in the admin
+  // setting `rfq_launch_date` (public-readable). Empty = always open. One
+  // setInterval drives the single floating chip; a re-render clears it first.
+  var CD = { timer: null, el: null, end: 0 };
+  function clearCountdown() {
+    if (CD.timer) { clearInterval(CD.timer); CD.timer = null; }
+    CD.el = null; CD.end = 0;
+  }
+  function loadLaunch() {
+    if (typeof STATE.launch === "string") return Promise.resolve(STATE.launch);
+    return SB.from("settings").select("value").eq("key", "rfq_launch_date").maybeSingle()
+      .then(function (r) {
+        var v = r && r.data ? r.data.value : "";
+        STATE.launch = (v == null ? "" : String(v)).replace(/"/g, "").trim().slice(0, 10);
+        return STATE.launch;
+      }, function () { STATE.launch = ""; return ""; });
+  }
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+  function cdTick() {
+    if (!CD.el || !CD.el.isConnected) { clearCountdown(); return; }
+    var ms = CD.end - Date.now();
+    if (ms <= 0) {
+      if (CD.timer) { clearInterval(CD.timer); CD.timer = null; }
+      CD.el.className = "lzc-cd ended";
+      CD.el.textContent = "انتهت مهلة الوصول · مقتصر على المستوى ٥";
+      return;
+    }
+    var s = Math.floor(ms / 1000);
+    var d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600),
+        m = Math.floor((s % 3600) / 60), sec = s % 60;
+    CD.el.className = "lzc-cd live";
+    CD.el.textContent = (d > 0 ? d + " يوم " : "") + pad2(h) + " ساعة " + pad2(m) + " دقيقة " + pad2(sec) + " ثانية";
+  }
+  function startCountdown(chip) {
+    var el = chip.querySelector(".lzc-cd");
+    if (!el) return;
+    loadLaunch().then(function (launch) {
+      if (!el.isConnected) return;                  // chip replaced during fetch
+      if (CD.timer) { clearInterval(CD.timer); CD.timer = null; } // guard duplicates
+      if (!launch) { el.className = "lzc-cd open"; el.textContent = "مفتوح دائماً"; return; }
+      var base = new Date(launch + "T00:00:00");
+      if (isNaN(base.getTime())) { el.className = "lzc-cd open"; el.textContent = "مفتوح دائماً"; return; }
+      // launch_date + 6 calendar months (mirrors `+ interval '6 months'`).
+      var end = new Date(base.getFullYear(), base.getMonth() + 6, base.getDate(),
+        base.getHours(), base.getMinutes(), base.getSeconds());
+      CD.el = el; CD.end = end.getTime();
+      cdTick();
+      CD.timer = setInterval(cdTick, 1000);
+    });
+  }
+
   // ---------- chip ----------
   function renderChip() {
+    clearCountdown();                                // guard: kill prior timer on re-render / nav away
     var old = document.querySelector(".lzc-chip"); if (old) old.remove();
     if (!STATE.profile || !isSeller(STATE.profile)) return;
     var seg = primarySeg(STATE.profile);
@@ -151,18 +246,30 @@
     if (!tr) return;
     var nx = nextTier(STATE.tiers, seg, tr.level);
     var prog = nx ? Math.max(0, Math.min(100, ((cum - tr.min_sales) / (nx.min_sales - tr.min_sales)) * 100)) : 100;
+
+    // Progress toward Level 5 (permanent preorder access) + descending window countdown.
+    var l5 = l5Status(STATE.profile);
+    var p5 = l5.qualified
+      ? '<span class="lzc-p5b"><i style="width:100%"></i></span>' +
+        '<span class="lzc-p5t ok">وصلت للمستوى ٥ · وصول دائم</span>'
+      : '<span class="lzc-p5b"><i style="width:' + l5.pct.toFixed(1) + '%"></i></span>' +
+        '<span class="lzc-p5t">متبقٍ ' + grp(l5.remaining) + " للوصول للمستوى ٥ (" + l5.label + ")</span>" +
+        '<span class="lzc-cd"></span>';
+
     var btn = document.createElement("button");
     btn.className = "lzc-chip lzc";
     btn.style.setProperty("--p", prog.toFixed(0) + "%");
     btn.innerHTML =
       '<span class="rg"><i>' + AR(tr.level) + "</i></span>" +
-      '<span class="ct"><b>مستوى ' + AR(tr.level) + "</b><s>" + SEG_AR[seg] + " · " + pct(tr.rate, seg) + "</s></span>";
+      '<span class="ct"><b>مستوى ' + AR(tr.level) + "</b><s>" + SEG_AR[seg] + " · " + pct(tr.rate, seg) + "</s>" +
+      '<span class="lzc-p5">' + p5 + "</span></span>";
     document.body.appendChild(btn);
     try {
       var saved = JSON.parse(localStorage.getItem("lzc_chip_pos") || "null");
       if (saved && typeof saved.left === "number") applyPos(btn, saved.left, saved.top);
     } catch (e) {}
     makeDraggable(btn, openSheet);
+    if (!l5.qualified) startCountdown(btn);          // qualified => no countdown
   }
 
   // Drag the chip anywhere; a tap (no real movement) opens the sheet. Position persists.
