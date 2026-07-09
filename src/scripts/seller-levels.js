@@ -198,7 +198,12 @@
   // setInterval drives every mounted countdown (the compact RFQ-header indicator
   // and the full حسابي panel share it — they are never on screen at once, but the
   // single interval writes to all `.lzc-cd` nodes regardless).
-  var CD = { timer: null, end: 0, state: "loading" };  // state: loading|open|live|ended
+  // state: loading|open|pre|live|ended. Two counting phases share the same D/H/M/S
+  // render: `pre` counts down to the launch date (preorder opens), then rolls into
+  // `live` which counts down to launch + 6 months (window closes). `windowEnd` is
+  // stashed so the pre→live handoff can retarget without re-reading the setting.
+  var CD = { timer: null, end: 0, windowEnd: 0, state: "loading" };
+  function cdCounting() { return CD.state === "live" || CD.state === "pre"; }
   function loadLaunch() {
     if (typeof STATE.launch === "string") return Promise.resolve(STATE.launch);
     return SB.from("settings").select("value").eq("key", "rfq_launch_date").maybeSingle()
@@ -213,23 +218,32 @@
     if (CD.state === "open") return { cls: "lzc-cd open", txt: "مفتوح دائماً" };
     if (CD.state === "ended") return { cls: "lzc-cd ended", txt: "انتهت مهلة الوصول · مقتصر على المستوى ٥" };
     var ms = CD.end - Date.now();
+    // Phase A finished (launch reached) → roll straight into Phase B toward window end.
+    if (ms <= 0 && CD.state === "pre") { CD.state = "live"; CD.end = CD.windowEnd; ms = CD.end - Date.now(); }
     if (ms <= 0) { CD.state = "ended"; return { cls: "lzc-cd ended", txt: "انتهت مهلة الوصول · مقتصر على المستوى ٥" }; }
     var s = Math.floor(ms / 1000);
     var d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600),
         m = Math.floor((s % 3600) / 60), sec = s % 60;
     // Western digits, zero-padded HH/MM/SS, "يوم" hidden when days = 0.
-    return { cls: "lzc-cd live", txt: (d > 0 ? d + " يوم " : "") + pad2(h) + " ساعة " + pad2(m) + " دقيقة " + pad2(sec) + " ثانية" };
+    var time = (d > 0 ? d + " يوم " : "") + pad2(h) + " ساعة " + pad2(m) + " دقيقة " + pad2(sec) + " ثانية";
+    // Phase A prefixes "يبدأ خلال" (full label for the panel); the compact header,
+    // which is nowrap-tight, drops the prefix and shows just the D/H/M/S (`compact`).
+    if (CD.state === "pre") return { cls: "lzc-cd live", txt: "يبدأ خلال " + time, compact: time };
+    return { cls: "lzc-cd live", txt: time };
   }
   function cdApply() {
     var els = document.querySelectorAll(".lzc-cd");
     if (!els.length) return false;
     var info = cdText();
-    for (var i = 0; i < els.length; i++) { els[i].className = info.cls; els[i].textContent = info.txt; }
+    for (var i = 0; i < els.length; i++) {
+      els[i].className = info.cls;
+      els[i].textContent = (info.compact && els[i].getAttribute("data-lzc-mini")) ? info.compact : info.txt;
+    }
     return true;
   }
   function cdTick() {
     if (!cdApply()) { if (CD.timer) { clearInterval(CD.timer); CD.timer = null; } return; }  // nothing mounted → pause
-    if (CD.state !== "live" && CD.timer) { clearInterval(CD.timer); CD.timer = null; }        // reached open/ended → stop
+    if (!cdCounting() && CD.timer) { clearInterval(CD.timer); CD.timer = null; }              // reached open/ended → stop
   }
   // Resolve the access window once, paint every mounted countdown, and keep the
   // single 1s interval alive only while it is genuinely counting down.
@@ -241,14 +255,20 @@
         if (isNaN(base.getTime())) { CD.state = "open"; CD.end = 0; }
         else {
           // launch_date + 6 calendar months (mirrors `+ interval '6 months'`).
-          var end = new Date(base.getFullYear(), base.getMonth() + 6, base.getDate(),
-            base.getHours(), base.getMinutes(), base.getSeconds());
-          CD.end = end.getTime();
-          CD.state = CD.end - Date.now() > 0 ? "live" : "ended";
+          var windowEnd = new Date(base.getFullYear(), base.getMonth() + 6, base.getDate(),
+            base.getHours(), base.getMinutes(), base.getSeconds()).getTime();
+          var launchMs = base.getTime(), now = Date.now();
+          CD.windowEnd = windowEnd;
+          // Two-phase anchor: before launch count to launch (A); during the window
+          // count to its end (B); after the window it is closed (C). Window math is
+          // unchanged — only which target we count to depends on the phase.
+          if (now < launchMs) { CD.state = "pre"; CD.end = launchMs; }
+          else if (now < windowEnd) { CD.state = "live"; CD.end = windowEnd; }
+          else { CD.state = "ended"; CD.end = windowEnd; }
         }
       }
       if (!cdApply()) return;
-      if (CD.state === "live" && !CD.timer) CD.timer = setInterval(cdTick, 1000);
+      if (cdCounting() && !CD.timer) CD.timer = setInterval(cdTick, 1000);
     });
   }
 
@@ -278,7 +298,7 @@
     var info = levelInfo();
     var tail = info.l5.qualified
       ? '<span class="lzc-cd-perma">وصول دائم</span>'
-      : '<span class="lzc-cd"></span>';
+      : '<span class="lzc-cd" data-lzc-mini="1"></span>';
     // Only the badge is tappable (a ticking countdown is a poor tap affordance); the
     // chevron cues the navigation, and the enlarged ::after hit area keeps the target usable.
     var chev = '<svg class="lzc-mini-chev" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
