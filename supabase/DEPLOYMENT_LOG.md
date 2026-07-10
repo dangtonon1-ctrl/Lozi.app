@@ -6,6 +6,66 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-10 — `20260725_close_demo_insert_anon_hole`
+
+Security hardening — closes the `demo_insert` anon-INSERT hole on `public.orders`
+(the follow-up flagged in the Step-3 entry below). **Client untouched.**
+
+### What it changes
+
+`demo_insert` was a leftover always-true permissive INSERT policy (`WITH CHECK
+true`, no role → PUBLIC incl. `anon`) — the INSERT-side twin of the `demo_read`
+policy dropped in `20260706_orders_read_isolation`. Checkout is always
+authenticated (the client sets `customer_id = auth.uid()` and refuses checkout
+without a session — no anon insert path exists anywhere in the client), so the
+policy was pure attack surface. Applied as one migration, statements in strict
+dependency order (each independently reversible; rollback pre-image at
+`supabase/rollback/20260725_close_demo_insert_anon_hole.sql`):
+
+- **(a)** `drop policy demo_insert` → `anon` now has no satisfiable permissive
+  INSERT policy (`orders_insert` is `to authenticated`; the admin policies need
+  `is_admin()`), so RLS denies anon INSERT.
+- **(b)** `revoke insert on orders from anon` → defense-in-depth (RLS already denies).
+- **( )** `revoke select on orders from anon` → latent Supabase-default grant; no
+  SELECT policy ever applied to `anon`, so this changes no legitimate read.
+- **(c)** `revoke execute … from anon` on the two `SECURITY DEFINER` helpers,
+  matching `is_suspended`'s ACL: `is_seller_on_order` (only used by the
+  `to authenticated` read policy) and `order_has_suspended_seller` (only used by the
+  restrictive INSERT block — anon can no longer insert, so never needs it; hence
+  ordered **after** (a)). The Step-3 `revoke … from public` had not stripped the
+  **direct** `anon` grant that Supabase's schema default-privilege adds, so this
+  revokes from `anon` explicitly.
+
+The legitimate customer path is untouched and intact: `orders_insert`
+(`to authenticated`, `WITH CHECK auth.uid() = customer_id`) AND-ed with the
+restrictive `orders_block_suspended_seller`. Authenticated still holds its INSERT
+grant and EXECUTE on both helpers.
+
+### Verification (local Postgres replica — schema pulled verbatim from prod; run as BOTH `anon` and `authenticated`; prod never written during testing)
+
+- **Baseline (hole):** `set role anon` → INSERT **succeeds** (`INSERT 0 1`).
+- **After change:** `set role anon` → INSERT and SELECT both **rejected**
+  (`permission denied for table orders`).
+- **Authenticated customer happy path:** `INSERT 0 1`; all four INSERT triggers
+  fired — delivery-fee BEFORE trigger corrected a wrong 99 → **1000** (total
+  **11000**), `orders_make_groups` created **1** group (subtotal 10000),
+  `decrement_stock` 100 → **98**; then status → `delivered` drove the commission
+  engine to **200.00 charged @0.0200**, seller cumulative → **10000**. All assertions pass.
+- **Suspension block:** suspended seller → **rejected** (`orders_block_suspended_seller`);
+  active → succeeds. **Ownership:** authenticated A inserting `customer_id = B` →
+  **rejected**. **Reversibility:** rollback re-opens (anon INSERT succeeds), forward
+  re-closes (anon INSERT rejected).
+
+### Security advisor
+
+**58 → 55 lints, 0 added.** Removed exactly **3**:
+`anon_security_definer_function_executable` for `is_seller_on_order` **and**
+`order_has_suspended_seller` (now match `is_suspended` — no `anon`), plus
+`rls_policy_always_true` on `orders` (that was `demo_insert`'s `WITH CHECK true`).
+No other lint changed.
+
+---
+
 ## 2026-07-10 — `20260724_commission_per_seller_1_schema` + `20260724_commission_per_seller_2_engine` + `20260724_commission_per_seller_3_orchestrator`
 
 Unified-cart **Step 4** — per-seller commission engine (server-only, Option B:
