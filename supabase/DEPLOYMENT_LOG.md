@@ -6,6 +6,57 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-10 — `20260721_seller_read_group_based` + `20260722_seller_mark_to_hub_group_based` + `20260723_block_suspended_any_seller`
+
+Unified-cart **Step 3** — group-based seller RLS/RPCs (server-only, backward-compatible).
+Applied 3a → 3b → 3c in order, each behind a gate. Client unchanged.
+
+### What it changes
+
+- **3a `orders_seller_read`** → group-based: a seller may read an order iff they own
+  one of its `order_seller_groups`. Evaluated via a SECURITY DEFINER helper
+  `is_seller_on_order(uuid)` so the group read bypasses RLS (avoids infinite
+  recursion with `osg_customer_read`, which reads back `orders`).
+- **3b `seller_mark_to_hub`** → order lookup by group membership; the
+  `status='preparing'` guard and the inner (own-group, forward-only) update are
+  unchanged.
+- **3c `orders_block_suspended_seller`** → blocks checkout if ANY resolved seller in
+  the order's items is suspended, via `order_has_suspended_seller(jsonb,uuid)`. Kept
+  **AS RESTRICTIVE** (verified `pg_policy.polpermissive = false`) so it actually
+  blocks (AND-ed with the permissive insert policies).
+- `orders_seller_update` left untouched (deferred to the 2c client cutover).
+
+### Verification (local replica seeded read-only from the live 17 orders, run as the non-superuser `authenticated` role; then re-verified on live)
+
+- **Pre-apply snapshot (live):** 17 orders, old access booleans — read(realseller)=true,
+  read(nonseller)=false, block=false, mark(realseller)=true.
+- **3a (live):** read/mark equivalence old-vs-new **85/85, 0 mismatches**; a live
+  seller read returned rows with **no RLS-recursion error**.
+- **3b (live):** real seller of a preparing order → lookup resolves; new order →
+  `status='preparing'` guard fires; non-seller → `order not found`.
+- **3c (live):** policy is **RESTRICTIVE**; block equivalence **17/17, 0 mismatches**;
+  in a rolled-back txn a suspended-seller insert was **blocked** and an all-active
+  insert **succeeded** (nothing written).
+
+### Security advisor
+
+54 → 58 lints. Expected **+2** `authenticated_security_definer_function_executable`
+(`is_seller_on_order`, `order_has_suspended_seller`). Also **+2**
+`anon_security_definer_function_executable` for the same two functions: Supabase's
+schema default privileges grant EXECUTE to `anon`, and `revoke … from public` does
+not remove that explicit `anon` grant (`is_suspended`, by contrast, has no `anon`
+grant). No new `function_search_path_mutable` and no new `security_definer_view`.
+
+**Follow-up (not yet done — pending review):** revoke EXECUTE from `anon` on
+`is_seller_on_order` (safe — only used by the `to authenticated` read policy) to
+match `is_suspended`. `order_has_suspended_seller` is evaluated by the INSERT block
+policy, which applies to `anon` (because the leftover always-true `demo_insert`
+policy + `anon` INSERT grant let anon insert); revoking it from `anon` would break
+anon inserts, so the clean fix is to remove `demo_insert` first. Both are out of
+Step-3 scope.
+
+---
+
 ## 2026-07-10 — `20260719_seller_group_decision_schema` + `20260720_seller_group_accept_reject`
 
 Unified-cart **Step 2** — per-seller order accept/reject (server-side only,
