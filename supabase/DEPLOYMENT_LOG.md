@@ -6,6 +6,91 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-10 — `20260724_commission_per_seller_1_schema` + `20260724_commission_per_seller_2_engine` + `20260724_commission_per_seller_3_orchestrator`
+
+Unified-cart **Step 4** — per-seller commission engine (server-only, Option B:
+keeps the existing order-level `status='delivered'` trigger point; per-seller
+independent timing deferred as Step 4d). Applied 4a → 4b → 4c behind money gates.
+**Client untouched. Step 4d not built.**
+
+### What it changes
+
+- **4a (additive schema):** authoritative per-group commission columns on
+  `order_seller_groups` (`commission_segment`, `commission_rate_applied`,
+  `commission_amount`, `cumulative_before`, `commission_state`, `reversed_amount`)
+  + two guarded CHECK constraints. **No backfill** — nothing reads them yet.
+- **4b (engine):** `resolve_group_segment(order,seller)`,
+  `charge_group_commission(group)`, `reverse_group_commission(group,ret)` — mirrors
+  of the order-level engine keyed to a group. Same `commission_bracket` progressive
+  math, same rounding, same zero-floor; each seller advances/decrements only their
+  own retail/wholesale counter on their own `subtotal_amount`. The two money movers
+  are `SECURITY DEFINER`, `search_path=public`, revoked from `public/anon/authenticated`
+  → `{postgres, service_role}` (identical to `charge_commission`);
+  `resolve_group_segment` is a read-only invoker helper (mirrors
+  `resolve_order_segment`).
+- **4c (orchestrator cutover):** `charge_commission` now loops the eligible
+  (non-`rejected`, non-`rejected_at_hub`) groups via `charge_group_commission`, then
+  rolls the sum onto `orders.commission_amount` (display) — for a single-seller order
+  this is byte-identical to the old engine. `reverse_commission` uses the per-group
+  engine when the order was charged per-group, else falls back to the **verbatim**
+  pre-Step-4 order-level body so legacy-charged orders reverse byte-identically. The
+  order-level guard AND the per-group guard together make a group chargeable at most
+  once. Rollback pre-image committed at `supabase/rollback/20260724_commission_per_seller_preimage.sql`.
+
+**Not retroactive.** Both guards (`orders.commission_state`, per-group
+`commission_state`) freeze already-settled rows; historical rows keep their exact
+snapshot. The 8 legacy order-level charges carry no per-group rows and reverse via
+the verbatim fallback.
+
+### Pre-apply before-image (live, immediately pre-apply)
+
+17 orders — 10 settled (`commission_state` not null), 17 groups; 5 sellers with
+counters; `charge_commission` still the OLD order-level engine.
+
+Frozen-state fingerprints (md5 over the commission columns):
+
+- orders (10 settled): `383558e64c21ab6b3d5017c73a7bab23`
+- order_seller_groups (17, snapshot cols): `02211b1425e5464b1074505d2a56e26a`
+
+### Verification (gated apply on live; also pre-verified on a local Postgres replica seeded read-only from the live 17 orders, run incl. as the non-superuser `authenticated` role — Supabase branching is Pro-gated)
+
+1. **4a:** 6 columns added, 2 constraints, **0 rows backfilled**; both fingerprints
+   **unchanged**.
+2. **4b:** three functions present; `charge_group_commission` /
+   `reverse_group_commission` = `SECURITY DEFINER`, `search_path=public`, ACL
+   `{postgres, service_role}`; `has_function_privilege('authenticated', …)` = **false**
+   for both (and `anon` false); `resolve_group_segment` = invoker, `search_path=public`.
+   Fingerprints still **unchanged** (nothing wired).
+3. **4c money gate — BYTE-IDENTICAL:** re-captured fingerprints post-cutover →
+   orders `383558e64c21ab6b3d5017c73a7bab23` **identical**, order_seller_groups
+   `02211b1425e5464b1074505d2a56e26a` **identical**.
+   - **Single counter-advancing path:** `charge_commission` no longer references
+     `cumulative_sales` (delegates); exactly **one** `+`-path live
+     (`charge_group_commission`).
+   - **Idempotency (rolled-back txn):** re-invoking `charge_commission` on settled
+     order `4b64aa15` left the order row, seller profile, and group rows all
+     unchanged; the transaction was rolled back (nothing written).
+   - Replica proofs: single-seller OLD-vs-NEW replay identical on
+     `commission_amount` / `commission_rate_applied` / `cumulative_before` / counter
+     delta (rejected order charges nothing, as intended); multi-seller synthetic
+     (own-subtotal/own-track advance, Σ = order amount, seller- & hub-rejected never
+     charged, single-seller reversal isolates that seller zero-floored, charge
+     idempotent); bracket edges via the per-group path retail 1,000,000→11,650.00 &
+     20,000,000→116,650.00; legacy full-reversal OLD-vs-NEW byte-for-byte identical.
+
+### Security advisor
+
+58 → **58** lints — **no change**. No new
+`authenticated_security_definer_function_executable` (the new money movers are
+revoked from `authenticated`/`anon`, matching `charge_commission`, so they are not
+flagged), and **no new** `function_search_path_mutable` (2 → 2) or
+`security_definer_view` (2 → 2). The three Step-4 functions are not flagged.
+
+Ledger versions recorded as `20260724` to match the merged repo filenames
+(`supabase/migrations/20260724_commission_per_seller_{1_schema,2_engine,3_orchestrator}.sql`).
+
+---
+
 ## 2026-07-10 — `20260721_seller_read_group_based` + `20260722_seller_mark_to_hub_group_based` + `20260723_block_suspended_any_seller`
 
 Unified-cart **Step 3** — group-based seller RLS/RPCs (server-only, backward-compatible).
