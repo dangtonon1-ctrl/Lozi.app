@@ -6,6 +6,69 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-11 — `20260727_orders_price_integrity` — ⏳ VERIFIED ON REPLICA, PENDING PROD APPLY
+
+Server-side **price integrity** for orders. Item prices in `orders.items` (jsonb)
+were client-supplied; the DB validated only the delivery fee (`20260717`) and took
+`items[].price` at face value. A tampered price corrupted the customer charge
+(`orders.total`), the per-seller commission base
+(`order_seller_groups.subtotal_amount`), each seller's commission, and their
+cumulative-sales counter — all in one INSERT. Demonstrated live (rolled-back txn):
+a two-item order tampered to `price:500` each produced `total 2250` and commission
+bases `500/500` instead of the honest `48250` and `37000/10000`.
+
+### What it changes
+
+Folds price normalization into the existing `BEFORE INSERT/UPDATE` trigger function
+`lozi_orders_enforce_delivery_fee` (no new trigger → no firing-order fragility):
+
+- **Non-admin INSERT:** (1) **reject** if any catalog (uuid) line item's product is
+  missing, `status <> 'available'`, or has a NULL price (`errcode 23514`); (2)
+  overwrite each catalog item's `price` with the authoritative `products.price`
+  (RFQ non-uuid `p` items exempt); (3) recompute `delivery_fee`/`total` from the
+  corrected items (unchanged logic, corrected inputs).
+- **Non-admin UPDATE:** pin `items`, `total` **and** `delivery_fee` to their stored
+  `OLD` values — closes the seller-UPDATE tamper vector.
+- **Admin (`is_admin()`):** full bypass preserved (wholesale/RFQ quoting, manual
+  corrections).
+
+Single `CREATE OR REPLACE` on one function. Pre-image at
+`supabase/rollback/20260727_orders_price_integrity_preimage.sql`. No data modified
+(INSERT-time logic only; settled orders frozen).
+
+### Replica verification (local Postgres, seeded read-only from prod)
+
+Faithful replica (7 chain tables verbatim DDL, all 67 `public` functions, 5 order
+triggers, RLS policies + grants, real prod product/profile/tier rows). Baseline
+first reproduced today's behavior byte-for-byte, then the migration was applied and
+the suite run — all green:
+
+- tampered `500/500` → corrected to live: `total 48250`, bases `37000/10000`,
+  commissions `672.50/200`; driven to `delivered`, seller counters advanced
+  `0→37000` / `0→10000` and OSG charged `672.50/200` (payout snapshot correct);
+- honest insert → byte-identical to baseline (`48250`, `37000/10000`);
+- missing product & hidden product → both **rejected** with the clear error;
+- RFQ item → price `666` **untouched**, sibling catalog item corrected;
+- seller UPDATE of items/total → **pinned** to OLD (tamper ignored);
+- suspended-seller RLS block + delivery-fee recompute + group sync all still fire;
+- admin insert → custom price/total **preserved**.
+
+### DEFERRED (explicit follow-ups — NOT in this change)
+
+- **byAmount purchase path.** The dormant "buy N riyals worth" flow flattens to
+  `{q:1, price:round(amount)}`, indistinguishable from a normal item, so this
+  migration treats every uuid item as unit-priced (which would corrupt a byAmount
+  line). Mitigation shipped alongside: the byAmount purchase UI is **disabled
+  client-side** (`src/scripts/app.shop.js`, `buy-mode` block gated behind `false`)
+  so no user can create one. **TODO:** re-enable only with a coordinated fix that
+  stores byAmount as `{q: amount/live_price, price: live_price, amount}` and has
+  the trigger recompute `q := amount/price`.
+- **RFQ price cross-check.** Non-uuid `rfq-*` items pass through untouched today.
+  **TODO (phase 2):** validate their price against `rfq_offer_items` for the
+  accepted offer (`offer_item_id` is embedded in the `rfq-<uuid>` id).
+
+---
+
 ## 2026-07-11 — `20260726_orders_realtime_publication`
 
 Realtime Phase 1 (orders) — **Step (i): server enablement only**. Adds the two
