@@ -6,6 +6,55 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-11 — `20260726_orders_realtime_publication`
+
+Realtime Phase 1 (orders) — **Step (i): server enablement only**. Adds the two
+order tables to the `supabase_realtime` publication so Postgres emits change
+events for them, and strips `anon`'s latent DML grants on `order_seller_groups`
+(defense-in-depth, mirroring the `20260725` orders hardening). **Client
+untouched** — no live behavior changes until the per-role client increments
+(ii)–(iv) ship. Rollback pre-image at
+`supabase/rollback/20260726_orders_realtime_publication.sql`.
+
+### What it changes
+
+- **(1)** `alter publication supabase_realtime add table public.orders` and
+  `... add table public.order_seller_groups` (each guarded by a
+  `pg_publication_tables` existence check → idempotent). This is the **entire**
+  server requirement for live order tracking: no schema change, **no
+  `REPLICA IDENTITY` change** (client subscribes to INSERT+UPDATE only and
+  re-fetches on event, so the default PK replica identity authorizes each
+  subscriber against the NEW record via the existing RLS SELECT policies), no
+  new RLS policies, no new grants. DELETE is deliberately out of scope (Realtime
+  does not apply RLS to DELETE).
+- **(2)** `revoke select, insert, update, delete on public.order_seller_groups
+  from anon` → removes latent attack surface. RLS already denied `anon` (no anon
+  policy on the table) and `anon` never subscribes to these tables, so no
+  legitimate path changes. Brings the table in line with `orders` (whose anon
+  SELECT/INSERT were revoked in `20260725`).
+
+Realtime evaluates RLS against the **base** table, which requires `authenticated`
+to hold a direct `SELECT` grant — confirmed still present on both tables after
+the change (see evidence).
+
+### Before → after evidence
+
+`supabase_realtime` publication membership (public schema):
+
+- **Before:** `chat_flag_alerts, conversations, messages, notifications, rfq_flag_alerts`
+- **After:**  `chat_flag_alerts, conversations, messages, notifications, order_seller_groups, orders, rfq_flag_alerts`
+
+`anon` grants on `public.order_seller_groups`:
+
+- **Before:** `DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE`
+- **After:**  `REFERENCES, TRIGGER, TRUNCATE` (all API-reachable DML removed)
+
+`authenticated` SELECT on base tables (Realtime authorization requirement) —
+**unchanged / still present:** `public.orders` = `SELECT`,
+`public.order_seller_groups` = `SELECT`.
+
+---
+
 ## 2026-07-10 — `20260725_close_demo_insert_anon_hole`
 
 Security hardening — closes the `demo_insert` anon-INSERT hole on `public.orders`
