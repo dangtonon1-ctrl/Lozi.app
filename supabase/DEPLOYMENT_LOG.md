@@ -6,7 +6,7 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
-## 2026-07-11 — `20260727_orders_price_integrity` — ⏳ VERIFIED ON REPLICA, PENDING PROD APPLY
+## 2026-07-11 — `20260727_orders_price_integrity` — ✅ APPLIED
 
 Server-side **price integrity** for orders. Item prices in `orders.items` (jsonb)
 were client-supplied; the DB validated only the delivery fee (`20260717`) and took
@@ -52,6 +52,28 @@ the suite run — all green:
 - seller UPDATE of items/total → **pinned** to OLD (tamper ignored);
 - suspended-seller RLS block + delivery-fee recompute + group sync all still fire;
 - admin insert → custom price/total **preserved**.
+
+### Live apply evidence (prod `niloddwnllhsvrmuxfxw`)
+
+Applied via `apply_migration` (recorded `schema_migrations.version 20260711225045`).
+
+- **Function switched.** `md5(pg_get_functiondef(lozi_orders_enforce_delivery_fee))`
+  went `708d33fe73fbb556a78abbdfdcefecda` (pre-image) → `6d04b08eee94abe48b85e5e7ca6b0309`.
+- **Live attack demo (rolled-back txn).** Two-item order, tampered `price:500` each
+  vs honest `37000/10000`, both inserted as the same customer:
+
+  | order | total | delivery_fee | stored prices | group bases |
+  |-------|------:|-------------:|---------------|-------------|
+  | honest   | 48250 | 1250 | `[37000, 10000]` | `37000 / 10000` |
+  | tampered | 48250 | 1250 | `[37000, 10000]` | `37000 / 10000` |
+
+  The tampered order is corrected to the honest outcome — customer charge, delivery
+  fee, and per-seller commission bases all derived from `products.price`.
+- **No data touched.** `orders` row count unchanged (22 before and after); demo rows
+  rolled back (residue 0).
+- **Rollback validated.** Re-running
+  `supabase/rollback/20260727_orders_price_integrity_preimage.sql` reproduces the
+  pre-image exactly (`md5 708d33fe73fbb556a78abbdfdcefecda`).
 
 ### DEFERRED (explicit follow-ups — NOT in this change)
 
