@@ -1245,7 +1245,33 @@ function OrdersAdmin() {
     setPcat(pc); setVcat(vc); setStores(sm); setProf(pm);
     setOrders(o.error ? [] : (o.data || []));
   };
-  useEffect(() => { load(); }, []);
+  // Realtime: lightweight re-fetch of just the orders list (no blanking, no ancillary refetch).
+  const reloadOrders = async () => {
+    const o = await SB.from('orders').select('*').order('created_at', { ascending: false });
+    if (!o.error) setOrders(o.data || []);
+  };
+  // Mount: full load, then subscribe to live order + group changes (mirrors admin-convs).
+  useEffect(() => {
+    load();
+    let t = null, ch = null;
+    const bump = () => { if (t) clearTimeout(t); t = setTimeout(() => { reloadOrders(); }, 350); };
+    const teardown = () => { if (t) { clearTimeout(t); t = null; } if (ch) { try { SB.removeChannel(ch); } catch (e) {} ch = null; } };
+    const subscribe = () => {
+      teardown();
+      try {
+        ch = SB.channel('orders-admin')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, bump)
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, bump)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_seller_groups' }, bump)
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'order_seller_groups' }, bump)
+          .subscribe();
+      } catch (e) {}
+    };
+    const onVis = () => { if (document.visibilityState === 'visible') { reloadOrders(); subscribe(); } else { teardown(); } };
+    subscribe();
+    document.addEventListener('visibilitychange', onVis);
+    return () => { try { document.removeEventListener('visibilitychange', onVis); } catch (e) {} teardown(); };
+  }, []);
   // Patch a single order in place after a details action (no full reload / no list blank).
   const patchOrder = (order_no, p) => setOrders((os) => (os || []).map((o) => o.order_no === order_no ? { ...o, ...p } : o));
   // Each order's section is taken from its products' category (the accurate source),
