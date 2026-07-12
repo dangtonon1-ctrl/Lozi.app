@@ -1,0 +1,33 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- Step 6 cleanup (2/2) — drop the dormant AFTER INSERT commission hook.
+--
+-- trg_orders_commission_sync_ins → orders_commission_sync_ins() charges
+-- commission only if an order is INSERTED already at status='delivered'. It is a
+-- true no-op in the live system and is never usefully reachable:
+--
+--   * No code path inserts a delivered order. The only orders INSERT in the app
+--     (checkout, app.main.js — single- and multi-seller branches) hard-codes
+--     status:'new'; the column default is 'received'. Admin never inserts orders,
+--     it transitions them via admin_set_order_status() (an UPDATE).
+--   * The REAL commission charge is on the status→'delivered' UPDATE path:
+--     trg_orders_commission_sync → orders_commission_sync() → charge_commission.
+--     All delivered orders in prod were charged that way.
+--
+-- Not merely dormant — a latent footgun. AFTER INSERT triggers on orders fire
+-- alphabetically: trg_decrement_stock → trg_orders_commission_sync_ins →
+-- trg_orders_make_groups. Since Step 4 (20260724) charge_commission loops
+-- order_seller_groups, so were an order ever inserted at status='delivered' this
+-- hook would run BEFORE the groups exist → charge nothing AND leave
+-- commission_state NULL, with no later UPDATE to re-trigger (silent
+-- under-charge). It therefore provides no safety and hides a trap.
+--
+-- Independent of every other trigger (reads/writes nothing decrement_stock,
+-- orders_make_groups, or the BEFORE fee trigger depend on; nothing in pg_depend
+-- references the function beyond its own trigger). Dropping it leaves the UPDATE
+-- charge path and all other INSERT triggers fully intact.
+--
+-- Pre-image: supabase/rollback/20260733_drop_orders_commission_sync_ins_preimage.sql
+-- ════════════════════════════════════════════════════════════════════════════
+
+DROP TRIGGER IF EXISTS trg_orders_commission_sync_ins ON public.orders;
+DROP FUNCTION IF EXISTS public.orders_commission_sync_ins();
