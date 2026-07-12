@@ -6,6 +6,58 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-12 — `20260730_orders_seller_facing_own_items` — ✅ APPLIED (server, Phase B)
+
+Unified-cart **Step 2c — Phase B (server half)**. The Phase-B client cutover drops the
+`.eq('seller_vendor_id', uid)` filter so every seller on a unified order sees their
+slice (row + status isolation comes from the view's group-membership WHERE + RLS). But
+the view still returned the FULL `o.items`, so on a shared multi-seller order each
+seller's card would render the OTHER sellers' items. This migration filters `items` to
+the caller's own lines — resolve each line's vendor via `products.vendor_id`, else fall
+back to `o.seller_vendor_id` (which also attributes RFQ/non-uuid `p` lines to the
+primary), mirroring the admin Hub panel's `groupItems`.
+
+### What it changes
+
+- Only the `items` column expression changes (same name/type/position), so it's an
+  in-place `CREATE OR REPLACE VIEW` — no column add/remove, grants preserved.
+- `is_admin()` and NULL `items` pass through unchanged; non-admin gets the own-items
+  jsonb (empty `[]` when none match — never falls back to the full list, so no leak).
+
+### Replica verification (as `authenticated`, rolled back on live prod data)
+
+- **Single-seller item byte-identical:** seller `9d52fae2`, live-view vs new-view →
+  5 single-seller orders, **0 items changed**; the 3 multi-seller orders' items changed
+  (filtered), as expected.
+- **Per-seller item isolation on `983057`** (7 lines across 3 sellers): `9d52fae2` → **1**
+  (own `55fcc075`), `9dfa8c65` → **1** (own `2c10ef5c`), `66563bfb` → **5** (own), admin
+  (`5c821a81`) → **7** (all). 1+1+5 = 7 — no leaks, no dropped lines.
+- **Row/status isolation (from the client filter removal), proven separately:** seller A
+  sees 8 orders, seller B 3, sharing 2 (incl. `983057`); `a_leak=0 / b_leak=0` — neither
+  sees an order where it owns no group.
+
+### Live apply evidence (prod `niloddwnllhsvrmuxfxw`)
+
+Applied via `apply_migration` (recorded `schema_migrations.version 20260712181357`).
+
+- **Pre-apply guard.** Live md5 `c98d89bc7682fbd77c3cd590f76d2154` (the Phase-A state —
+  not drifted). **After apply →** `748ba6bb79b34b83fd25208e6092d90c`; `authenticated`
+  SELECT grant preserved.
+- **Live smoke (rolled-back, as `authenticated`).** Seller `9d52fae2` on `983057` →
+  **1 item** (own only); single-seller order `879561` unchanged.
+- **No data touched** (view-only).
+
+### Phase B client (same feature branch)
+
+`app.main.js`: accept edge → `rpc('seller_accept_group')` (no optimistic status, relies
+on realtime reload); reject → `rpc('seller_reject_group', {p_reason})` (optimistic own
+slice, re-syncs on error); dropped the `seller_vendor_id` filter; mapper prefers the
+group's `decline_reason`. `app.seller.js` + `app.data.js`: two preset reject reasons
+(`نفاد الكمية`, `لا يمكن التجهيز حالياً`). `canReject` stays `{new, preparing}`
+(= server gate: `paid_by_customer` + rank ≤ 1). Client-only, no merge.
+
+---
+
 ## 2026-07-12 — `20260729_orders_seller_facing_seller_decision` — ✅ APPLIED (server)
 
 Unified-cart **Step 2c — Phase A** (view augmentation). Step 2b (`20260720`) added
