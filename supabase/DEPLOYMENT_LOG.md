@@ -83,16 +83,26 @@ Applied via `apply_migration` (recorded `schema_migrations.version 2026071207114
 - **No data touched.** `orders` count 22 before and after; smoke residue 0; almond
   stock still 2 (rolled-back decrement undone).
 
-### DEFERRED (client + follow-ups — NOT in this change)
+### byAmount reinstatement — ✅ COMPLETE (phases 1–3, quarter-only, launched 2026-07-12)
 
-- **Client cutover (Phase 2 — NOT started).** The byAmount UI stays **disabled
-  client-side** until the client sends intent-only (`{p, mode:'amount', amount}`),
-  re-derives grams from live price with `Math.floor`, upgrades any legacy persisted
-  byAmount cart line to the new shape on reconcile, and reads back the authoritative
-  order via `.select().single()` (rendering items/total/grams from it; status still
-  from the customer-facing view). Only then is the `false` guard removed
-  (`src/scripts/app.shop.js`, scoped to `isQuarter && !p.bundle`).
-- **Unify product price semantics.** See the deferred backlog item under `20260727`.
+- **Phase 1 — server (this migration).** ✅ Applied to prod 2026-07-12 as `20260728`
+  (see above): intent-only `{p, mode:'amount', amount}`; trigger derives grams/q/line
+  authoritatively; quarter categories only.
+- **Phase 2 — client cutover.** ✅ Live in `main` (commit `b2c9624`). The client sends
+  intent-only (`{p, mode:'amount', amount}`), re-derives grams from live price with
+  `Math.floor`, upgrades any legacy persisted byAmount cart line to the new shape on
+  reconcile, and reads back the authoritative order via `.select().single()` (rendering
+  items/total/grams from it; status still from the customer-facing view).
+- **Phase 3 — launch (guard removal).** ✅ Done 2026-07-12. Removed the disable guard in
+  `src/scripts/app.shop.js` (`buy-mode` block): `isConsumer && !p.bundle && false/*…*/`
+  → `isQuarter && !p.bundle`. The byAmount toggle now renders **only** for
+  `almond`/`raisin`/`savings` (quarter-only) and stays hidden on retail/vip/wholesale/
+  bundle/RFQ — the client gate matches the server's category check exactly.
+
+### Still deferred (unchanged)
+
+- **Unify product price semantics (byAmount beyond quarter cats).** See the deferred
+  backlog item under `20260727`.
 
 ---
 
@@ -179,8 +189,9 @@ Applied via `apply_migration` (recorded `schema_migrations.version 2026071122504
   `20260728_orders_byamount_reinstate` (intent-only `{p, mode:'amount', amount}`;
   trigger derives `grams := floor(amount/price*1000)`, `q := grams/1000`; quarter
   categories only; rejects non-positive/sub-gram/non-quarter). **Applied to prod
-  2026-07-12 (server) as `20260728` — see the top entry; client still gated** —
-  client cutover + guard removal is the next phase.
+  2026-07-12 (server) as `20260728`; client cutover (Phase 2, commit `b2c9624`) and
+  guard removal/launch (Phase 3) COMPLETE 2026-07-12 — quarter-only. See the top
+  entry.**
 - **RFQ price cross-check.** Non-uuid `rfq-*` items pass through untouched today.
   **TODO (phase 2):** validate their price against `rfq_offer_items` for the
   accepted offer (`offer_item_id` is embedded in the `rfq-<uuid>` id).
