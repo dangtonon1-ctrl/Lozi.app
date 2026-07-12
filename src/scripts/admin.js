@@ -1365,6 +1365,7 @@ const FUL_STAGES = [
   ['pending_hub_delivery', 'بانتظار التوريد'],
   ['out_for_delivery', 'قيد التوصيل للعميل'],
   ['done', 'منجزة / مرفوضة'],
+  ['refunds', 'استرداد مبالغ العملاء'],
 ];
 const FUL_META = {
   paid_by_customer:       ['بانتظار تأكيد الدفع', 'pending'],
@@ -1381,6 +1382,11 @@ const PAYOUT_META = {
   paid_cash:         ['مدفوع نقداً', 'approved'],
   paid_transfer:     ['مدفوع عبر حوالة', 'approved'],
   withheld_disputed: ['محجوز (نزاع)', 'rejected'],
+};
+// Manual-refund tracking for a seller-declined slice (order_seller_groups.refund_status).
+const REFUND_META = {
+  pending:  ['بانتظار الرد', 'pending'],
+  refunded: ['تم الرد', 'approved'],
 };
 const DONE_STATES = ['rejected_at_hub', 'delivered_to_customer', 'returned_by_customer', 'disputed'];
 const isIOS = () => /iP(hone|ad|od)/.test((typeof navigator !== 'undefined' && navigator.userAgent) || '');
@@ -1414,6 +1420,9 @@ function GroupCard({ grp, items, seller, tiers, hubAddr, onPatch }) {
   const fs = grp.fulfillment_status;
   const meta = FUL_META[fs] || [fs, 'pending'];
   const subtotal = Number(grp.subtotal_amount) || 0;
+  // Seller declined this slice (Step 2c): block the hub actions; the refund is
+  // tracked in the «استرداد مبالغ العملاء» tab.
+  const sellerRejected = grp.seller_decision === 'rejected';
   const channel = o.segment === 'wholesale' ? 'wholesale' : 'retail';
   const cum = channel === 'wholesale'
     ? Number(seller.wholesale_cumulative_sales) || 0
@@ -1530,14 +1539,24 @@ function GroupCard({ grp, items, seller, tiers, hubAddr, onPatch }) {
       </div>
       <div className="od-total grand"><span>إجمالي بضاعة البائع</span><span>{orderMoney(subtotal)}</span></div>
 
-      {/* ── paid_by_customer: manual confirm-payment ── */}
-      {fs === 'paid_by_customer' &&
+      {/* ── seller declined their slice: no hub action; refund tracked in the refunds tab ── */}
+      {sellerRejected &&
+        <div className="kv" style={{ marginTop: 10, color: 'var(--danger)' }}>
+          <b>اعتذر البائع عن تجهيز نصيبه من الطلب.</b>{grp.decline_reason ? ' — ' + grp.decline_reason : ''}
+          {grp.refund_owed_yer != null &&
+            <div style={{ marginTop: 4 }}>المبلغ المستحق ردّه للعميل: <b>{orderMoney(grp.refund_owed_yer)}</b> · <span className={`tag ${(REFUND_META[grp.refund_status] || REFUND_META.pending)[1]}`}>{(REFUND_META[grp.refund_status] || REFUND_META.pending)[0]}</span></div>}
+          {grp.refund_status != null &&
+            <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>تتم متابعة الاسترداد من تبويب «استرداد مبالغ العملاء».</div>}
+        </div>}
+
+      {/* ── paid_by_customer: manual confirm-payment (suppressed for a declined slice) ── */}
+      {fs === 'paid_by_customer' && !sellerRejected &&
         <div className="acts" style={{ marginTop: 10 }}>
           <button className="btn sm" disabled={busy} onClick={confirmPay}>💳 تأكيد الدفع واستلام الطلب</button>
         </div>}
 
       {/* ── pending_hub_delivery: communicate + inspect + pay/reject ── */}
-      {fs === 'pending_hub_delivery' && <>
+      {fs === 'pending_hub_delivery' && !sellerRejected && <>
         <div className="secttl" style={{ margin: '12px 0 4px', fontSize: 13 }}>📨 مراسلة البائع</div>
         <div className="acts" style={{ flexWrap: 'wrap' }}>
           <a className="btn sm" href={waHref} target="_blank" rel="noopener noreferrer" style={{ background: '#25D366', color: '#fff' }}>📱 مراسلة واتساب</a>
@@ -1602,6 +1621,50 @@ function GroupCard({ grp, items, seller, tiers, hubAddr, onPatch }) {
   );
 }
 
+// Refund-tracking card: one per seller-declined slice. The system flagged the
+// amount owed back (order_seller_groups.refund_owed_yer); the admin settles it by
+// hand, then marks refund_status='refunded' (osg_admin PERMISSIVE policy allows the
+// direct write). Never auto-refunds.
+function RefundCard({ grp, seller, onPatch }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const o = grp.orders || {};
+  const cust = o.customer || {};
+  const refunded = grp.refund_status === 'refunded';
+  const markRefunded = async () => {
+    if (!window.confirm('تأكيد أنه تم رد المبلغ المستحق للعميل؟')) return;
+    setBusy(true); setErr('');
+    const { error } = await SB.from('order_seller_groups').update({ refund_status: 'refunded' }).eq('id', grp.id);
+    setBusy(false);
+    if (error) { setErr('خطأ: ' + error.message); return; }
+    onPatch(grp.id, { refund_status: 'refunded' });
+  };
+  return (
+    <div className="card">
+      <div className="v-head">
+        <strong style={{ flex: 1 }}>{seller.name || 'بائع'}</strong>
+        <span className="tag" style={{ background: 'var(--sand)' }}>طلب #{o.order_no}</span>
+        <span className={`tag ${(REFUND_META[grp.refund_status] || REFUND_META.pending)[1]}`}>{(REFUND_META[grp.refund_status] || REFUND_META.pending)[0]}</span>
+      </div>
+      <div className="kv"><b>المشتري:</b> {cust.name || '—'}{cust.phone ? ' · ' + cust.phone : ''}</div>
+      {grp.decline_reason && <div className="kv"><b>سبب الاعتذار:</b> {grp.decline_reason}</div>}
+      <div className="od-comm" style={{ marginTop: 10 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <span className="tag">بضاعة البائع المرفوضة: {orderMoney(grp.refund_rejected_subtotal)}</span>
+          <span className="tag">فرق رسوم التوصيل: {orderMoney(grp.refund_fee_diff)}</span>
+          <span className="tag" style={{ background: 'var(--gold-deep)', color: '#fff' }}>إجمالي المستحق ردّه: {orderMoney(grp.refund_owed_yer)}</span>
+        </div>
+      </div>
+      {refunded
+        ? <div className="kv" style={{ marginTop: 8, color: 'var(--green-deep)' }}><b>تم رد المبلغ للعميل ✓</b></div>
+        : <div className="acts" style={{ marginTop: 10 }}>
+            <button className="btn sm" disabled={busy} onClick={markRefunded}>💵 تم رد المبلغ للعميل</button>
+          </div>}
+      {err && <div className="err">{err}</div>}
+    </div>
+  );
+}
+
 function FulfillmentAdmin() {
   const [groups, setGroups] = useState(null);
   const [prof, setProf] = useState({});
@@ -1626,7 +1689,34 @@ function FulfillmentAdmin() {
     setHubAddr((hs && hs.data && hs.data.value) || 'شارع خولان - أمام المطعم الملكي - وكالة بيت المكسرات');
     setGroups(g.error ? [] : (g.data || []));
   };
-  useEffect(() => { load(); }, []);
+  // Lightweight re-fetch of just the groups (no blanking, no ancillary reload) for realtime.
+  const reloadGroups = async () => {
+    const g = await SB.from('order_seller_groups')
+      .select('*, orders!inner(order_no, items, customer, seller_vendor_id, created_at, segment)')
+      .order('created_at', { ascending: false });
+    if (!g.error) setGroups(g.data || []);
+  };
+  // Mount: full load, then subscribe to live seller-group changes (mirrors AdminOrders).
+  // A seller_decision / refund_status change now re-renders this panel without a manual reload.
+  useEffect(() => {
+    load();
+    let t = null, ch = null;
+    const bump = () => { if (t) clearTimeout(t); t = setTimeout(() => { reloadGroups(); }, 350); };
+    const teardown = () => { if (t) { clearTimeout(t); t = null; } if (ch) { try { SB.removeChannel(ch); } catch (e) {} ch = null; } };
+    const subscribe = () => {
+      teardown();
+      try {
+        ch = SB.channel('fulfillment-admin')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_seller_groups' }, bump)
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'order_seller_groups' }, bump)
+          .subscribe();
+      } catch (e) {}
+    };
+    const onVis = () => { if (document.visibilityState === 'visible') { reloadGroups(); subscribe(); } else { teardown(); } };
+    subscribe();
+    document.addEventListener('visibilitychange', onVis);
+    return () => { try { document.removeEventListener('visibilitychange', onVis); } catch (e) {} teardown(); };
+  }, []);
   const patch = (id, p) => setGroups((gs) => (gs || []).map((x) => x.id === id ? { ...x, ...p } : x));
   // Items belonging to a seller-group: resolve each line's vendor (product →
   // vendor, else the order's seller) and keep only this group's seller's lines.
@@ -1635,9 +1725,11 @@ function FulfillmentAdmin() {
     const its = Array.isArray(o.items) ? o.items : [];
     return its.filter((it) => (prodVendor[it.p] || o.seller_vendor_id) === grp.seller_id);
   };
-  const inStage = (grp) => stage === 'done'
-    ? DONE_STATES.indexOf(grp.fulfillment_status) >= 0
-    : grp.fulfillment_status === stage;
+  const inStage = (grp) => stage === 'refunds'
+    ? (grp.seller_decision === 'rejected' && grp.refund_status != null)
+    : stage === 'done'
+      ? DONE_STATES.indexOf(grp.fulfillment_status) >= 0
+      : grp.fulfillment_status === stage;
   const shown = (groups || []).filter(inStage);
   return (
     <div>
@@ -1650,10 +1742,12 @@ function FulfillmentAdmin() {
           <button key={id} className={stage === id ? 'on' : ''} onClick={() => setStage(id)}>{label}</button>)}
       </div>
       {groups === null ? <div className="empty">جارٍ التحميل…</div>
-        : !shown.length ? <div className="empty">لا توجد طلبات في هذه المرحلة.</div>
+        : !shown.length ? <div className="empty">{stage === 'refunds' ? 'لا توجد مبالغ مستحقة للرد.' : 'لا توجد طلبات في هذه المرحلة.'}</div>
           : shown.map((grp) => (
-            <GroupCard key={grp.id} grp={grp} items={groupItems(grp)}
-              seller={prof[grp.seller_id] || {}} tiers={tiers} hubAddr={hubAddr} onPatch={patch} />
+            stage === 'refunds'
+              ? <RefundCard key={grp.id} grp={grp} seller={prof[grp.seller_id] || {}} onPatch={patch} />
+              : <GroupCard key={grp.id} grp={grp} items={groupItems(grp)}
+                  seller={prof[grp.seller_id] || {}} tiers={tiers} hubAddr={hubAddr} onPatch={patch} />
           ))}
     </div>
   );
