@@ -6,7 +6,7 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
-## 2026-07-12 — `20260731_orders_seller_facing_failopen_items` — ⏳ REPLICA-VERIFIED, APPLY PENDING APPROVAL (server, Phase B fix)
+## 2026-07-12 — `20260731_orders_seller_facing_failopen_items` — ✅ APPLIED (server, Phase B fix)
 
 Fixes the deleted-product edge in `20260730`. That migration filtered `items` to the
 caller's own lines but, when a line's product could not be resolved, fell back to the
@@ -47,8 +47,19 @@ through; grants preserved.
 sellers — but only orphaned/RFQ lines, only on multi-seller orders.
 
 Pre-image at `supabase/rollback/20260731_orders_seller_facing_failopen_items_preimage.sql`.
-**Not yet applied — awaiting explicit approval (standing rule: every prod apply stops
-for approval first).** Live apply evidence will be appended here on apply.
+
+### Live apply evidence (prod `niloddwnllhsvrmuxfxw`)
+
+Applied via `apply_migration` (recorded `schema_migrations.version 20260712201926`).
+
+- **Pre-apply guard.** Live md5 `748ba6bb79b34b83fd25208e6092d90c` (the `20260730` state
+  — not drifted).
+- **View switched.** After apply → `4c7250e9aa9868d9da41867d0d11c4b6`; `authenticated`
+  (and `anon`) SELECT grants preserved.
+- **Live smoke (rolled-back, as `authenticated`).** Resolvable isolation intact: seller
+  `9d52fae2` sees **1** own item on multi-seller `983057`; single-seller `879561`
+  unchanged — matches the replica (fail-open only alters the deleted-product edge).
+- **No data touched** (view-only).
 
 ### DEFERRED hardening (approved, NOT in this change) — per-item `vendor_id` snapshot
 
