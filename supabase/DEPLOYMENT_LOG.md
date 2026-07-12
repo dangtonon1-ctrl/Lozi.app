@@ -6,6 +6,96 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-12 — `20260728_orders_byamount_reinstate` — ✅ APPLIED (server)
+
+Re-enables the **byAmount** ("buy N riyals worth") purchase path under the price-
+integrity regime (the DEFERRED item from `20260727`). A byAmount line now carries
+**intent only** — `{p, mode:'amount', amount}` — and the `BEFORE INSERT/UPDATE`
+trigger `lozi_orders_enforce_delivery_fee` derives everything authoritatively from
+`products.price`, at the top of the non-admin INSERT branch (before the subtotal
+CTE) so the corrected line flows into `v_subtotal`, `NEW.total`, `NEW.items` and
+every AFTER trigger:
+
+```
+price := products.price
+grams := floor(amount / price * 1000)     -- always round DOWN
+q     := grams / 1000.0
+line  := price * q                        -- <= amount, never above
+weight := '≈ <grams> جم'
+```
+
+Tampering is neutralized: a forged `price`/`q`/`weight` is ignored (re-derived); a
+forged `amount` only means the customer pays that amount.
+
+### What it changes (single `CREATE OR REPLACE`, one function)
+
+- **Scope (D1 — quarter categories only):** honors `mode='amount'` **only** for
+  `almond`/`raisin`/`savings`, where `products.price` is per-kilogram (weight basis
+  1 kg) so the client's grams preview equals the server's. `mode='amount'` on any
+  other category (retail/vip/**wholesale**) or a **non-uuid (RFQ)** id is REJECTED —
+  which also excludes wholesale/RFQ (defense-in-depth; the client never offers it).
+- **Reject (D2):** `mode='amount'` with non-positive amount, non-positive product
+  price, or an amount that buys **< 1 gram** → REJECT (`errcode 23514`, Arabic
+  message).
+- **Preserved verbatim from `20260727`:** admin (`is_admin()`) bypass, non-admin
+  UPDATE pinning, the missing/hidden/priceless reject, RFQ (non-uuid) exemption, the
+  subtotal/fee/total recompute and the wholesale delivery branch. The **non-byAmount
+  path is byte-identical** (verified). `decrement_stock` already subtracts the
+  fractional `q`; `sync_order_seller_groups` sums the corrected `price*q` into
+  `order_seller_groups.subtotal_amount` → per-seller commission → payout.
+
+Pre-image at `supabase/rollback/20260728_orders_byamount_reinstate_preimage.sql`.
+No data modified (INSERT-time logic only).
+
+### Replica verification (local Postgres 16, seeded read-only from prod)
+
+Faithful replica (9 chain-tables verbatim DDL + enums, money-chain functions
+verbatim, 8 triggers, RLS + policies + grants, real product/profile/tier rows).
+Baseline reproduced live byte-for-byte: `md5(pg_get_functiondef(...)) =
+6d04b08eee94abe48b85e5e7ca6b0309`. All assertions run `set role authenticated`
+(non-superuser), each in a rolled-back txn — all green:
+
+- honest 18500 of almond @37000/kg → `q 0.500`, `price 37000`, `weight ≈ 500 جم`,
+  `line 18500`, `total 19500`, fee 1000, OSG subtotal 18500, stock 2→**1.5**; driven
+  to `delivered` → commission **348.75**, seller retail counter 0→18500;
+- **tamper** (`q:99, price:5, weight:fake`) → re-derived to the honest outcome;
+- rejects: amount≤0, sub-gram (36<37/g), retail `mode='amount'`, wholesale
+  `mode='amount'`, missing product, hidden product — all rejected;
+- multi-seller (18500@37000 + 8500@17000) → total 28250, fee 1250, subs 18500/8500,
+  commissions 348.75/170.00, order 518.75;
+- **non-byAmount order → byte-identical** OLD vs NEW (total 92250, prices rewritten,
+  q kept);
+- admin insert → tampered price/total **preserved**;
+- rollback pre-image re-run → restores `6d04b08eee94abe48b85e5e7ca6b0309` exactly.
+
+### Live apply evidence (prod `niloddwnllhsvrmuxfxw`)
+
+Applied via `apply_migration` (recorded `schema_migrations.version 20260712071149`).
+
+- **Pre-apply guard.** Live `md5(pg_get_functiondef(lozi_orders_enforce_delivery_fee))`
+  = `6d04b08eee94abe48b85e5e7ca6b0309` (unchanged since investigation → not drifted).
+- **Function switched.** After apply → `64c79140f968d4e4867c267e0d8fd48e`.
+- **Live smoke (rolled-back, non-persisting).** Honest byAmount INSERT as
+  `authenticated` (customer `d64fe722…`, almond @37000, amount 18500), executed
+  inside an atomic `DO` block that raises to force rollback:
+  `q=0.500 price=37000 weight=[≈ 500 جم] line=18500 total=19500 fee=1000
+  osg_subtotal=18500.00` — matches the replica exactly.
+- **No data touched.** `orders` count 22 before and after; smoke residue 0; almond
+  stock still 2 (rolled-back decrement undone).
+
+### DEFERRED (client + follow-ups — NOT in this change)
+
+- **Client cutover (Phase 2 — NOT started).** The byAmount UI stays **disabled
+  client-side** until the client sends intent-only (`{p, mode:'amount', amount}`),
+  re-derives grams from live price with `Math.floor`, upgrades any legacy persisted
+  byAmount cart line to the new shape on reconcile, and reads back the authoritative
+  order via `.select().single()` (rendering items/total/grams from it; status still
+  from the customer-facing view). Only then is the `false` guard removed
+  (`src/scripts/app.shop.js`, scoped to `isQuarter && !p.bundle`).
+- **Unify product price semantics.** See the deferred backlog item under `20260727`.
+
+---
+
 ## 2026-07-11 — `20260727_orders_price_integrity` — ✅ APPLIED
 
 Server-side **price integrity** for orders. Item prices in `orders.items` (jsonb)
@@ -85,9 +175,22 @@ Applied via `apply_migration` (recorded `schema_migrations.version 2026071122504
   so no user can create one. **TODO:** re-enable only with a coordinated fix that
   stores byAmount as `{q: amount/live_price, price: live_price, amount}` and has
   the trigger recompute `q := amount/price`.
+  **UPDATE (2026-07-12):** server side written & replica-verified as
+  `20260728_orders_byamount_reinstate` (intent-only `{p, mode:'amount', amount}`;
+  trigger derives `grams := floor(amount/price*1000)`, `q := grams/1000`; quarter
+  categories only; rejects non-positive/sub-gram/non-quarter). **Applied to prod
+  2026-07-12 (server) as `20260728` — see the top entry; client still gated** —
+  client cutover + guard removal is the next phase.
 - **RFQ price cross-check.** Non-uuid `rfq-*` items pass through untouched today.
   **TODO (phase 2):** validate their price against `rfq_offer_items` for the
   accepted offer (`offer_item_id` is embedded in the `rfq-<uuid>` id).
+- **Unify product price semantics (byAmount beyond quarter cats).** byAmount is
+  scoped to almond/raisin/savings because only there is `products.price`
+  guaranteed per-kilogram (weight basis 1 kg). The schema already carries unused
+  `price_per_kg` + `min_order_grams` columns; populate/use them (seller form +
+  `20260728`-style trigger derivation) so byAmount can safely extend to packaged
+  retail/vip products. The live retail product with `data.weight='500'`
+  (per-kg ≠ `price`) is the known offender that this would fix. **Not implemented.**
 
 ---
 
