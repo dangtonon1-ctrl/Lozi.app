@@ -6,6 +6,226 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-12 — `20260731_orders_seller_facing_failopen_items` — ✅ APPLIED (server, Phase B fix)
+
+Fixes the deleted-product edge in `20260730`. That migration filtered `items` to the
+caller's own lines but, when a line's product could not be resolved, fell back to the
+order's primary `seller_vendor_id`. On a multi-seller order that mis-handles a deleted
+product: if a SECONDARY seller's product row is deleted, their line resolves to NULL →
+falls back to the primary → the line **vanishes from its true owner** (who must still
+fulfil it) and **leaks onto the primary**. Verified live (rolled-back): deleting seller
+`9d52fae2`'s product on `983057` gave `9d52` → **0** items, primary `66563` → **6**.
+
+### What it changes (one-token fix)
+
+The `items` filter predicate `coalesce(resolved_vendor, o.seller_vendor_id) = auth.uid()`
+becomes `coalesce(resolved_vendor, auth.uid()) = auth.uid()` — the fallback for an
+**unresolvable** line changes from the primary to the caller, i.e. it **fails OPEN**:
+
+- resolvable & mine → keep (isolated, unchanged);
+- resolvable & another's → drop (isolated, unchanged);
+- **unresolvable (deleted product / non-uuid RFQ `p`) → keep for EVERY seller** on the
+  order, so an orphaned line never disappears from the seller who must fulfil it.
+
+In-place `CREATE OR REPLACE` (items expression only); `is_admin()` / NULL items pass
+through; grants preserved.
+
+### Replica verification (as `authenticated`, rolled-back on live prod data)
+
+- **Byte-identical to live `20260730` on current data:** with no products deleted every
+  line resolves, so the fallback is never used — **0 rows changed** across all of a
+  seller's orders (single- and multi-seller), and single-seller items unchanged.
+- **Deleted-product fail-open** (delete `9d52fae2`'s product `55fcc075` on `983057`):
+  the orphaned line now appears for its true owner **and** the other sellers, vanishing
+  from no one — `9d52` → 1 (own orphan), `9dfa` → 2 (own + orphan), `66563` → 6
+  (own 5 + orphan), admin → 7. Resolvable lines stay isolated (`9dfa` keeps its own,
+  `66563` its 5).
+- **Prod untouched by the tests:** live view md5 stayed `748ba6bb79b34b83fd25208e6092d90c`
+  throughout; test product restored on rollback.
+
+**Trade-off (accepted):** an unresolvable line is over-shown to the order's other
+sellers — but only orphaned/RFQ lines, only on multi-seller orders.
+
+Pre-image at `supabase/rollback/20260731_orders_seller_facing_failopen_items_preimage.sql`.
+
+### Live apply evidence (prod `niloddwnllhsvrmuxfxw`)
+
+Applied via `apply_migration` (recorded `schema_migrations.version 20260712201926`).
+
+- **Pre-apply guard.** Live md5 `748ba6bb79b34b83fd25208e6092d90c` (the `20260730` state
+  — not drifted).
+- **View switched.** After apply → `4c7250e9aa9868d9da41867d0d11c4b6`; `authenticated`
+  (and `anon`) SELECT grants preserved.
+- **Live smoke (rolled-back, as `authenticated`).** Resolvable isolation intact: seller
+  `9d52fae2` sees **1** own item on multi-seller `983057`; single-seller `879561`
+  unchanged — matches the replica (fail-open only alters the deleted-product edge).
+- **No data touched** (view-only).
+
+### DEFERRED hardening (approved, NOT in this change) — per-item `vendor_id` snapshot
+
+The precise alternative to fail-open: stamp each order line's `vendor_id` (authoritatively
+from `products.vendor_id`) onto `orders.items` **at order creation**, inside the existing
+price-integrity trigger `lozi_orders_enforce_delivery_fee` (adding a `v` field to both
+uuid branches — the byAmount `jsonb_build_object` rebuild and the normal-item `jsonb_set`
+patch), plus a one-time backfill of existing orders. The view would then resolve each line
+by its stamped `v`, so attribution survives product deletion exactly. Deferred because it
+touches the **order-creation money-chain trigger** and cannot reliably backfill lines whose
+product is **already** deleted (that mapping is unrecoverable). It is a companion to the
+existing "unify product price semantics" backlog item under `20260727` — both touch the
+order-creation path and should ship together with coordinated replica verification.
+
+---
+
+## 2026-07-12 — `20260730_orders_seller_facing_own_items` — ✅ APPLIED (server, Phase B)
+
+Unified-cart **Step 2c — Phase B (server half)**. The Phase-B client cutover drops the
+`.eq('seller_vendor_id', uid)` filter so every seller on a unified order sees their
+slice (row + status isolation comes from the view's group-membership WHERE + RLS). But
+the view still returned the FULL `o.items`, so on a shared multi-seller order each
+seller's card would render the OTHER sellers' items. This migration filters `items` to
+the caller's own lines — resolve each line's vendor via `products.vendor_id`, else fall
+back to `o.seller_vendor_id` (which also attributes RFQ/non-uuid `p` lines to the
+primary), mirroring the admin Hub panel's `groupItems`.
+
+### What it changes
+
+- Only the `items` column expression changes (same name/type/position), so it's an
+  in-place `CREATE OR REPLACE VIEW` — no column add/remove, grants preserved.
+- `is_admin()` and NULL `items` pass through unchanged; non-admin gets the own-items
+  jsonb (empty `[]` when none match — never falls back to the full list, so no leak).
+
+### Replica verification (as `authenticated`, rolled back on live prod data)
+
+- **Single-seller item byte-identical:** seller `9d52fae2`, live-view vs new-view →
+  5 single-seller orders, **0 items changed**; the 3 multi-seller orders' items changed
+  (filtered), as expected.
+- **Per-seller item isolation on `983057`** (7 lines across 3 sellers): `9d52fae2` → **1**
+  (own `55fcc075`), `9dfa8c65` → **1** (own `2c10ef5c`), `66563bfb` → **5** (own), admin
+  (`5c821a81`) → **7** (all). 1+1+5 = 7 — no leaks, no dropped lines.
+- **Row/status isolation (from the client filter removal), proven separately:** seller A
+  sees 8 orders, seller B 3, sharing 2 (incl. `983057`); `a_leak=0 / b_leak=0` — neither
+  sees an order where it owns no group.
+
+### Live apply evidence (prod `niloddwnllhsvrmuxfxw`)
+
+Applied via `apply_migration` (recorded `schema_migrations.version 20260712181357`).
+
+- **Pre-apply guard.** Live md5 `c98d89bc7682fbd77c3cd590f76d2154` (the Phase-A state —
+  not drifted). **After apply →** `748ba6bb79b34b83fd25208e6092d90c`; `authenticated`
+  SELECT grant preserved.
+- **Live smoke (rolled-back, as `authenticated`).** Seller `9d52fae2` on `983057` →
+  **1 item** (own only); single-seller order `879561` unchanged.
+- **No data touched** (view-only).
+
+### Phase B client (same feature branch)
+
+`app.main.js`: accept edge → `rpc('seller_accept_group')` (no optimistic status, relies
+on realtime reload); reject → `rpc('seller_reject_group', {p_reason})` (optimistic own
+slice, re-syncs on error); dropped the `seller_vendor_id` filter; mapper prefers the
+group's `decline_reason`. `app.seller.js` + `app.data.js`: two preset reject reasons
+(`نفاد الكمية`, `لا يمكن التجهيز حالياً`). `canReject` stays `{new, preparing}`
+(= server gate: `paid_by_customer` + rank ≤ 1). Client-only, no merge.
+
+---
+
+## 2026-07-12 — `20260729_orders_seller_facing_seller_decision` — ✅ APPLIED (server)
+
+Unified-cart **Step 2c — Phase A** (view augmentation). Step 2b (`20260720`) added
+`seller_decision` (pending|accepted|rejected) + the manual-refund flag to
+`order_seller_groups`, but `orders_seller_facing.internal_status` was still derived
+only from the ORDER aggregate + the group's `fulfillment_status`. In a multi-seller
+order a seller who had already accepted or rejected THEIR slice couldn't see it:
+while the other sellers stayed pending the order sat at `new` (rank 0), so the
+seller's card kept showing `new` with live accept/reject buttons — their own
+decision appeared lost. This migration makes the CALLER's own group decision drive
+`internal_status`, and exposes `decline_reason` + `refund_owed_yer` for the Phase-B
+seller "you declined this slice — X ر owed back" banner.
+
+### What it changes (single `CREATE OR REPLACE VIEW`, security_invoker preserved)
+
+- **Two additive `internal_status` CASE branches:**
+  - `g.seller_decision = 'rejected'` → `'rejected'` (placed after the order-level
+    `rejected`/`cancelled` branches; a multi-seller order continues, but the
+    rejecting seller's own card now reads `rejected`).
+  - `g.seller_decision = 'accepted' AND g.fulfillment_status = 'paid_by_customer'
+    AND order_status_rank(o.status) = 0` → `'preparing'` (I accepted; the order has
+    not flipped yet because other sellers are still pending).
+- **Three additive columns appended at the TAIL** (`CREATE OR REPLACE VIEW` may only
+  add columns to the end, never reorder): `seller_decision`, `decline_reason`,
+  `refund_owed_yer`. Ignored by today's client mapper; the Phase-B client reads them.
+- Admin (`is_admin()`) keeps the pre-existing "first group" projection.
+
+Pre-image at `supabase/rollback/20260729_orders_seller_facing_seller_decision_preimage.sql`
+(restores the exact 23-column pre-Phase-A view via **DROP + recreate + re-grant** —
+column removal is impossible with `CREATE OR REPLACE`; the view has no SQL
+dependents, is in no realtime publication, and holds no own RLS, so the DROP is
+safe). No data modified (view-only).
+
+### Single-seller byte-identical — why the new branches never fire on legacy rows
+
+- The `own rejected → rejected` branch sits AFTER `o.status='rejected'`. On a
+  single-seller order `seller_decision` becomes `'rejected'` ONLY when the order is
+  also `'rejected'` (`seller_reject_group` recompute → `status='rejected'`; the 2a
+  backfill matched), so the order-level branch already fires — the new branch is
+  unreachable.
+- The `own accepted → preparing` branch only fires while `order_status_rank(o.status)
+  = 0` (new/received/payreview). A single-seller accept always flips the order to
+  `preparing` (rank 1), so a single-seller rank-0 order is always still `pending` —
+  the new branch is likewise unreachable.
+
+### Replica verification (as non-superuser `authenticated`, each inside a `BEGIN … ROLLBACK` on live prod data — real RLS + real RPCs, zero persistence)
+
+Simulated per-seller via `set_config('request.jwt.claims', …)` + `set local role
+authenticated` (verified `auth.uid()` resolves and the view scopes per seller):
+
+- **Case 1 — single-seller byte-identity:** seller `9d52fae2`, live view vs new view
+  → 8 rows, **0 changed**, 0 missing.
+- **Byte-identity, comprehensive:** OLD-vs-NEW `internal_status` over **every** real
+  order×group pair → **29/29 identical** (incl. all 19 single-seller pairs).
+- **Case 2 — multi-seller `983057`, `9d52fae2` accepts** (real `seller_accept_group`):
+  order stays `new`; my row `internal_status=preparing`, `seller_decision=accepted`;
+  the OTHER seller `9dfa8c65` **unaffected** (`new` / `pending`).
+- **Case 3 — multi-seller `983057`, `9d52fae2` rejects** (real `seller_reject_group`,
+  reason `نفاد الكمية`): order **continues** (`new`, 2 sellers remain); my row
+  `internal_status=rejected` + `decline_reason=نفاد الكمية` + `refund_owed_yer=25250`;
+  the OTHER seller **unaffected**. Fee recalc verified: `old_fee 1500 (3 sellers) −
+  lozi_delivery_fee(2)=1250 → fee_diff 250`; `refund = 25000 + 250 = 25250`;
+  `refund_status='pending'`.
+
+### Live apply evidence (prod `niloddwnllhsvrmuxfxw`)
+
+Applied via `apply_migration` (recorded `schema_migrations.version 20260712175641`).
+
+- **Pre-apply guard.** Live `md5(pg_get_viewdef(orders_seller_facing, true))` =
+  `19efec02e1b859b0a51dc0b4f22bf12b` (matched the investigation baseline — not drifted).
+- **View switched.** After apply → `c98d89bc7682fbd77c3cd590f76d2154`; the three new
+  columns (`seller_decision, decline_reason, refund_owed_yer`) are present and
+  `authenticated` retains its `SELECT` grant.
+- **Live smoke (rolled-back, as `authenticated`).** Real single-seller order `879561`
+  (`status=delivered`, seller `9d52fae2`) → `internal_status=delivered`,
+  `seller_decision=accepted`, `decline_reason`/`refund_owed_yer` null — correct.
+- **No data touched** (view-only; the Case 2/3 RPC calls were rolled back — group
+  decision counts unchanged at 9 accepted / 1 rejected).
+
+### Client cutover — Phase B / C (pending)
+
+The RPCs (`seller_accept_group`, `seller_reject_group`) and grants have been live since
+Step 2b; Phase A only unblocks the seller UI. **Phase B** (seller client cutover to the
+RPCs + drop the `.eq('seller_vendor_id', uid)` filter + preset reject reasons) and
+**Phase C** (admin refund panel) are pure client and land as separate commits.
+
+### DEFERRED (approved — NOT in this change)
+
+- **D-ii — customer-facing partial-rejection line.** A line on the customer order card
+  indicating a seller declined part of the order and a refund is pending. The
+  `seller_rejected` notification (from `20260720`) already satisfies the Step-2
+  "customer can see a seller declined" rule, so this is polish. Surfacing it on the
+  card would need a small additive flag/aggregate on `orders_customer_facing` (e.g.
+  `has_rejected_seller` / aggregated `refund_owed`) + client rendering; **replica-verify
+  if pursued.** Deferred by decision on 2026-07-12.
+
+---
+
 ## 2026-07-12 — `20260728_orders_byamount_reinstate` — ✅ APPLIED (server)
 
 Re-enables the **byAmount** ("buy N riyals worth") purchase path under the price-
