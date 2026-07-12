@@ -6,6 +6,104 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-12 — `20260729_orders_seller_facing_seller_decision` — ✅ APPLIED (server)
+
+Unified-cart **Step 2c — Phase A** (view augmentation). Step 2b (`20260720`) added
+`seller_decision` (pending|accepted|rejected) + the manual-refund flag to
+`order_seller_groups`, but `orders_seller_facing.internal_status` was still derived
+only from the ORDER aggregate + the group's `fulfillment_status`. In a multi-seller
+order a seller who had already accepted or rejected THEIR slice couldn't see it:
+while the other sellers stayed pending the order sat at `new` (rank 0), so the
+seller's card kept showing `new` with live accept/reject buttons — their own
+decision appeared lost. This migration makes the CALLER's own group decision drive
+`internal_status`, and exposes `decline_reason` + `refund_owed_yer` for the Phase-B
+seller "you declined this slice — X ر owed back" banner.
+
+### What it changes (single `CREATE OR REPLACE VIEW`, security_invoker preserved)
+
+- **Two additive `internal_status` CASE branches:**
+  - `g.seller_decision = 'rejected'` → `'rejected'` (placed after the order-level
+    `rejected`/`cancelled` branches; a multi-seller order continues, but the
+    rejecting seller's own card now reads `rejected`).
+  - `g.seller_decision = 'accepted' AND g.fulfillment_status = 'paid_by_customer'
+    AND order_status_rank(o.status) = 0` → `'preparing'` (I accepted; the order has
+    not flipped yet because other sellers are still pending).
+- **Three additive columns appended at the TAIL** (`CREATE OR REPLACE VIEW` may only
+  add columns to the end, never reorder): `seller_decision`, `decline_reason`,
+  `refund_owed_yer`. Ignored by today's client mapper; the Phase-B client reads them.
+- Admin (`is_admin()`) keeps the pre-existing "first group" projection.
+
+Pre-image at `supabase/rollback/20260729_orders_seller_facing_seller_decision_preimage.sql`
+(restores the exact 23-column pre-Phase-A view via **DROP + recreate + re-grant** —
+column removal is impossible with `CREATE OR REPLACE`; the view has no SQL
+dependents, is in no realtime publication, and holds no own RLS, so the DROP is
+safe). No data modified (view-only).
+
+### Single-seller byte-identical — why the new branches never fire on legacy rows
+
+- The `own rejected → rejected` branch sits AFTER `o.status='rejected'`. On a
+  single-seller order `seller_decision` becomes `'rejected'` ONLY when the order is
+  also `'rejected'` (`seller_reject_group` recompute → `status='rejected'`; the 2a
+  backfill matched), so the order-level branch already fires — the new branch is
+  unreachable.
+- The `own accepted → preparing` branch only fires while `order_status_rank(o.status)
+  = 0` (new/received/payreview). A single-seller accept always flips the order to
+  `preparing` (rank 1), so a single-seller rank-0 order is always still `pending` —
+  the new branch is likewise unreachable.
+
+### Replica verification (as non-superuser `authenticated`, each inside a `BEGIN … ROLLBACK` on live prod data — real RLS + real RPCs, zero persistence)
+
+Simulated per-seller via `set_config('request.jwt.claims', …)` + `set local role
+authenticated` (verified `auth.uid()` resolves and the view scopes per seller):
+
+- **Case 1 — single-seller byte-identity:** seller `9d52fae2`, live view vs new view
+  → 8 rows, **0 changed**, 0 missing.
+- **Byte-identity, comprehensive:** OLD-vs-NEW `internal_status` over **every** real
+  order×group pair → **29/29 identical** (incl. all 19 single-seller pairs).
+- **Case 2 — multi-seller `983057`, `9d52fae2` accepts** (real `seller_accept_group`):
+  order stays `new`; my row `internal_status=preparing`, `seller_decision=accepted`;
+  the OTHER seller `9dfa8c65` **unaffected** (`new` / `pending`).
+- **Case 3 — multi-seller `983057`, `9d52fae2` rejects** (real `seller_reject_group`,
+  reason `نفاد الكمية`): order **continues** (`new`, 2 sellers remain); my row
+  `internal_status=rejected` + `decline_reason=نفاد الكمية` + `refund_owed_yer=25250`;
+  the OTHER seller **unaffected**. Fee recalc verified: `old_fee 1500 (3 sellers) −
+  lozi_delivery_fee(2)=1250 → fee_diff 250`; `refund = 25000 + 250 = 25250`;
+  `refund_status='pending'`.
+
+### Live apply evidence (prod `niloddwnllhsvrmuxfxw`)
+
+Applied via `apply_migration` (recorded `schema_migrations.version 20260712175641`).
+
+- **Pre-apply guard.** Live `md5(pg_get_viewdef(orders_seller_facing, true))` =
+  `19efec02e1b859b0a51dc0b4f22bf12b` (matched the investigation baseline — not drifted).
+- **View switched.** After apply → `c98d89bc7682fbd77c3cd590f76d2154`; the three new
+  columns (`seller_decision, decline_reason, refund_owed_yer`) are present and
+  `authenticated` retains its `SELECT` grant.
+- **Live smoke (rolled-back, as `authenticated`).** Real single-seller order `879561`
+  (`status=delivered`, seller `9d52fae2`) → `internal_status=delivered`,
+  `seller_decision=accepted`, `decline_reason`/`refund_owed_yer` null — correct.
+- **No data touched** (view-only; the Case 2/3 RPC calls were rolled back — group
+  decision counts unchanged at 9 accepted / 1 rejected).
+
+### Client cutover — Phase B / C (pending)
+
+The RPCs (`seller_accept_group`, `seller_reject_group`) and grants have been live since
+Step 2b; Phase A only unblocks the seller UI. **Phase B** (seller client cutover to the
+RPCs + drop the `.eq('seller_vendor_id', uid)` filter + preset reject reasons) and
+**Phase C** (admin refund panel) are pure client and land as separate commits.
+
+### DEFERRED (approved — NOT in this change)
+
+- **D-ii — customer-facing partial-rejection line.** A line on the customer order card
+  indicating a seller declined part of the order and a refund is pending. The
+  `seller_rejected` notification (from `20260720`) already satisfies the Step-2
+  "customer can see a seller declined" rule, so this is polish. Surfacing it on the
+  card would need a small additive flag/aggregate on `orders_customer_facing` (e.g.
+  `has_rejected_seller` / aggregated `refund_owed`) + client rendering; **replica-verify
+  if pursued.** Deferred by decision on 2026-07-12.
+
+---
+
 ## 2026-07-12 — `20260728_orders_byamount_reinstate` — ✅ APPLIED (server)
 
 Re-enables the **byAmount** ("buy N riyals worth") purchase path under the price-
