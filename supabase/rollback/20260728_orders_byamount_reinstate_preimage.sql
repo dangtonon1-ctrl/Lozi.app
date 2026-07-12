@@ -1,0 +1,147 @@
+-- ============================================================================
+-- ROLLBACK PRE-IMAGE for 20260728_orders_byamount_reinstate.sql
+--
+-- This is the VERBATIM body of public.lozi_orders_enforce_delivery_fee() as it
+-- was deployed live (project niloddwnllhsvrmuxfxw) immediately BEFORE the byAmount
+-- reinstatement -- i.e. the 20260727_orders_price_integrity version
+-- (md5(pg_get_functiondef(...)) = 6d04b08eee94abe48b85e5e7ca6b0309). Re-running
+-- this file restores the exact prior behavior: every uuid catalog item is treated
+-- as unit-priced (price := products.price, q untouched), so any byAmount line
+-- reverts to being corrupted -- which is why the client byAmount UI stays gated
+-- until this pre-image is NOT in effect. Roll back the CLIENT cutover in lockstep.
+--
+-- To roll back: run this file. Single CREATE OR REPLACE on one function; the
+-- trigger binding (trg_orders_enforce_delivery_fee) is unchanged. No data modified.
+-- ============================================================================
+
+create or replace function public.lozi_orders_enforce_delivery_fee()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_count       int;
+  v_subtotal    numeric;
+  v_wholesale   boolean;
+  v_only_seller uuid;
+  v_free_min    numeric;
+  v_fee         int;
+begin
+  -- Admins are trusted (wholesale quotes, corrections via the admin panel).
+  if public.is_admin() then
+    return NEW;
+  end if;
+
+  -- Non-admin UPDATE: pin fee, line items AND total to the stored values. Sellers
+  -- may advance status etc., but can never move the price, the items, or the total
+  -- (and any prior admin override survives).
+  if TG_OP = 'UPDATE' then
+    NEW.delivery_fee := OLD.delivery_fee;
+    NEW.items        := OLD.items;
+    NEW.total        := OLD.total;
+    return NEW;
+  end if;
+
+  -- ---- Non-admin INSERT (customer checkout) --------------------------------
+
+  -- (c) Reject if any catalog (uuid) line item references a product that is
+  -- missing, hidden, or has no price. Non-uuid items (RFQ 'rfq-...') are exempt.
+  if exists (
+    select 1
+    from jsonb_array_elements(coalesce(NEW.items, '[]'::jsonb)) it
+    where (it->>'p') ~ '^[0-9a-fA-F-]{36}$'
+      and not exists (
+        select 1 from public.products p
+        where p.id = (it->>'p')::uuid
+          and p.status = 'available'
+          and p.price is not null
+      )
+  ) then
+    raise exception
+      'PRICE_INTEGRITY: order contains an item whose product is missing or unavailable'
+      using errcode = '23514';
+  end if;
+
+  -- (a)(b) Derive prices from the products table: overwrite each catalog item's
+  -- price with the authoritative products.price. Non-uuid (RFQ) items untouched.
+  -- Order is preserved via WITH ORDINALITY.
+  select jsonb_agg(
+           case
+             when (elem.it->>'p') ~ '^[0-9a-fA-F-]{36}$'
+               then jsonb_set(
+                      elem.it,
+                      '{price}',
+                      to_jsonb((select p.price
+                                  from public.products p
+                                 where p.id = (elem.it->>'p')::uuid))
+                    )
+             else elem.it
+           end
+           order by elem.ord
+         )
+    into NEW.items
+    from jsonb_array_elements(coalesce(NEW.items, '[]'::jsonb))
+         with ordinality as elem(it, ord);
+
+  -- From here on NEW.items carries authoritative prices. Recompute fee/total from
+  -- the corrected line items. Seller resolution mirrors sync_order_seller_groups().
+  with items as (
+    select
+      coalesce(
+        case when (it->>'p') ~ '^[0-9a-fA-F-]{36}$'
+             then (select p.vendor_id from public.products p where p.id = (it->>'p')::uuid) end,
+        NEW.seller_vendor_id
+      ) as sid,
+      coalesce((it->>'price')::numeric, 0) * coalesce((it->>'q')::numeric, 0) as line,
+      (it->>'p') as pid
+    from jsonb_array_elements(coalesce(NEW.items, '[]'::jsonb)) it
+  )
+  select
+    count(distinct sid) filter (where sid is not null),
+    coalesce(sum(line), 0),
+    coalesce(bool_or(
+      pid ~ '^[0-9a-fA-F-]{36}$'
+      and exists (
+        select 1 from public.products p
+        where p.id = pid::uuid and lower(coalesce(p.category, '')) = 'wholesale'
+      )
+    ), false),
+    (array_agg(distinct sid) filter (where sid is not null))[1]
+  into v_count, v_subtotal, v_wholesale, v_only_seller
+  from items;
+
+  v_count := coalesce(v_count, 0);
+
+  -- Wholesale: delivery is quoted by an admin later, never by the formula or client.
+  if coalesce(v_wholesale, false) then
+    NEW.delivery_fee := null;
+    NEW.total := round(v_subtotal)::int;
+    return NEW;
+  end if;
+
+  -- Retail: authoritative fee from the real distinct-seller count.
+  v_fee := public.lozi_delivery_fee(v_count);
+
+  -- Seller free-delivery promotion (single-seller orders only). Shape mirrors the
+  -- client: stores.offers -> freeDelivery -> min.
+  if v_count = 1 and v_only_seller is not null then
+    select nullif(s.offers #>> '{freeDelivery,min}', '')::numeric
+      into v_free_min
+      from public.stores s
+     where s.vendor_id = v_only_seller
+     limit 1;
+    if v_free_min is not null and v_subtotal >= v_free_min then
+      v_fee := 0;
+    end if;
+  end if;
+
+  NEW.delivery_fee := v_fee;
+  NEW.total := round(v_subtotal)::int + v_fee;
+
+  return NEW;
+end;
+$function$;
+
+comment on function public.lozi_orders_enforce_delivery_fee() is
+  'BEFORE INSERT/UPDATE on orders. Non-admin INSERT: rejects items whose product is missing/hidden/priceless, overwrites each catalog item''s price with products.price (RFQ non-uuid items exempt), then recomputes delivery_fee and total from the corrected line items. Non-admin UPDATE: pins items/total/fee to OLD. Admins bypass. Keep the fee formula in sync with the client (app.shop.js).';

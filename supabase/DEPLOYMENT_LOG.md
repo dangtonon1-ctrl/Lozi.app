@@ -85,9 +85,21 @@ Applied via `apply_migration` (recorded `schema_migrations.version 2026071122504
   so no user can create one. **TODO:** re-enable only with a coordinated fix that
   stores byAmount as `{q: amount/live_price, price: live_price, amount}` and has
   the trigger recompute `q := amount/price`.
+  **UPDATE (2026-07-12):** server side written & replica-verified as
+  `20260728_orders_byamount_reinstate` (intent-only `{p, mode:'amount', amount}`;
+  trigger derives `grams := floor(amount/price*1000)`, `q := grams/1000`; quarter
+  categories only; rejects non-positive/sub-gram/non-quarter). **Not yet applied
+  to prod; client still gated** — client cutover + guard removal is the next phase.
 - **RFQ price cross-check.** Non-uuid `rfq-*` items pass through untouched today.
   **TODO (phase 2):** validate their price against `rfq_offer_items` for the
   accepted offer (`offer_item_id` is embedded in the `rfq-<uuid>` id).
+- **Unify product price semantics (byAmount beyond quarter cats).** byAmount is
+  scoped to almond/raisin/savings because only there is `products.price`
+  guaranteed per-kilogram (weight basis 1 kg). The schema already carries unused
+  `price_per_kg` + `min_order_grams` columns; populate/use them (seller form +
+  `20260728`-style trigger derivation) so byAmount can safely extend to packaged
+  retail/vip products. The live retail product with `data.weight='500'`
+  (per-kg ≠ `price`) is the known offender that this would fix. **Not implemented.**
 
 ---
 
