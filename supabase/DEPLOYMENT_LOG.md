@@ -6,6 +6,65 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-12 — `20260731_orders_seller_facing_failopen_items` — ⏳ REPLICA-VERIFIED, APPLY PENDING APPROVAL (server, Phase B fix)
+
+Fixes the deleted-product edge in `20260730`. That migration filtered `items` to the
+caller's own lines but, when a line's product could not be resolved, fell back to the
+order's primary `seller_vendor_id`. On a multi-seller order that mis-handles a deleted
+product: if a SECONDARY seller's product row is deleted, their line resolves to NULL →
+falls back to the primary → the line **vanishes from its true owner** (who must still
+fulfil it) and **leaks onto the primary**. Verified live (rolled-back): deleting seller
+`9d52fae2`'s product on `983057` gave `9d52` → **0** items, primary `66563` → **6**.
+
+### What it changes (one-token fix)
+
+The `items` filter predicate `coalesce(resolved_vendor, o.seller_vendor_id) = auth.uid()`
+becomes `coalesce(resolved_vendor, auth.uid()) = auth.uid()` — the fallback for an
+**unresolvable** line changes from the primary to the caller, i.e. it **fails OPEN**:
+
+- resolvable & mine → keep (isolated, unchanged);
+- resolvable & another's → drop (isolated, unchanged);
+- **unresolvable (deleted product / non-uuid RFQ `p`) → keep for EVERY seller** on the
+  order, so an orphaned line never disappears from the seller who must fulfil it.
+
+In-place `CREATE OR REPLACE` (items expression only); `is_admin()` / NULL items pass
+through; grants preserved.
+
+### Replica verification (as `authenticated`, rolled-back on live prod data)
+
+- **Byte-identical to live `20260730` on current data:** with no products deleted every
+  line resolves, so the fallback is never used — **0 rows changed** across all of a
+  seller's orders (single- and multi-seller), and single-seller items unchanged.
+- **Deleted-product fail-open** (delete `9d52fae2`'s product `55fcc075` on `983057`):
+  the orphaned line now appears for its true owner **and** the other sellers, vanishing
+  from no one — `9d52` → 1 (own orphan), `9dfa` → 2 (own + orphan), `66563` → 6
+  (own 5 + orphan), admin → 7. Resolvable lines stay isolated (`9dfa` keeps its own,
+  `66563` its 5).
+- **Prod untouched by the tests:** live view md5 stayed `748ba6bb79b34b83fd25208e6092d90c`
+  throughout; test product restored on rollback.
+
+**Trade-off (accepted):** an unresolvable line is over-shown to the order's other
+sellers — but only orphaned/RFQ lines, only on multi-seller orders.
+
+Pre-image at `supabase/rollback/20260731_orders_seller_facing_failopen_items_preimage.sql`.
+**Not yet applied — awaiting explicit approval (standing rule: every prod apply stops
+for approval first).** Live apply evidence will be appended here on apply.
+
+### DEFERRED hardening (approved, NOT in this change) — per-item `vendor_id` snapshot
+
+The precise alternative to fail-open: stamp each order line's `vendor_id` (authoritatively
+from `products.vendor_id`) onto `orders.items` **at order creation**, inside the existing
+price-integrity trigger `lozi_orders_enforce_delivery_fee` (adding a `v` field to both
+uuid branches — the byAmount `jsonb_build_object` rebuild and the normal-item `jsonb_set`
+patch), plus a one-time backfill of existing orders. The view would then resolve each line
+by its stamped `v`, so attribution survives product deletion exactly. Deferred because it
+touches the **order-creation money-chain trigger** and cannot reliably backfill lines whose
+product is **already** deleted (that mapping is unrecoverable). It is a companion to the
+existing "unify product price semantics" backlog item under `20260727` — both touch the
+order-creation path and should ship together with coordinated replica verification.
+
+---
+
 ## 2026-07-12 — `20260730_orders_seller_facing_own_items` — ✅ APPLIED (server, Phase B)
 
 Unified-cart **Step 2c — Phase B (server half)**. The Phase-B client cutover drops the
