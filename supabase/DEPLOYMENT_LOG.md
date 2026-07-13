@@ -6,6 +6,95 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-13 — `20260734_products_realtime_publication` — ✅ APPLIED (server, Realtime Phase 2 — Step 2a server enablement)
+
+Realtime **Phase 2** (products / offers / savings) — **server enablement only**.
+Adds `public.products` to the `supabase_realtime` publication so Postgres emits
+change events for it, and strips `anon`'s latent **write** DML on the table.
+**anon SELECT is deliberately KEPT** — visitor browsing stays open (anon must keep
+reading products). One table covers all three Phase-2 surfaces: the product feed,
+the "offers/العروض" flags (`limited_offer_enabled` / `limited_offer_ends_at`
+columns) and the customer "savings/التوفير" section (`category='savings'`) are all
+rows of `public.products`. (`savings_products` is unused by the client;
+`product_sold_counts` is a VIEW over `orders` and cannot be published — neither is
+touched.) **Client untouched** — no live behavior changes until the 2a client
+increment ships. Rollback pre-image at
+`supabase/rollback/20260734_products_realtime_publication.sql`.
+
+### What it changes
+
+- **(1)** guarded `alter publication supabase_realtime add table public.products`
+  (idempotent `pg_publication_tables` existence check). This is the ENTIRE server
+  requirement: no schema change, **no REPLICA IDENTITY change**, no new RLS policy,
+  no new grant. The client subscribes to INSERT + UPDATE only (never `'*'`) and
+  re-fetches the product list on each event (never reads the payload), so the
+  default (primary-key) replica identity authorizes each subscriber against the NEW
+  record via the existing SELECT policies. DELETE is intentionally excluded
+  (Realtime does not apply RLS to DELETE); a hard `DELETE` therefore does not
+  propagate live — **accepted by decision** (it clears on the next natural reload;
+  the price-integrity trigger already blocks ordering a missing product). The common
+  "hide from storefront" action is a soft-hide UPDATE (`status='hidden'`), which
+  DOES propagate.
+- **(2)** `revoke insert, update, delete on public.products from anon` — removes
+  latent write surface (mirrors the `20260726` treatment of `order_seller_groups`).
+  RLS already denied anon writes (`own_products` / `products_*_own` require
+  `auth.uid()=vendor_id`; the admin policies require `is_admin()`), so no legitimate
+  path changes. **anon SELECT NOT revoked.** `authenticated` grants untouched
+  (Realtime evaluates RLS against the base table and needs `authenticated` to hold a
+  direct SELECT grant — confirmed still present).
+
+**RLS posture — DECISION "A" (unchanged):** the two permissive SELECT policies OR
+together — `read_products (status='available')` and `products_select_all (USING
+true, PUBLIC)` — so every product row stays SELECT-authorized. This is what makes
+the soft-hide pattern work over Realtime: the `status→'hidden'` UPDATE is delivered,
+the client re-fetches, `rowToProduct` sets `active=false` and the card drops. The
+flip side (`products_select_all` also makes hidden rows + all columns anon-readable —
+already true via REST today, NOT introduced here) is left UNCHANGED and tracked as a
+SEPARATE future hardening ticket.
+
+### Replica verification (rolled-back txn on live prod data — real RLS, as anon AND authenticated)
+
+Forward migration applied inside a `BEGIN … ROLLBACK`, then probed per role:
+
+- **publication:** `products_in_publication` = **yes** (after apply, inside the txn).
+- **grant layer (`has_table_privilege`):** anon SELECT **true**; anon
+  INSERT/UPDATE/DELETE **false**; authenticated SELECT/INSERT/UPDATE/DELETE **all
+  true** (unchanged).
+- **actual attempts under `set local role`:** as **anon** → `select` **SUCCEEDED
+  (rows=30)**, `insert`/`update`/`delete` all **rejected** (`permission denied for
+  table products`); as **authenticated** → `select` **SUCCEEDED (rows=30)**.
+- **rollback confirmed clean:** post-rollback live re-check equalled the pre-apply
+  baseline (`products_in_publication`=no, anon SELECT & INSERT grants both true) —
+  nothing persisted.
+
+### Live apply evidence (prod `niloddwnllhsvrmuxfxw`)
+
+Applied via `apply_migration` (recorded `schema_migrations.version 20260713074052`).
+
+- **Publication membership (public schema):**
+  - **Before:** `chat_flag_alerts, conversations, messages, notifications, order_seller_groups, orders, rfq_flag_alerts`
+  - **After:**  `chat_flag_alerts, conversations, messages, notifications, order_seller_groups, orders, products, rfq_flag_alerts`
+- **`anon` grants on `public.products`:**
+  - **Before:** `SELECT, INSERT, UPDATE, DELETE`
+  - **After:**  `SELECT` (INSERT/UPDATE/DELETE revoked; **SELECT retained**)
+- **`authenticated` grants on `public.products`:** `SELECT, INSERT, UPDATE, DELETE`
+  — **unchanged** (Realtime SELECT authz requirement satisfied).
+- **Security advisor:** **55 → 55**, delta **0** (none added, none removed).
+- **No data touched** (publication + grant DDL only).
+
+### Client increments (pending — separate commits, this feature branch)
+
+- **2a products feed:** an app-level `products-feed` channel in the root `App`
+  (`INSERT`+`UPDATE`, 350 ms-debounced re-fetch → `setDbProducts`,
+  `visibilitychange` reconnect, `try/catch` silent degrade). Product cards and the
+  product-detail page (both derived from the live list) refresh with no manual
+  reload.
+- **2b prices** (re-run the cart reconcile on live product-list changes; the server
+  price-rewrite trigger stays the authoritative safety net) and **2c offers/savings**
+  (verify they refresh under the same 2a channel) land as their own commits.
+
+---
+
 ## 2026-07-13 — `20260733_drop_orders_commission_sync_ins` — ✅ APPLIED (server, Step 6 cleanup 2/2)
 
 Drops the dormant `AFTER INSERT` commission hook `trg_orders_commission_sync_ins`
