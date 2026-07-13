@@ -6,6 +6,109 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-13 — `20260735_orders_rfq_price_crosscheck` — ✅ APPLIED (server, price-integrity Phase 2 — RFQ)
+
+Closes the **"RFQ price cross-check"** item DEFERRED under `20260727`. The price-
+integrity shield (`20260727`/`20260728`) validates and rewrites only **catalog
+(uuid)** line items — every rule is gated on `(p ~ '^[0-9a-fA-F-]{36}$')`. An RFQ
+line carries a **non-uuid** id, `rfq-<offer_item_id>` (client `app.main.js
+acceptRfqOffer` → `addToCart({id:"rfq-"+it.offer_item_id, price:oi.price …})` →
+the **normal checkout INSERT**), so it SKIPPED the missing-product reject AND the
+price overwrite. Its price and quantity were taken at **face value** and flowed
+straight into `orders.total`, `order_seller_groups.subtotal_amount`, the
+per-seller commission base and the seller's cumulative-sales counter. Because
+"RFQ" is nothing but the item **shape**, ANY authenticated customer could forge a
+normal checkout INSERT with `items:[{p:"rfq-<anything>", q, price}]` and ride the
+exemption — the same tamper the catalog shield blocks, through the one door it
+left open.
+
+### What it changes (single `CREATE OR REPLACE`, one function — non-admin INSERT branch)
+
+- **(1) Structural reject.** Every **non-catalog** line must be a valid,
+  buyer-accepted RFQ line: `p` matches `rfq-<uuid>`; the `rfq_offer_items` row
+  exists; its `rfq_offers` row is `status='accepted'`; that offer's request
+  `buyer_id` equals the order's `customer_id`; that offer's `seller_id` equals the
+  order's `seller_vendor_id`; and `q` is positive and `<= available_quantity`.
+  Anything else — a bogus/foreign/unaccepted offer id, wrong buyer or seller, an
+  over-quantity, **or any other non-uuid `p`** (residual bypass) — is REJECTED
+  (`errcode 23514`), mirroring the catalog missing-product reject.
+- **(2) Price rewrite.** Each rfq line's `price` is overwritten authoritatively
+  from `rfq_offer_items.price` inside the SAME `jsonb_agg` normalization that
+  rewrites catalog prices from `products.price` — "server price wins, silently"
+  (`20260727` rule (b)). A **no-op for an honest order** (the client already sends
+  the offer price); a tampered price is corrected. The subtotal/fee/total recompute
+  is unchanged and now runs on corrected inputs (RFQ keeps its present retail-fee
+  treatment — rfq lines resolve to `seller_vendor_id`, `v_wholesale` stays false).
+- **Preserved verbatim:** admin (`is_admin()`) bypass — admins may still create/
+  correct RFQ or wholesale orders with custom prices; non-admin UPDATE pinning;
+  the catalog missing/hidden/priceless reject; byAmount D1/D2; the wholesale branch;
+  the retail fee formula + free-delivery promotion.
+- **Cast hardening (bug found during verification).** The existing `(p)::uuid`
+  casts are guarded only by an *adjacent* regex; Postgres evaluated the cast
+  **eagerly** in some plans (a standalone probe errored on `rfq-…`). The live
+  trigger short-circuits today, but adding the `roi` join to the normalization
+  could destabilize it. Every uuid cast in the blocks this migration touches (the
+  new reject block + the extended normalization, **both** the `roi` and the catalog
+  `pr` join) is now **`CASE`-guarded on a STRICT uuid regex**, so a malformed rfq id
+  fails **closed** as a clean reject, never a raw cast error. Behaviour is identical
+  to the pre-image for every well-formed line.
+
+Non-RFQ note: rfq line prices are normalized to the source type `numeric(14,2)`
+(e.g. `255` → `255.00`) — jsonb-equal, `255*22 = 5610` unchanged, no client/monetary
+impact (same as the catalog shield writing `products.price`). Pre-image at
+`supabase/rollback/20260735_orders_rfq_price_crosscheck_preimage.sql`
+(restores `md5 64c79140f968d4e4867c267e0d8fd48e`). No data modified (INSERT-time
+logic only; settled orders frozen by the UPDATE pin).
+
+### Investigation of existing prod data (before apply)
+
+- **3 RFQ orders** exist (`632952`, `758868`, `924379`), all `delivered`,
+  single-line/single-seller. **All already match their accepted offers exactly** —
+  price (255/255, 666/666, 33/33), qty (22≤22, 9≤9, 6≤6), `status='accepted'`,
+  buyer & seller both match. No tampering, no legacy drift.
+- **Whole-table line inventory:** 35 catalog-uuid lines + 3 valid `rfq-<uuid>`
+  lines, **zero** junk/other non-uuid lines. So this migration rejects nothing that
+  exists and needs **no backfill**.
+
+### Replica verification (read-only against real prod data, then a rolled-back live smoke — all non-persisting)
+
+- **Reject truth table, 11/11** over crafted payloads built from real buyer/seller/
+  offer fixtures: honest & tamper-price-low → allow; over-qty(23>22), zero-qty,
+  junk-uuid, malformed `rfq-junk`, foreign-buyer, foreign-seller, unaccepted-pending,
+  other-non-uuid → all **reject**; catalog-uuid → ignored by the block. Price rewrite:
+  tampered `price:1` → `255.00`.
+- **Byte-identity replay on all 3 live RFQ orders:** `would_reject=false`, normalized
+  `items` jsonb-equal to stored (`=` true); total unchanged.
+- **Live rolled-back smoke** (new fn installed inside a `DO` block that `RAISE`s to
+  force full rollback; inserts run as the real `authenticated` buyer
+  `82e0811f…`, `is_admin=false`): **T1 tamper (price 1)** → `stored_price=255.00`,
+  `total=6610`, `fee=1000`, and the AFTER-trigger `order_seller_groups.subtotal=5610.00`
+  (make_groups/sync integration confirmed); **T2 over-qty / T3 junk-uuid / T4
+  unaccepted-pending / T5 other-non-uuid** → all rejected (PRICE_INTEGRITY); **T6
+  fully honest (255)** → `total=6610`. Post-smoke: `orders` 22, residue **0**, live fn
+  still `64c79140…` (nothing persisted).
+
+### Live apply evidence (prod `niloddwnllhsvrmuxfxw`)
+
+Applied via `apply_migration` (recorded `schema_migrations.version 20260713124240`).
+
+- **Function switched.** `md5(pg_get_functiondef(...))` `64c79140f968d4e4867c267e0d8fd48e`
+  → **`01ee2d20af222de879ac0efd200922e6`**. Trigger `trg_orders_enforce_delivery_fee`
+  still bound & enabled.
+- **Security advisor:** **55 → 55, delta 0** (no lint added/removed; the function is
+  not flagged — pure `CREATE OR REPLACE`, no new function/grant/RLS/table).
+- **No data touched.** `orders` row count 22 before and after; smoke residue 0; the 3
+  existing RFQ orders unchanged.
+
+### Client cutover
+
+**None required.** The client already sends the accepted-offer price; the server is
+now the authoritative check. The RFQ checkout continues to use the normal
+single-vendor checkout INSERT — it simply can no longer carry a tampered or
+unaccepted rfq line.
+
+---
+
 ## 2026-07-13 — `20260734_products_realtime_publication` — ✅ APPLIED (server, Realtime Phase 2 — Step 2a server enablement)
 
 Realtime **Phase 2** (products / offers / savings) — **server enablement only**.
