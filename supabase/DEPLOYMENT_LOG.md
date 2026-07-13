@@ -6,6 +6,125 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-13 — `20260733_drop_orders_commission_sync_ins` — ✅ APPLIED (server, Step 6 cleanup 2/2)
+
+Drops the dormant `AFTER INSERT` commission hook `trg_orders_commission_sync_ins`
+(function `orders_commission_sync_ins()`). It charged commission only if an order
+was **inserted already** at `status='delivered'` — a path no code exercises:
+checkout (`app.main.js`, single- and multi-seller) hard-codes `status:'new'`, the
+column default is `'received'`, and admin only transitions orders via
+`admin_set_order_status()` (an UPDATE). The **real** charge is the status→delivered
+UPDATE path (`trg_orders_commission_sync` → `orders_commission_sync()` →
+`charge_commission`); all 9 delivered orders in prod were charged that way.
+
+Not merely dormant — a latent footgun. `AFTER INSERT` triggers on `orders` fire
+alphabetically (`trg_decrement_stock` → `trg_orders_commission_sync_ins` →
+`trg_orders_make_groups`), so since Step 4 (`20260724`, where `charge_commission`
+loops `order_seller_groups`) an insert-as-delivered would run this hook **before**
+the groups exist → charge nothing **and** leave `commission_state` NULL, with no
+later UPDATE to re-trigger (silent under-charge). It provides no safety and hides a
+trap. Pre-image at
+`supabase/rollback/20260733_drop_orders_commission_sync_ins_preimage.sql`
+(re-creation is one function + one trigger). No data modified.
+
+### Replica verification (as `authenticated` where relevant, each in `BEGIN … ROLLBACK` on live prod data)
+
+- **`pg_depend`:** the only dependant of `orders_commission_sync_ins()` is its own
+  trigger `trg_orders_commission_sync_ins` — nothing else references it.
+- **Surviving triggers** (after a rolled-back DROP): `trg_decrement_stock`,
+  `trg_orders_commission_sync` (the UPDATE charge path), `trg_orders_make_groups`,
+  `trg_orders_enforce_delivery_fee` — all intact.
+- **Charge-exactly-once via the UPDATE path** (INS hook dropped, order `266621`
+  `new`→`delivered`): `commission_state` null→`charged`, `commission_amount`
+  **832.50**, exactly **1** group charged, seller retail counter **+50000.00**;
+  re-invoking `charge_commission` is a guarded no-op (amount unchanged) —
+  `idempotent_no_double_charge = true`. Rolled back.
+
+### Live apply evidence (prod `niloddwnllhsvrmuxfxw`)
+
+Applied via `apply_migration` (recorded `schema_migrations.version 20260713071150`).
+
+- **Pre-apply guard.** `trg_orders_commission_sync_ins` confirmed still present.
+- **After apply.** `ins_trigger_still_present = false`, `orders_commission_sync_ins`
+  function count = **0**; surviving triggers on `orders` = `trg_decrement_stock`
+  [AFTER INS], `trg_orders_commission_sync` [AFTER UPD], `trg_orders_enforce_delivery_fee`
+  [BEFORE INS UPD], `trg_orders_make_groups` [AFTER INS].
+- **No data touched** (DDL only; the money chain's UPDATE charge path is unchanged).
+
+---
+
+## 2026-07-13 — `20260732_has_purchased_from_group_based` — ✅ APPLIED (server, Step 6 cleanup 1/2)
+
+Rewrites review-eligibility `has_purchased_from(uuid)` from the single
+`orders.seller_vendor_id` rule to a **group-based UNION rule**. A unified retail
+order stores ONE `seller_vendor_id` (the primary) but the real per-seller
+relationship lives in `order_seller_groups`, so a customer who bought from N
+sellers in one order could review only the primary (and could wrongly review the
+primary when the primary's slice was rejected while the order still delivered via
+others). Client half (its own commit): `app.catalog.js` `canReview` now calls
+`rpc('has_purchased_from', {p_vendor})` so the "write a review" button shares one
+source of truth with the `reviews_insert_own` RLS `WITH CHECK` (the function's
+**only** DB reference).
+
+### The rule (UNION) and why `orders.status` is authoritative for "delivered"
+
+The customer may review seller S iff they own a **non-rejected**
+`order_seller_groups` row for S whose order reached them:
+`g.seller_id = p_vendor` AND `g.seller_decision IS DISTINCT FROM 'rejected'` AND
+`g.fulfillment_status <> 'rejected_at_hub'` AND
+(`o.status IN ('delivered','done')` **OR** `g.fulfillment_status='delivered_to_customer'`).
+
+`orders.status` (set by `admin_set_order_status()`, the customer lifecycle) is the
+authoritative "delivered to customer" signal — today's rule already uses it — while
+a group's `delivered_to_customer` (set by a **separate** admin action, `admin.js`)
+can lag. **Known drift example (no reconciliation performed):** live order `830586`
+is `status='delivered'` with its group still `out_for_delivery`/`pending`; the
+UNION rule covers this via the `orders.status` branch, whereas a strict
+`delivered_to_customer`-only rule would have regressed it. The
+`delivered_to_customer` OR-branch is defensive/forward-compat (currently redundant,
+since every such group sits in a delivered order).
+
+Single in-place `CREATE OR REPLACE` (same signature / STABLE / SECURITY DEFINER /
+search_path) → ACL preserved (`authenticated`=EXECUTE, `anon`=none). The only
+reference is the `reviews_insert_own` `WITH CHECK` on INSERT, so redefining the
+function **cannot orphan or re-validate any existing review** (verified: the 3
+existing reviews are unaffected; one was already invalid under both old and new
+rules, pre-existing). Pre-image at
+`supabase/rollback/20260732_has_purchased_from_group_based_preimage.sql`. No data
+modified.
+
+### Replica verification (as `authenticated`, each in `BEGIN … ROLLBACK` on live prod data — real RLS)
+
+- **Backward compat, comprehensive:** OLD vs UNION vs STRICT over all **12** real
+  (customer, seller) pairs → `regressions_union = 0` (no currently-eligible pair
+  loses eligibility), `regressions_strict = 1` (strict would drop the `830586`
+  outlier — why UNION was chosen). `gap_fixed_union = 0` on today's data is
+  expected (every delivered order is single-seller; the multi-seller fix is
+  forward-looking).
+- **Named cases:** A eligible `5c821a81→9d52fae2` old/union/strict = **T/T/T**;
+  **B outlier `d64fe722→66563bfb` = T/T/F** (UNION keeps it, STRICT drops it);
+  C ineligible `d64fe722→9dfa8c65` = **F/F/F**.
+- **Synthetic multi-seller (as the customer under RLS):** one delivered order, three
+  groups — A `delivered_to_customer`/accepted → old **T**, union **T**; B
+  `out_for_delivery`/accepted → old **F** (the gap) → union **T** (fixed); C
+  `pending_hub_delivery`/rejected → old **F**, union **F** (correctly denied). Two
+  non-rejected sellers allowed, the rejected one denied. Rolled back.
+
+### Live apply evidence (prod `niloddwnllhsvrmuxfxw`)
+
+Applied via `apply_migration` (recorded `schema_migrations.version 20260713071112`).
+
+- **Pre-apply guard.** Live `md5(pg_get_functiondef(...))` =
+  `91f4972b7d6ab1a882bfbad199d4200b` (the seller_vendor_id body — not drifted).
+- **Function switched.** After apply → `d03df0e21481aa838efe27cf63fbde07`;
+  `authenticated` retains EXECUTE, `anon` still has none.
+- **Live smoke (rolled back, as `authenticated`).** Eligible pair
+  `5c821a81→9d52fae2` → **true**; ineligible pair `d64fe722→9dfa8c65` → **false**.
+- **No data touched** (function-only; all test rows rolled back — reviews 3 /
+  orders 22 / groups 29 unchanged).
+
+---
+
 ## 2026-07-12 — `20260731_orders_seller_facing_failopen_items` — ✅ APPLIED (server, Phase B fix)
 
 Fixes the deleted-product edge in `20260730`. That migration filtered `items` to the
