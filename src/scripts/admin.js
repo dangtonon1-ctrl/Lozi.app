@@ -319,6 +319,13 @@ function SettingsTab() {
   const [hubAddr, setHubAddr] = useState('');
   const [haMsg, setHaMsg] = useState('');
   const [haUpdated, setHaUpdated] = useState(null);
+  const [ocMsg, setOcMsg] = useState('');
+  const resetOrderCounter = async () => {
+    if (!confirm('تصفير عدّاد أرقام الطلبات؟\n\nللاختبار فقط — قد تتكرر الأرقام إن لم تُمسح الطلبات القديمة.\nسيبدأ الطلب التالي من #1.')) return;
+    const { error } = await SB.rpc('admin_reset_order_no_counter');
+    setOcMsg(error ? 'خطأ: ' + error.message : 'تم تصفير العدّاد ✓ · الطلب التالي #1 · 🕒 ' + nowStamp());
+    setTimeout(() => setOcMsg(''), 4000);
+  };
   useEffect(() => {
     SB.from('settings').select('value,updated_at').eq('key', 'support_wa').maybeSingle().then(({ data }) => { if (data) { setWa(data.value || ''); setWaUpdated(data.updated_at || null); } });
     SB.from('settings').select('value,updated_at').eq('key', 'retail_bundle_limit').maybeSingle().then(({ data }) => { if (data && data.value != null && data.value !== '') { setBundleLimit(String(data.value)); setBlUpdated(data.updated_at || null); } });
@@ -403,6 +410,12 @@ function SettingsTab() {
         </div>
         {rlUpdated && <Stamp at={rlUpdated} label="آخر تحديث" />}
         {rlMsg && <div className={rlMsg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{rlMsg}</div>}
+      </div>
+      <div className="card">
+        <div className="secttl">تصفير عدّاد الطلبات (اختبار فقط)</div>
+        <div className="kv" style={{ marginBottom: 8, color: 'var(--muted)' }}>يُعيد ترقيم الطلبات ليبدأ التالي من <b>#1</b>. <b>للاختبار فقط</b> — قد تتكرر الأرقام إن لم تُمسح الطلبات القديمة.</div>
+        <button className="btn sm ghost" onClick={resetOrderCounter}>تصفير عدّاد الطلبات</button>
+        {ocMsg && <div className={ocMsg.indexOf('خطأ') === 0 ? 'err' : 'ok'}>{ocMsg}</div>}
       </div>
     </div>
   );
