@@ -6,6 +6,46 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-17 — `20260737_products_weight_grams` — ✅ APPLIED (M2 — retail-by-kg fee overhaul, step 2 of 4)
+
+Adds `products.weight_grams integer` as the numeric source of truth for retail
+weight, replacing the free-text `data.weight` parsed by `weightKg()`
+(`app.shop.js`). Nullable, `CHECK (weight_grams IS NULL OR weight_grams > 0)`.
+Read by the M3 weight-fee layer and M4 byAmount derivation. `data.weight` is left
+untouched as the display/audit string.
+
+### Backfill (Qaari-approved)
+
+- **Clean sold-by-kg retail → 1000:** the 18 rows whose `data.weight.ar` matches
+  `^\s*1\s*(كيلو|كجم|كغ|kg)?\s*$` (i.e. `"1"` / `"1 كيلو"`).
+- **Two live mis-parses kept visible → 1000:** `e9b734f3` لوززز ذماري (was `"500"`
+  ⇒ the 500 kg bug), `1594de4a` تجربة تجزئة (bundle `"عرض مشكّل"`).
+- **Four junk test rows hidden** (weight_grams left NULL): `e17b23b7` `"و"`,
+  `378c34e3` `"ف"`, `72fabeb0` `"حبة البركة"`, `72757f62` `"غ"`.
+- **Wholesale left NULL** (admin-quoted delivery, no weight_fee; M4 hard-rejects
+  wholesale byAmount — no consumer in M1–M4).
+
+`price`=per-kg invariant: every backfilled row is a 1 kg basis, so the stored
+`price` already equals price-per-kg — **no price data changed**. Input-time kg
+enforcement is the seller form, deferred to RN Phase 2.
+
+### Evidence (live, post-apply)
+
+| category | wg=1000 | wg=NULL | total |
+|---|---|---|---|
+| retail | 20 | 2 (hidden junk) | 22 |
+| wholesale | 0 | 5 | 5 |
+
+The 6 formerly-mis-parsing rows verified: #1/#2 → 1000 & visible; #3–#6 → NULL &
+hidden. Pre-apply read-only check: clean regex matched exactly 18 rows, 0 of the 6.
+
+### Rollback
+
+`supabase/rollback/20260737_products_weight_grams_preimage.sql` un-hides the four
+rows and drops the constraint + column (roll back M3/M4 first if applied).
+
+---
+
 ## 2026-07-17 — `20260736_delivery_store_fee_params` — ✅ APPLIED (M1 — retail-by-kg fee overhaul, step 1 of 4)
 
 Bumps the two tunable constants of the authoritative store-fee helper
