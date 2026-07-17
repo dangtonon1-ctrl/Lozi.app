@@ -6,6 +6,58 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-17 — `20260739_byamount_retail_expansion` — ✅ APPLIED (M4 — retail-by-kg fee overhaul, step 4 of 4)
+
+Expands byAmount (buy-by-money-amount) from the quarter categories
+(almond/raisin/savings) to ALL consumer sold-by-kg products, adds a per-product
+opt-out, and syncs the client in lockstep.
+
+### Server (`20260739`)
+
+- New column `products.allow_byamount boolean NOT NULL DEFAULT true`.
+- byAmount D1 gate in `lozi_orders_enforce_delivery_fee()` changed from
+  `category in (almond,raisin,savings)` to:
+  ```
+  is_consumer (category <> 'wholesale')
+    AND weight_grams = 1000        -- sold-by-kg 1 kg basis (M2); excludes fixed packs & NULL
+    AND NOT (data->>'bundle')      -- excludes fixed assorted bundles
+    AND allow_byamount             -- per-product opt-out
+  ```
+  Wholesale + RFQ (non-uuid) hard-rejected structurally; D2 (amount>0, price>0,
+  buys ≥1 gram) unchanged. byAmount grams derivation `floor(amount/price*1000)`
+  unchanged — stays in lockstep with the client.
+
+### Client (lockstep, deploys on merge)
+
+- `rowToProduct` (app.main.js) exposes `weight_grams` + `allow_byamount`.
+- Product page (app.shop.js) reads `p.weight_grams` instead of `weightKg()` (the
+  free-text parser is now unused).
+- Customer byAmount gate mirrors the server predicate.
+- Weight-fee DISPLAY stays store-fee-only (accepted RN Phase 2 gap); seller-form
+  toggle + kg-enforcement UI deferred to RN Phase 2.
+
+### Pre-M4 confirmation (as required)
+
+Continuous-weight vs fixed-pack is represented today **only** by `data.bundle=true`
+(assorted offer; `data.unit` unused). After M2, `weight_grams=1000` is the numeric
+sold-by-kg signal. The gate excludes fixed packs (`bundle` OR `weight_grams<>1000`)
+and all wholesale (structural). ✅
+
+### Evidence (live, post-apply)
+
+`allow_byamount` present, default `true`, 0 non-true rows. Gate verified as M4 (new
+predicates present, old almond/raisin/savings scope gone). **18 visible retail
+products byAmount-eligible**; 5 wholesale, 1 bundle, 2 non-kg retail excluded.
+`md5(pg_get_functiondef(...)) = 3ce8be051962d69f8e8779613bbb8359`.
+
+### Rollback
+
+`supabase/rollback/20260739_byamount_retail_expansion_preimage.sql` restores the
+`20260738` function (quarter-category gate) and drops `allow_byamount`. Roll back
+the client (rowToProduct / weightKg / gate) in lockstep.
+
+---
+
 ## 2026-07-17 — `20260738_delivery_weight_fee` — ✅ APPLIED (M3 — retail-by-kg fee overhaul, step 3 of 4)
 
 Extends `public.lozi_orders_enforce_delivery_fee()` (from `20260735`) with a
