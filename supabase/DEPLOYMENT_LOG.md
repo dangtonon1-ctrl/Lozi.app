@@ -6,6 +6,64 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-17 — `20260738_delivery_weight_fee` — ✅ APPLIED (M3 — retail-by-kg fee overhaul, step 3 of 4)
+
+Extends `public.lozi_orders_enforce_delivery_fee()` (from `20260735`) with a
+per-kg weight fee on top of the M1 store fee, reading grams numerically from
+`products.weight_grams` (M2) — no more text parsing. Adds a display-only
+`orders.vehicle_type` column.
+
+### Formula (retail path)
+
+```
+store_fee    = lozi_delivery_fee(distinct_sellers)      -- M1
+free_kg      = 20 + 10*(distinct_sellers - 1)
+billable_kg  = floor( sum(grams per line) / 1000 )      -- fractional kg dropped
+weight_fee   = max(0, billable_kg - free_kg) * 30       -- UNCAPPED
+delivery_fee = store_fee + weight_fee
+vehicle_type = motorcycle if raw grams <= 50000 else truck
+```
+
+Per-line grams: catalog (uuid) line = `q * coalesce(products.weight_grams, 1000)`;
+RFQ/non-uuid line = 0. A byAmount line is a uuid line with `weight_grams=1000` and
+`q = floor(amount/price*1000)/1000`, so `q*1000` == its floor-derived grams.
+
+### Decisions (Qaari-approved)
+
+- Free-delivery promo waives the **store fee only**; weight_fee still charged.
+- NULL `weight_grams` (pre-RN-Phase-2 new product) → **1000 g** fallback.
+- `vehicle_type` in a **new `orders.vehicle_type` column** (`CHECK in
+  ('motorcycle','truck')`), set authoritatively, pinned to OLD on non-admin
+  UPDATE, NULL for wholesale.
+- RFQ/non-uuid lines → **0 grams** (preserves their store-fee-only treatment).
+
+Client NOT synced — `weight_fee` is server-only; the web `feeFor()` shows the
+store fee only (accepted RN Phase 2 gap).
+
+### Evidence (read-only, live M1 helper + M3 math)
+
+| sellers | kg | store | free_kg | billable | weight_fee | delivery | vehicle |
+|---|---|---|---|---|---|---|---|
+| 1 | 3 | 1000 | 20 | 3 | 0 | 1000 | motorcycle |
+| 1 | 25 | 1000 | 20 | 25 | 150 | 1150 | motorcycle |
+| 1 | 50 | 1000 | 20 | 50 | 900 | 1900 | motorcycle |
+| 1 | 60 | 1000 | 20 | 60 | 1200 | 2200 | truck |
+| 2 | 55 | 1300 | 30 | 55 | 750 | 2050 | truck |
+| 3 | 100 | 1600 | 40 | 100 | 1800 | 3400 | truck |
+
+Boundaries: 20th kg free (charge starts at 21), `≤50 kg` = motorcycle. Post-apply
+verified: `orders.vehicle_type` present, `CHECK ((vehicle_type IS NULL) OR
+(vehicle_type = ANY (ARRAY['motorcycle','truck'])))`, `md5(pg_get_functiondef(...))
+= 3998c0b96e59eebc4a2b4f4cd1997fd1`.
+
+### Rollback
+
+`supabase/rollback/20260738_delivery_weight_fee_preimage.sql` restores the verbatim
+`20260735` function (store-fee only) and drops `orders.vehicle_type` (roll back M4
+first if applied).
+
+---
+
 ## 2026-07-17 — `20260737_products_weight_grams` — ✅ APPLIED (M2 — retail-by-kg fee overhaul, step 2 of 4)
 
 Adds `products.weight_grams integer` as the numeric source of truth for retail
