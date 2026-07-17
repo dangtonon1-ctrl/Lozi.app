@@ -6,6 +6,48 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-17 — `20260736_delivery_store_fee_params` — ✅ APPLIED (M1 — retail-by-kg fee overhaul, step 1 of 4)
+
+Bumps the two tunable constants of the authoritative store-fee helper
+`public.lozi_delivery_fee(int)` (first defined in `20260717_delivery_fee_server_validation`):
+surcharge per extra distinct seller **250 → 300**, hard cap **2000 → 2500**. Base
+(1000) and the `store_count < 1 → 0` guard are unchanged. This helper is the
+**store-fee component only**; the `weight_fee` layer lands in M3, where the orders
+trigger will compute `delivery_fee = lozi_delivery_fee(count) + weight_fee`.
+
+### Change (single `CREATE OR REPLACE`, one function)
+
+```
+before:  least(1000 + 250 * (greatest(store_count, 1) - 1), 2000)
+after:   least(1000 + 300 * (greatest(store_count, 1) - 1), 2500)
+```
+
+### Evidence (live, post-apply via `select lozi_delivery_fee(n)`)
+
+| distinct sellers | 1 | 2 | 3 | 5 | 6 | 9 |
+|---|---|---|---|---|---|---|
+| fee (YER) | 1000 | 1300 | 1600 | 2200 | 2500 | 2500 |
+
+n=1 unchanged (1000); old capped at 2000 (n≥5), new caps at 2500 (n≥6).
+
+### Client sync (shipped in lockstep — Qaari-approved)
+
+`app.shop.js` `feeFor()` bumped `Math.min(FEE+250*(n-1),2000)` →
+`Math.min(FEE+300*(n-1),2500)` so displayed fee == charged fee for multi-seller
+carts (single-seller was already identical). **Accepted gap:** M3's `weight_fee`
+is NOT client-synced — after M3 the web client shows store-fee only (no weight
+component); full fee display is deferred to RN Phase 2.
+
+### Rollback
+
+`supabase/rollback/20260736_delivery_store_fee_params_preimage.sql` restores the
+verbatim live 250/2000 body. Roll the client `feeFor()` constant back together
+with it. Blast radius: orders `BEFORE INSERT/UPDATE` trigger + seller-group
+accept/reject recompute (`20260720`) pick up the new fee immediately; existing
+orders keep their pinned `delivery_fee`; no data modified.
+
+---
+
 ## 2026-07-13 — `20260735_orders_rfq_price_crosscheck` — ✅ APPLIED (server, price-integrity Phase 2 — RFQ)
 
 Closes the **"RFQ price cross-check"** item DEFERRED under `20260727`. The price-
