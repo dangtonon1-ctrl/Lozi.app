@@ -6,6 +6,198 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-17 — `20260739_byamount_retail_expansion` — ✅ APPLIED (M4 — retail-by-kg fee overhaul, step 4 of 4)
+
+Expands byAmount (buy-by-money-amount) from the quarter categories
+(almond/raisin/savings) to ALL consumer sold-by-kg products, adds a per-product
+opt-out, and syncs the client in lockstep.
+
+### Server (`20260739`)
+
+- New column `products.allow_byamount boolean NOT NULL DEFAULT true`.
+- byAmount D1 gate in `lozi_orders_enforce_delivery_fee()` changed from
+  `category in (almond,raisin,savings)` to:
+  ```
+  is_consumer (category <> 'wholesale')
+    AND weight_grams = 1000        -- sold-by-kg 1 kg basis (M2); excludes fixed packs & NULL
+    AND NOT (data->>'bundle')      -- excludes fixed assorted bundles
+    AND allow_byamount             -- per-product opt-out
+  ```
+  Wholesale + RFQ (non-uuid) hard-rejected structurally; D2 (amount>0, price>0,
+  buys ≥1 gram) unchanged. byAmount grams derivation `floor(amount/price*1000)`
+  unchanged — stays in lockstep with the client.
+
+### Client (lockstep, deploys on merge)
+
+- `rowToProduct` (app.main.js) exposes `weight_grams` + `allow_byamount`.
+- Product page (app.shop.js) reads `p.weight_grams` instead of `weightKg()` (the
+  free-text parser is now unused).
+- Customer byAmount gate mirrors the server predicate.
+- Weight-fee DISPLAY stays store-fee-only (accepted RN Phase 2 gap); seller-form
+  toggle + kg-enforcement UI deferred to RN Phase 2.
+
+### Pre-M4 confirmation (as required)
+
+Continuous-weight vs fixed-pack is represented today **only** by `data.bundle=true`
+(assorted offer; `data.unit` unused). After M2, `weight_grams=1000` is the numeric
+sold-by-kg signal. The gate excludes fixed packs (`bundle` OR `weight_grams<>1000`)
+and all wholesale (structural). ✅
+
+### Evidence (live, post-apply)
+
+`allow_byamount` present, default `true`, 0 non-true rows. Gate verified as M4 (new
+predicates present, old almond/raisin/savings scope gone). **18 visible retail
+products byAmount-eligible**; 5 wholesale, 1 bundle, 2 non-kg retail excluded.
+`md5(pg_get_functiondef(...)) = 3ce8be051962d69f8e8779613bbb8359`.
+
+### Rollback
+
+`supabase/rollback/20260739_byamount_retail_expansion_preimage.sql` restores the
+`20260738` function (quarter-category gate) and drops `allow_byamount`. Roll back
+the client (rowToProduct / weightKg / gate) in lockstep.
+
+---
+
+## 2026-07-17 — `20260738_delivery_weight_fee` — ✅ APPLIED (M3 — retail-by-kg fee overhaul, step 3 of 4)
+
+Extends `public.lozi_orders_enforce_delivery_fee()` (from `20260735`) with a
+per-kg weight fee on top of the M1 store fee, reading grams numerically from
+`products.weight_grams` (M2) — no more text parsing. Adds a display-only
+`orders.vehicle_type` column.
+
+### Formula (retail path)
+
+```
+store_fee    = lozi_delivery_fee(distinct_sellers)      -- M1
+free_kg      = 20 + 10*(distinct_sellers - 1)
+billable_kg  = floor( sum(grams per line) / 1000 )      -- fractional kg dropped
+weight_fee   = max(0, billable_kg - free_kg) * 30       -- UNCAPPED
+delivery_fee = store_fee + weight_fee
+vehicle_type = motorcycle if raw grams <= 50000 else truck
+```
+
+Per-line grams: catalog (uuid) line = `q * coalesce(products.weight_grams, 1000)`;
+RFQ/non-uuid line = 0. A byAmount line is a uuid line with `weight_grams=1000` and
+`q = floor(amount/price*1000)/1000`, so `q*1000` == its floor-derived grams.
+
+### Decisions (Qaari-approved)
+
+- Free-delivery promo waives the **store fee only**; weight_fee still charged.
+- NULL `weight_grams` (pre-RN-Phase-2 new product) → **1000 g** fallback.
+- `vehicle_type` in a **new `orders.vehicle_type` column** (`CHECK in
+  ('motorcycle','truck')`), set authoritatively, pinned to OLD on non-admin
+  UPDATE, NULL for wholesale.
+- RFQ/non-uuid lines → **0 grams** (preserves their store-fee-only treatment).
+
+Client NOT synced — `weight_fee` is server-only; the web `feeFor()` shows the
+store fee only (accepted RN Phase 2 gap).
+
+### Evidence (read-only, live M1 helper + M3 math)
+
+| sellers | kg | store | free_kg | billable | weight_fee | delivery | vehicle |
+|---|---|---|---|---|---|---|---|
+| 1 | 3 | 1000 | 20 | 3 | 0 | 1000 | motorcycle |
+| 1 | 25 | 1000 | 20 | 25 | 150 | 1150 | motorcycle |
+| 1 | 50 | 1000 | 20 | 50 | 900 | 1900 | motorcycle |
+| 1 | 60 | 1000 | 20 | 60 | 1200 | 2200 | truck |
+| 2 | 55 | 1300 | 30 | 55 | 750 | 2050 | truck |
+| 3 | 100 | 1600 | 40 | 100 | 1800 | 3400 | truck |
+
+Boundaries: 20th kg free (charge starts at 21), `≤50 kg` = motorcycle. Post-apply
+verified: `orders.vehicle_type` present, `CHECK ((vehicle_type IS NULL) OR
+(vehicle_type = ANY (ARRAY['motorcycle','truck'])))`, `md5(pg_get_functiondef(...))
+= 3998c0b96e59eebc4a2b4f4cd1997fd1`.
+
+### Rollback
+
+`supabase/rollback/20260738_delivery_weight_fee_preimage.sql` restores the verbatim
+`20260735` function (store-fee only) and drops `orders.vehicle_type` (roll back M4
+first if applied).
+
+---
+
+## 2026-07-17 — `20260737_products_weight_grams` — ✅ APPLIED (M2 — retail-by-kg fee overhaul, step 2 of 4)
+
+Adds `products.weight_grams integer` as the numeric source of truth for retail
+weight, replacing the free-text `data.weight` parsed by `weightKg()`
+(`app.shop.js`). Nullable, `CHECK (weight_grams IS NULL OR weight_grams > 0)`.
+Read by the M3 weight-fee layer and M4 byAmount derivation. `data.weight` is left
+untouched as the display/audit string.
+
+### Backfill (Qaari-approved)
+
+- **Clean sold-by-kg retail → 1000:** the 18 rows whose `data.weight.ar` matches
+  `^\s*1\s*(كيلو|كجم|كغ|kg)?\s*$` (i.e. `"1"` / `"1 كيلو"`).
+- **Two live mis-parses kept visible → 1000:** `e9b734f3` لوززز ذماري (was `"500"`
+  ⇒ the 500 kg bug), `1594de4a` تجربة تجزئة (bundle `"عرض مشكّل"`).
+- **Four junk test rows hidden** (weight_grams left NULL): `e17b23b7` `"و"`,
+  `378c34e3` `"ف"`, `72fabeb0` `"حبة البركة"`, `72757f62` `"غ"`.
+- **Wholesale left NULL** (admin-quoted delivery, no weight_fee; M4 hard-rejects
+  wholesale byAmount — no consumer in M1–M4).
+
+`price`=per-kg invariant: every backfilled row is a 1 kg basis, so the stored
+`price` already equals price-per-kg — **no price data changed**. Input-time kg
+enforcement is the seller form, deferred to RN Phase 2.
+
+### Evidence (live, post-apply)
+
+| category | wg=1000 | wg=NULL | total |
+|---|---|---|---|
+| retail | 20 | 2 (hidden junk) | 22 |
+| wholesale | 0 | 5 | 5 |
+
+The 6 formerly-mis-parsing rows verified: #1/#2 → 1000 & visible; #3–#6 → NULL &
+hidden. Pre-apply read-only check: clean regex matched exactly 18 rows, 0 of the 6.
+
+### Rollback
+
+`supabase/rollback/20260737_products_weight_grams_preimage.sql` un-hides the four
+rows and drops the constraint + column (roll back M3/M4 first if applied).
+
+---
+
+## 2026-07-17 — `20260736_delivery_store_fee_params` — ✅ APPLIED (M1 — retail-by-kg fee overhaul, step 1 of 4)
+
+Bumps the two tunable constants of the authoritative store-fee helper
+`public.lozi_delivery_fee(int)` (first defined in `20260717_delivery_fee_server_validation`):
+surcharge per extra distinct seller **250 → 300**, hard cap **2000 → 2500**. Base
+(1000) and the `store_count < 1 → 0` guard are unchanged. This helper is the
+**store-fee component only**; the `weight_fee` layer lands in M3, where the orders
+trigger will compute `delivery_fee = lozi_delivery_fee(count) + weight_fee`.
+
+### Change (single `CREATE OR REPLACE`, one function)
+
+```
+before:  least(1000 + 250 * (greatest(store_count, 1) - 1), 2000)
+after:   least(1000 + 300 * (greatest(store_count, 1) - 1), 2500)
+```
+
+### Evidence (live, post-apply via `select lozi_delivery_fee(n)`)
+
+| distinct sellers | 1 | 2 | 3 | 5 | 6 | 9 |
+|---|---|---|---|---|---|---|
+| fee (YER) | 1000 | 1300 | 1600 | 2200 | 2500 | 2500 |
+
+n=1 unchanged (1000); old capped at 2000 (n≥5), new caps at 2500 (n≥6).
+
+### Client sync (shipped in lockstep — Qaari-approved)
+
+`app.shop.js` `feeFor()` bumped `Math.min(FEE+250*(n-1),2000)` →
+`Math.min(FEE+300*(n-1),2500)` so displayed fee == charged fee for multi-seller
+carts (single-seller was already identical). **Accepted gap:** M3's `weight_fee`
+is NOT client-synced — after M3 the web client shows store-fee only (no weight
+component); full fee display is deferred to RN Phase 2.
+
+### Rollback
+
+`supabase/rollback/20260736_delivery_store_fee_params_preimage.sql` restores the
+verbatim live 250/2000 body. Roll the client `feeFor()` constant back together
+with it. Blast radius: orders `BEFORE INSERT/UPDATE` trigger + seller-group
+accept/reject recompute (`20260720`) pick up the new fee immediately; existing
+orders keep their pinned `delivery_fee`; no data modified.
+
+---
+
 ## 2026-07-13 — `20260735_orders_rfq_price_crosscheck` — ✅ APPLIED (server, price-integrity Phase 2 — RFQ)
 
 Closes the **"RFQ price cross-check"** item DEFERRED under `20260727`. The price-
