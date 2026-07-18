@@ -6,6 +6,52 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-18 — `20260741_wholesale_gate_catalog_rpcs` — ✅ APPLIED (Phase 1 auth pre-work — FIX 2: wholesale visibility)
+
+Three `SECURITY DEFINER` catalog RPCs bypassed the `read_products` RLS wholesale gate.
+They run as `postgres` (BYPASSRLS) and never called `can_see_wholesale()`, so wholesale
+product rows and prices reached `anon` and non-wholesale customers via the RPC path even
+though the direct-table RLS was correct. Each RPC now enforces the **same** predicate the
+policy uses: `(coalesce(market_segment,'retail') <> 'wholesale' OR public.can_see_wholesale())`.
+
+### Functions changed (signatures / return types / other predicates all unchanged)
+
+- `browse_products` — **live leak**: `browse_products(NULL)` returned the 2 available
+  wholesale rows (with prices) to `anon`. Gate added to its `WHERE`.
+- `browse_stores` — **latent**: aggregates (`product_count`, `in_stock_count`, `min_price`)
+  over `products` with no gate; would leak wholesale pricing the instant a store-listed
+  vendor lists a wholesale product. Gate added inside the `agg` CTE.
+- `get_store_public_stats` — the per-vendor `product_count` counted hidden wholesale rows
+  (count-only info leak). Gate added to that sub-count.
+
+`market_segment` split and `can_see_wholesale()` itself are unchanged.
+
+### Evidence (live, pre/post-apply)
+
+- Pre-apply `md5(pg_get_functiondef)`: browse_products `39d115f3…`, browse_stores
+  `9dfec4d9…`, get_store_public_stats `b25ade2e…`.
+- Post-apply: `d38096dc…`, `3e374723…`, `5f28fb50…` — all changed, all contain the gate.
+- **anon**: `can_see_wholesale()` = false; `browse_products(NULL)` wholesale rows **2 → 0**;
+  `browse_products('wholesale')` = **0 rows**; shared store-aggregate predicate over
+  `products` = **0**.
+- **wholesale profile** (`249033dc…`, via `request.jwt.claims`): `can_see_wholesale()` = true;
+  `browse_products(NULL)` wholesale rows = **2** (unchanged); predicate = **2**.
+- `browse_stores` has no live row-delta (no store-listed vendor currently has an available
+  wholesale product) — verified structurally (gate embedded) plus the identical predicate
+  proven discriminating (0 anon / 2 wholesale) on real data.
+- Applied via `apply_migration` (name `wholesale_gate_catalog_rpcs`).
+
+### Related — `20260742_role_server_controlled_signup` — ⏳ DRAFTED, NOT APPLIED
+
+FIX 1: `handle_new_user()` currently seeds `profiles.role` from client-supplied
+`user_metadata.role`, so a public `signUp` can self-assign `wholesale`. The draft migration
+derives the role from `vendor_authorizations` (server-side; the same source `verify-otp`
+trusts) instead, defaulting to `customer`. The file is committed as a **draft only** — its
+version is **not** in `schema_migrations`, and it awaits explicit separate approval before
+apply. Do not auto-migrate it.
+
+---
+
 ## 2026-07-17 — `20260740_products_is_package` — ✅ APPLIED (M5 — byAmount loose-vs-packaged gate)
 
 Adds `products.is_package` and moves the byAmount (buy-by-money-amount) D1 gate off
