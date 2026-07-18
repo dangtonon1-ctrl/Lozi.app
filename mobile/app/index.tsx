@@ -47,6 +47,10 @@ export default function Index() {
           <Text style={styles.reason}>{state.reason}</Text>
         </>
       )}
+
+      {/* OTA canary (Phase 0 Step 4): this line ships via EAS Update, not an
+          APK — seeing it on device proves the OTA pipeline end to end. */}
+      <Text style={styles.otaTag}>OTA-1 ✓ التحديث وصل</Text>
     </View>
   );
 }
@@ -71,4 +75,5 @@ const styles = StyleSheet.create({
     color: colors.muted,
     textAlign: 'center',
   },
+  otaTag: { fontSize: 14, fontFamily: fonts.medium, color: colors.goldDeep },
 });
