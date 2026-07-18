@@ -6,6 +6,77 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-17 — `20260740_products_is_package` — ✅ APPLIED (M5 — byAmount loose-vs-packaged gate)
+
+Adds `products.is_package` and moves the byAmount (buy-by-money-amount) D1 gate off
+the `weight_grams=1000` proxy onto the explicit flag. A 1 kg **package** ("عبوة") and
+1 kg of **loose** product both carry `weight_grams=1000`, so `weight_grams` cannot
+distinguish loose from packaged; `is_package` is the real loose-vs-packaged truth.
+`weight_grams` is unchanged as the M3 weight-fee basis and the per-kg basis for the
+byAmount grams derivation.
+
+### Server (`20260740`)
+
+- New column `products.is_package boolean NOT NULL DEFAULT false`. The non-volatile
+  constant default backfills every existing row to **loose** in one fast metadata
+  default (no table rewrite) — consistent with "existing retail is all loose today".
+- byAmount D1 gate in `lozi_orders_enforce_delivery_fee()` changed from
+  `coalesce(weight_grams,0) <> 1000` (reject) to `coalesce(is_package,false)` (reject):
+  ```
+  byAmount  <=>  category <> 'wholesale'   -- consumer only
+             AND NOT is_package            -- loose only  (was weight_grams=1000)
+             AND NOT (data->>'bundle')     -- not a fixed assorted bundle
+             AND allow_byamount            -- per-product opt-out (M4)
+  ```
+  One functional line; the rest of the 235-line body is **byte-identical** to
+  `20260739`. D2 (amount>0, price>0, buys ≥1 gram), the byAmount grams derivation
+  (`floor(amount/price*1000)`), wholesale/RFQ hard-reject, the store+weight fee and
+  `vehicle_type` are all unchanged.
+
+### Eligible-set decision (Qaari-approved)
+
+The byAmount-eligible set goes **18 → 19**. The +1 is the loose test row `43232af9`
+"تجربة تخطي الخمسين كيلو" (retail, `data.weight`="1 كجم", price 7000, `allow_byamount`
+=true, not a bundle), which the old gate excluded **only** because its `weight_grams`
+is NULL (created after M2's backfill). It is genuinely loose, so under `NOT is_package`
+it correctly becomes eligible — 19 is right; the old 18 reflected the NULL gap.
+**Decision: accept 19, M5 stays pure (no data edits).** Its weight fee stays correct
+via the M3 `NULL→1000` fallback (D-nullwg), which Fix 1's `feeFor()` mirrors.
+
+### Evidence (live, pre/post-apply)
+
+- **Pre-apply guard:** live `md5(pg_get_functiondef(...))` = `3ce8be051962d69f8e8779613bbb8359`
+  (the `20260739`/M4 body — not drifted); `is_package` absent.
+- **Applied** via `apply_migration` (recorded `schema_migrations.version 20260717194304`).
+- **Function switched** → `e6d6fb1c81f680467173167c2bad5672`. Trigger
+  `trg_orders_enforce_delivery_fee` still bound & enabled.
+- **Column:** `boolean`, `NOT NULL`, `DEFAULT false`, **0 rows true** (all 28 rows loose).
+- **Eligible set = 19** (consumer / `NOT is_package` / non-bundle / `allow_byamount` /
+  available); the loose test row is included; **0 packaged/bundle/wholesale/opted-out
+  leaked**. Consumer-available inventory: 20 total = 19 loose + 1 bundle → 19 eligible.
+- **Security advisor:** **61 → 61, delta 0** (pure `CREATE OR REPLACE` + one boolean
+  column — no new function/grant/RLS/policy).
+- **No order data touched** (INSERT-time logic only; settled orders frozen by the
+  UPDATE pin).
+
+### Client (lockstep, same branch — pending, NOT merged)
+
+- **Fix 1** (transparency, required): bring the M3 weight fee into `feeFor()`
+  (`app.shop.js`) so displayed == charged; read `weight_grams` via `rowToProduct`.
+- **Fix 2** (seller form): retail unit selector كيلو/جرام → `is_package=false`, عبوة →
+  `is_package=true` (+ package weight & price → per-kg on save, keeping the
+  price=per-kg invariant); expose `is_package` via `rowToProduct`; customer buy-mode
+  gate switches `Number(weight_grams)===1000` → `!is_package`.
+
+### Rollback
+
+`supabase/rollback/20260740_products_is_package_preimage.sql` restores the `20260739`
+function **byte-for-byte** (weight_grams=1000 gate) and drops `products.is_package`.
+Roll back the client (rowToProduct `is_package` / `!is_package` gate / seller-form unit
+selector / `feeFor` weight fee) in lockstep.
+
+---
+
 ## 2026-07-17 — `20260739_byamount_retail_expansion` — ✅ APPLIED (M4 — retail-by-kg fee overhaul, step 4 of 4)
 
 Expands byAmount (buy-by-money-amount) from the quarter categories
