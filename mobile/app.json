@@ -8,7 +8,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ExpoLocalization_supportsRTL": true,
+        "ExpoLocalization_forcesRTL": true
+      }
     },
     "android": {
       "package": "com.lozi.app",
@@ -23,13 +27,21 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-localization"],
+    "plugins": [
+      "expo-localization"
+    ],
     "extra": {
       "supportsRTL": true,
       "forcesRTL": true,
       "eas": {
         "projectId": "40438971-e083-48a7-8b26-cdd3eb721c64"
       }
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/40438971-e083-48a7-8b26-cdd3eb721c64"
     }
   }
 }

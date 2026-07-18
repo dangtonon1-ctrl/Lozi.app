@@ -6,7 +6,8 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -16,10 +17,12 @@
       "env": {
         "SUPABASE_URL": "https://niloddwnllhsvrmuxfxw.supabase.co",
         "SUPABASE_ANON_KEY": "sb_publishable_NFLkD_tYlo33PV8oYEKHyQ_Iri85AbS"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "channel": "production"
     }
   },
   "submit": {
