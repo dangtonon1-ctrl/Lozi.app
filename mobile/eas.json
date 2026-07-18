@@ -1,0 +1,28 @@
+{
+  "cli": {
+    "version": ">= 21.0.2",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "SUPABASE_URL": "https://niloddwnllhsvrmuxfxw.supabase.co",
+        "SUPABASE_ANON_KEY": "sb_publishable_NFLkD_tYlo33PV8oYEKHyQ_Iri85AbS"
+      }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
