@@ -8,6 +8,7 @@ import {
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { AuthProvider } from '../lib/auth';
 import { colors } from '../lib/theme';
 
 // Single stack, header hidden. Theme (Step 3): Tajawal is bundled in the app
@@ -25,7 +26,7 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <>
+    <AuthProvider>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -33,6 +34,6 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.cream },
         }}
       />
-    </>
+    </AuthProvider>
   );
 }
