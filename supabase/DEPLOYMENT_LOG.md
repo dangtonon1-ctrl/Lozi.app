@@ -6,6 +6,49 @@ before/after evidence captured at apply time. Newest first.
 
 ---
 
+## 2026-07-18 — `20260742_role_server_controlled_signup` — ✅ APPLIED (Phase 1 auth pre-work — FIX 1: role trust)
+
+`handle_new_user()` seeded `profiles.role` from client-supplied `user_metadata.role`, so a
+public `signUp` could self-assign e.g. `wholesale`. Role is now derived server-side from
+`vendor_authorizations` (the same allowlist `verify-otp` trusts), keyed on the **verified**
+`auth.users.phone`; default `customer`. Client metadata role is never read.
+
+### Security invariant (intended — written into the migration)
+
+A vendor role requires a VERIFIED phone matching `vendor_authorizations`. `auth.users.phone`
+is populated only by phone-OTP verification, so an authorized vendor who signs up through the
+normal EMAIL flow has an empty `auth.users.phone` and correctly lands as `customer`. Knowing
+an authorized number is not proof of owning it; unverified `raw_user_meta_data->>'phone'` is
+not consulted for role.
+
+### Behaviour / blast radius
+
+- Forward-only (`AFTER INSERT`) — all **56** existing accounts keep their roles unchanged.
+- Read-only pre-flight over the whole base: only **10 of 33** current vendor profiles are
+  backed by a matching `vendor_authorizations` phone; the other 23 got their role via the
+  metadata hole (test data) — quantifies the exposure now closed. Future real vendors via
+  `verify-otp` are unaffected (same normalized phone on both sides).
+
+### Evidence (live, pre/post-apply)
+
+- Pre-apply `md5(handle_new_user)` = `49d120a6…`, trusts `user_metadata.role` = **true**.
+- Post-apply `md5` = `292db04c…`, trusts metadata role = **false**, derives from
+  `vendor_authorizations` = **true**.
+- Read-only truth table (sample authorized role = `farmer`):
+  - **A** verify-otp vendor, verified phone → `farmer` ✓
+  - **B** authorized vendor via EMAIL signup, no verified phone → `customer` ✓ (intended)
+  - **C** forged `user_metadata.role`, no verified phone → `customer` ✓
+- Applied via `apply_migration` (name `role_server_controlled_signup`).
+
+### Open item (admin panel — logged, not built)
+
+A vendor authorized in `vendor_authorizations` who signed up via email is `customer`; if they
+later verify their phone, no path re-grants the role (INSERT-only trigger; `verify-otp` does
+not write `profiles.role` for an existing user). Recovery = admin `profiles.role` update.
+Tracked in `mobile/OPEN_ITEMS.md`.
+
+---
+
 ## 2026-07-18 — `20260741_wholesale_gate_catalog_rpcs` — ✅ APPLIED (Phase 1 auth pre-work — FIX 2: wholesale visibility)
 
 Three `SECURITY DEFINER` catalog RPCs bypassed the `read_products` RLS wholesale gate.
@@ -41,14 +84,9 @@ policy uses: `(coalesce(market_segment,'retail') <> 'wholesale' OR public.can_se
   proven discriminating (0 anon / 2 wholesale) on real data.
 - Applied via `apply_migration` (name `wholesale_gate_catalog_rpcs`).
 
-### Related — `20260742_role_server_controlled_signup` — ⏳ DRAFTED, NOT APPLIED
+### Related — `20260742_role_server_controlled_signup` — ✅ APPLIED (FIX 1)
 
-FIX 1: `handle_new_user()` currently seeds `profiles.role` from client-supplied
-`user_metadata.role`, so a public `signUp` can self-assign `wholesale`. The draft migration
-derives the role from `vendor_authorizations` (server-side; the same source `verify-otp`
-trusts) instead, defaulting to `customer`. The file is committed as a **draft only** — its
-version is **not** in `schema_migrations`, and it awaits explicit separate approval before
-apply. Do not auto-migrate it.
+FIX 1 (role trust) was applied immediately after this migration — see the entry above.
 
 ---
 
