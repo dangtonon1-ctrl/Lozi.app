@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { supabase } from '../lib/supabase';
+import { colors, fonts } from '../lib/theme';
 
 type ConnState =
   | { kind: 'checking' }
@@ -31,7 +32,7 @@ export default function Index() {
 
       {state.kind === 'checking' && (
         <View style={styles.checking}>
-          <ActivityIndicator />
+          <ActivityIndicator color={colors.greenDeep} />
           <Text style={styles.status}>جارٍ التحقق من الاتصال…</Text>
         </View>
       )}
@@ -50,7 +51,6 @@ export default function Index() {
   );
 }
 
-// Layout only (centering) — no theme/colors work yet beyond a pass/fail cue.
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -58,11 +58,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     gap: 16,
+    backgroundColor: colors.cream,
   },
   checking: { alignItems: 'center', gap: 8 },
-  brand: { fontSize: 40 },
-  status: { fontSize: 20 },
-  ok: { color: 'green' },
-  fail: { color: 'red' },
-  reason: { fontSize: 12, opacity: 0.6, textAlign: 'center' },
+  brand: { fontSize: 40, fontFamily: fonts.extraBold, color: colors.greenDeep },
+  status: { fontSize: 20, fontFamily: fonts.medium, color: colors.inkSoft },
+  ok: { color: colors.greenDeep, fontFamily: fonts.bold },
+  fail: { color: colors.danger, fontFamily: fonts.bold },
+  reason: {
+    fontSize: 12,
+    fontFamily: fonts.regular,
+    color: colors.muted,
+    textAlign: 'center',
+  },
 });
