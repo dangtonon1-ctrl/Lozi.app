@@ -34,20 +34,63 @@ export const e164 = (p: string) => {
   return s.charAt(0) === '+' ? s : '+967' + s.replace(/[^0-9]/g, '').replace(/^0+/, '');
 };
 
-// Edge-function caller mirroring the web invokeFn: unwraps a structured error
-// body ({reason}) when present so callers can branch on not_authorized etc.
+// Map any Supabase auth error to an Arabic string. A raw error.message must
+// NEVER reach the UI: known cases map to existing copy, everything else falls
+// back to a generic Arabic message. `creds` is used only for invalid_credentials
+// (customer vs vendor wording); `fallback` overrides the generic default.
+function mapAuthError(err: unknown, opts?: { creds?: string; fallback?: string }): string {
+  const e = (err ?? {}) as { code?: string; message?: string; status?: number };
+  const code = String(e.code ?? '').toLowerCase();
+  const msg = String(e.message ?? '').toLowerCase();
+  const fallback = opts?.fallback ?? copy.errGeneric;
+  if (e.status === 429 || code.includes('rate') || msg.includes('rate limit') || msg.includes('too many'))
+    return copy.errRateLimited;
+  if (code === 'invalid_credentials' || msg.includes('invalid login credentials'))
+    return opts?.creds ?? copy.errGeneric;
+  if (code === 'email_not_confirmed' || msg.includes('email not confirmed')) return copy.needsConfirm;
+  if (
+    code === 'user_already_exists' ||
+    code === 'email_exists' ||
+    msg.includes('already registered') ||
+    msg.includes('already been registered')
+  )
+    return copy.errEmailAlreadyRegistered;
+  if (code === 'weak_password' || msg.includes('password should be')) return copy.errCustomerPwLen;
+  return fallback;
+}
+
+// Map an edge-function reason code (verify-otp / request-otp) to Arabic.
+function mapReason(reason: string): string {
+  switch (reason) {
+    case 'not_authorized':
+      return copy.errNotAuthorized;
+    case 'invalid_code':
+      return copy.errBadOrExpiredCode;
+    case 'rate_limited':
+      return copy.errRateLimited;
+    default:
+      return copy.errGeneric;
+  }
+}
+
+// Edge-function caller. Returns an Arabic `error` on any failure (mapped from the
+// structured {reason}); `reason` is kept for callers that need to branch, but the
+// raw reason/message is never surfaced.
 async function invokeFn(fn: string, body: Record<string, unknown>): Promise<AuthResult> {
-  if (!supabase) return { ok: false, error: copy.errServiceDown };
   const { data, error } = await supabase.functions.invoke(fn, { body });
-  if (!error) return (data as AuthResult) ?? { ok: false };
+  if (!error) {
+    const d = (data ?? { ok: false }) as AuthResult;
+    if (d.ok) return d;
+    return { ok: false, reason: d.reason, error: mapReason(String(d.reason ?? '')) };
+  }
+  let reason = '';
   try {
     const b = await (error as { context: Response }).context.json();
-    if (b && (b.reason === 'not_authorized' || b.reason === 'rate_limited')) return b;
-    if (b) return { ok: false, error: b.detail || b.reason || error.message };
+    reason = String(b?.reason ?? '');
   } catch {
-    /* fall through */
+    /* body unreadable — fall through to generic */
   }
-  return { ok: false, error: error.message };
+  return { ok: false, reason, error: mapReason(reason) };
 }
 
 async function isBanned(uid: string): Promise<boolean> {
@@ -153,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const customerSignIn = useCallback<AuthContextValue['customerSignIn']>(async ({ email, password }) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: mapAuthError(error, { creds: copy.errCustomerCreds }) };
     if (data.user && (await isBanned(data.user.id))) {
       await supabase.auth.signOut();
       return { ok: false, error: copy.errAccountSuspended };
@@ -170,7 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
         options: { data: { role: 'customer', name, phone: e164(phone) } },
       });
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: mapAuthError(error) };
       if (data.session) {
         if (data.user) {
           try {
@@ -195,12 +238,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Option A: no redirectTo → Supabase uses the project's Site URL (the frozen
     // web app) for the reset link. In-app lozi://reset is a tracked open item.
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
-    return error ? { ok: false, error: error.message || copy.errSendFailed } : { ok: true };
+    return error ? { ok: false, error: mapAuthError(error, { fallback: copy.errSendFailed }) } : { ok: true };
   }, []);
 
   const vendorSignIn = useCallback<AuthContextValue['vendorSignIn']>(async ({ phone, password }) => {
     const { data, error } = await supabase.auth.signInWithPassword({ phone: e164(phone), password });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: mapAuthError(error, { creds: copy.errVendorCreds }) };
     if (data.user && (await isBanned(data.user.id))) {
       await supabase.auth.signOut();
       return { ok: false, error: copy.errAccountSuspended };
@@ -225,7 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setNewPassword = useCallback<AuthContextValue['setNewPassword']>(async ({ password }) => {
     const { error } = await supabase.auth.updateUser({ password });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: mapAuthError(error, { fallback: copy.errSavePwFailed }) };
     setRecovery(false);
     return { ok: true };
   }, []);

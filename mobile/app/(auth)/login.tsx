@@ -107,7 +107,7 @@ export default function Login() {
 
       {tab === 'vendor' && (
         <>
-          <Field label={copy.phone} value={phone} onChangeText={setPhone} placeholder={copy.phonePlaceholder} keyboardType="phone-pad" />
+          <Field label={copy.phone} value={phone} onChangeText={setPhone} placeholder={copy.phonePlaceholder} keyboardType="number-pad" />
           <PasswordField value={password} onChangeText={setPassword} show={showPw} onToggle={() => setShowPw((v) => !v)} />
           <ErrorText text={err} />
           <PrimaryButton label={busy ? copy.busy : copy.signIn} disabled={busy || !phoneOk || !password} onPress={doVendorLogin} />
@@ -231,18 +231,32 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     color: colors.ink,
     backgroundColor: colors.surface,
+    // Email/phone values are always Latin — force LTR so bidi reordering doesn't
+    // scramble them when the device keyboard is in Arabic mode.
+    textAlign: 'left',
+    writingDirection: 'ltr',
   },
   pwWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
     borderWidth: 1.5,
     borderColor: colors.line,
     borderRadius: 12,
     paddingHorizontal: 14,
     backgroundColor: colors.surface,
   },
-  pwInput: { flex: 1, height: 50, fontSize: 16, fontFamily: fonts.regular, color: colors.ink },
-  pwToggle: { fontSize: 14, fontFamily: fonts.bold, color: colors.greenDeep },
+  // Password is Latin too → LTR + left align, so it never runs under the toggle.
+  pwInput: {
+    flex: 1,
+    height: 50,
+    fontSize: 16,
+    fontFamily: fonts.regular,
+    color: colors.ink,
+    textAlign: 'left',
+    writingDirection: 'ltr',
+  },
+  pwToggle: { fontSize: 14, fontFamily: fonts.bold, color: colors.greenDeep, paddingVertical: 6 },
   btn: {
     height: 52,
     borderRadius: 14,

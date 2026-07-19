@@ -86,6 +86,10 @@ export const copy = {
   errEmailAlreadyRegistered:
     'هذا البريد الإلكتروني مسجّل بالفعل. إن لم تؤكّد حسابك بعد فابحث عن رسالة التأكيد في بريدك، وإلا فسجّل الدخول مباشرة.',
   needsConfirm: 'تحقّق من بريدك لتأكيد حسابك، ثم سجّل الدخول.',
+  errRateLimited: 'محاولات كثيرة، انتظر قليلاً ثم أعد المحاولة.',
+  // Generic fallback — shown for any auth error we haven't explicitly mapped, so
+  // a raw Supabase message never reaches the user.
+  errGeneric: 'حدث خطأ، حاول مرة أخرى.',
 } as const;
 
 // Validation rules mirrored from the web app.

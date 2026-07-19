@@ -57,9 +57,6 @@ export default function Home() {
         </>
       )}
 
-      {/* OTA canary (Phase 0 Step 4) — retained through the auth restructure. */}
-      <Text style={styles.otaTag}>OTA-1 ✓ التحديث وصل</Text>
-
       <Pressable style={styles.logout} onPress={logout} accessibilityRole="button">
         <Text style={styles.logoutText}>{copy.signOut}</Text>
       </Pressable>
@@ -89,7 +86,6 @@ const styles = StyleSheet.create({
   ok: { color: colors.greenDeep },
   fail: { color: colors.danger },
   reason: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, textAlign: 'center' },
-  otaTag: { fontSize: 14, fontFamily: fonts.medium, color: colors.goldDeep },
   logout: {
     marginTop: 12,
     paddingVertical: 12,
