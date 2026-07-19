@@ -20,6 +20,19 @@ Pixel-exact rendering of some web pieces needs native modules not in the current
 Until we choose to build, these render via JS-only approximations (rasterized PNG icons,
 solid colors) that keep the brand identity.
 
+### Planned "native batch" build (do all native deps at once)
+
+We add native modules in ONE build, not one APK per dependency. The batch:
+- `react-native-svg` — render the web SVG icons as real vector components.
+- `expo-linear-gradient` — real gradient fills.
+- whatever **GPS / location** needs in Phase 1 (e.g. `expo-location`).
+- (append any other native module that comes up before the batch ships).
+
+**Follow-up when the batch ships (do not forget):** the rasterized PNG role/brand icons
+are a TEMPORARY stand-in — replace them with real `react-native-svg` components built
+from the web's SVG source, and swap solid role-circle fills for `expo-linear-gradient`.
+The PNGs are not a solution; they exist only to keep this JS-only/OTA until the batch.
+
 ## Open gaps
 
 ### Auth — login / register

@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
+  Image,
+  type ImageSourcePropType,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,16 +20,22 @@ import { colors, fonts } from '../../lib/theme';
 type Step = 'role' | 'customer';
 type PickRole = 'customer' | 'farmer' | 'retail' | 'wholesale';
 
-const ROLES: { key: PickRole; label: string; desc: string }[] = [
-  { key: 'customer', label: copy.roleCustomer, desc: copy.roleCustomerDesc },
-  { key: 'farmer', label: copy.roleFarmer, desc: copy.roleFarmerDesc },
-  { key: 'retail', label: copy.roleRetail, desc: copy.roleRetailDesc },
-  { key: 'wholesale', label: copy.roleWholesale, desc: copy.roleWholesaleDesc },
+// Colors are the darker stop of each web gradient (solid fill — gradient is a
+// logged parity gap). Icons are rasterized from the web SVGs (TEMPORARY — the
+// native batch replaces them with react-native-svg; see 10-web-parity-gaps.md).
+type RoleDef = { key: PickRole; label: string; desc: string; color: string; icon: ImageSourcePropType };
+const ROLES: RoleDef[] = [
+  { key: 'customer', label: copy.roleCustomer, desc: copy.roleCustomerDesc, color: '#4c6450', icon: require('../../assets/role-customer.png') },
+  { key: 'farmer', label: copy.roleFarmer, desc: copy.roleFarmerDesc, color: '#a9743a', icon: require('../../assets/role-farmer.png') },
+  { key: 'retail', label: copy.roleRetail, desc: copy.roleRetailDesc, color: '#6b3f5a', icon: require('../../assets/role-retail.png') },
+  { key: 'wholesale', label: copy.roleWholesale, desc: copy.roleWholesaleDesc, color: '#8e6b1e', icon: require('../../assets/role-warehouse.png') },
 ];
 
 export default function Register() {
   const { customerSignUp } = useAuth();
   const [step, setStep] = useState<Step>('role');
+  const [role, setRole] = useState<PickRole | null>(null);
+  const [kind, setKind] = useState<'almond' | 'raisin' | ''>('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,12 +52,21 @@ export default function Register() {
   const pwMismatch = password2.length > 0 && password !== password2;
   const canSubmit = name.trim().length > 0 && emailOk && phoneOk && pwOk && password === password2;
 
-  const pickRole = (r: PickRole) => {
+  // Matches the web: select highlights (farmer needs a crop), then متابعة proceeds.
+  const roleReady = role !== null && (role !== 'farmer' || kind !== '');
+
+  const selectRole = (r: PickRole) => {
     setErr('');
     setNotice('');
-    // Vendor onboarding (farmer/retail/wholesale) is the OTP flow — ships next.
-    if (r === 'customer') setStep('customer');
-    else setNotice(copy.vendorRegSoon);
+    setRole(r);
+    if (r !== 'farmer') setKind('');
+  };
+
+  const onContinue = () => {
+    setErr('');
+    setNotice('');
+    if (role === 'customer') setStep('customer');
+    else setNotice(copy.vendorRegSoon); // vendor OTP flow ships in 3b
   };
 
   const submit = async () => {
@@ -71,10 +88,9 @@ export default function Register() {
 
   return (
     <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
-      <Text style={styles.brand}>لوزي</Text>
-
       {step === 'role' && (
         <>
+          <LoziBadge />
           <Text style={styles.title}>{copy.welcome}</Text>
           <Text style={styles.sub}>{copy.chooseRole}</Text>
           <Text style={styles.subMuted}>{copy.chooseRoleSub}</Text>
@@ -83,14 +99,25 @@ export default function Register() {
             <Text style={styles.yemenText}>🇾🇪 {copy.yemenOnly}</Text>
           </View>
 
-          {ROLES.map((r) => (
-            <Pressable key={r.key} style={styles.roleCard} onPress={() => pickRole(r.key)}>
-              <Text style={styles.roleLabel}>{r.label}</Text>
-              <Text style={styles.roleDesc}>{r.desc}</Text>
-            </Pressable>
-          ))}
+          <View style={styles.roleGrid}>
+            {ROLES.map((r) => (
+              <RoleCard key={r.key} role={r} selected={role === r.key} onPress={() => selectRole(r.key)} />
+            ))}
+          </View>
+
+          {role === 'farmer' && (
+            <View style={styles.cropWrap}>
+              <Text style={styles.fieldLabel}>{copy.farmerKind}</Text>
+              <View style={styles.seg}>
+                <SegButton label={copy.farmerAlmond} active={kind === 'almond'} onPress={() => setKind('almond')} />
+                <SegButton label={copy.farmerRaisin} active={kind === 'raisin'} onPress={() => setKind('raisin')} />
+              </View>
+            </View>
+          )}
 
           {!!notice && <Text style={styles.notice}>{notice}</Text>}
+
+          <PrimaryButton label={copy.cont} disabled={!roleReady} onPress={onContinue} />
 
           <Pressable onPress={() => router.replace('/login')} hitSlop={8}>
             <Text style={styles.link}>{copy.haveAccount}</Text>
@@ -123,6 +150,39 @@ export default function Register() {
         </>
       )}
     </ScrollView>
+  );
+}
+
+function LoziBadge() {
+  return (
+    <View style={styles.badge}>
+      <Image source={require('../../assets/adaptive-icon.png')} style={styles.badgeImg} resizeMode="contain" />
+    </View>
+  );
+}
+
+function RoleCard({ role, selected, onPress }: { role: RoleDef; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable style={[styles.roleCard, selected && styles.roleCardOn]} onPress={onPress}>
+      <View style={[styles.roleIc, { backgroundColor: role.color }]}>
+        <Image source={role.icon} style={styles.roleIcImg} resizeMode="contain" />
+      </View>
+      <Text style={styles.roleLabel}>{role.label}</Text>
+      <Text style={styles.roleDesc}>{role.desc}</Text>
+      {selected && (
+        <View style={styles.roleCheck}>
+          <Text style={styles.roleCheckTxt}>✓</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+function SegButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable style={[styles.segBtn, active && styles.segBtnOn]} onPress={onPress}>
+      <Text style={[styles.segTxt, active && styles.segTxtOn]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -202,10 +262,19 @@ function PrimaryButton({ label, disabled, onPress }: { label: string; disabled: 
 }
 
 const styles = StyleSheet.create({
-  screen: { padding: 24, gap: 12, paddingTop: 64, paddingBottom: 48 },
-  brand: { fontSize: 38, fontFamily: fonts.extraBold, color: colors.greenDeep, textAlign: 'center' },
-  title: { fontSize: 22, fontFamily: fonts.bold, color: colors.ink, textAlign: 'center' },
-  sub: { fontSize: 17, fontFamily: fonts.bold, color: colors.ink, textAlign: 'center', marginTop: 4 },
+  screen: { padding: 24, gap: 12, paddingTop: 56, paddingBottom: 48 },
+  badge: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: colors.greenDeep,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+  badgeImg: { width: 60, height: 60 },
+  title: { fontSize: 22, fontFamily: fonts.bold, color: colors.ink, textAlign: 'center', marginTop: 4 },
+  sub: { fontSize: 17, fontFamily: fonts.bold, color: colors.ink, textAlign: 'center', marginTop: 2 },
   subMuted: { fontSize: 14, fontFamily: fonts.regular, color: colors.inkSoft, textAlign: 'center' },
   yemen: {
     alignSelf: 'center',
@@ -216,16 +285,47 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   yemenText: { fontSize: 13, fontFamily: fonts.medium, color: colors.inkSoft },
+  roleGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
   roleCard: {
+    width: '48%',
     borderWidth: 1.5,
     borderColor: colors.line,
-    borderRadius: 14,
-    padding: 16,
-    gap: 4,
+    borderRadius: 16,
+    padding: 14,
+    gap: 6,
     backgroundColor: colors.surface,
   },
-  roleLabel: { fontSize: 17, fontFamily: fonts.bold, color: colors.greenDeep },
-  roleDesc: { fontSize: 13, fontFamily: fonts.regular, color: colors.inkSoft },
+  roleCardOn: { borderColor: colors.greenDeep, borderWidth: 2, backgroundColor: colors.greenSoft },
+  roleIc: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  roleIcImg: { width: 28, height: 28 },
+  roleLabel: { fontSize: 16, fontFamily: fonts.bold, color: colors.ink },
+  roleDesc: { fontSize: 12, fontFamily: fonts.regular, color: colors.inkSoft },
+  roleCheck: {
+    position: 'absolute',
+    top: 10,
+    insetInlineEnd: 10,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.greenDeep,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleCheckTxt: { color: '#fff', fontSize: 13, fontFamily: fonts.bold },
+  cropWrap: { gap: 8, marginTop: 4 },
+  seg: { flexDirection: 'row', gap: 8 },
+  segBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+  },
+  segBtnOn: { backgroundColor: colors.greenDeep, borderColor: colors.greenDeep },
+  segTxt: { fontSize: 15, fontFamily: fonts.bold, color: colors.inkSoft },
+  segTxtOn: { color: '#fff' },
   back: { fontSize: 15, fontFamily: fonts.medium, color: colors.greenDeep },
   field: { gap: 6 },
   fieldLabel: { fontSize: 14, fontFamily: fonts.medium, color: colors.inkSoft },
