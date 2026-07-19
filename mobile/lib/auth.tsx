@@ -69,6 +69,8 @@ function mapReason(reason: string): string {
       return copy.errNotAuthorized;
     case 'invalid_code':
       return copy.errBadOrExpiredCode;
+    case 'no_account':
+      return copy.errNoAccount;
     case 'rate_limited':
       return copy.errRateLimited;
     default:

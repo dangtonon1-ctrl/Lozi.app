@@ -55,8 +55,10 @@ logged exception. This is not a loosening of the rule; each exception is enumera
   - Increment 3 (role picker): web-matched 2x2 role grid + LoziBadge + متابعة flow. Shipped.
   - Increment 3b: vendor OTP registration (role → 4-part ID name + phone → `request-otp`
     → code → `verify-otp` → set password → auto sign-in; blocked→WhatsApp support). Done.
-  - **Increment 3c — NEXT:** vendor password reset from the login screen (OTP `purpose:
-    'reset'` → `verify-otp` → `vendor-forgot-password`). Currently stubbed in `login.tsx`.
+  - Increment 3c: vendor password reset from the login screen (forgot link → phone →
+    OTP `purpose:'reset'` → `verify-otp` → new password via `vendor-forgot-password` →
+    auto sign-in). Done.
+  - **Task 1 (auth) — feature-complete** pending device testing of the vendor flows.
 - **Security fixes — APPLIED + verified** (see DEPLOYMENT_LOG.md):
   - `20260741` FIX 2 — wholesale visibility gate in SECURITY DEFINER catalog RPCs.
   - `20260742` FIX 1 — signup role is server-controlled (derived from
