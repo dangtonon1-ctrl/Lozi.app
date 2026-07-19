@@ -186,10 +186,6 @@ export default function Register() {
           <Text style={styles.sub}>{copy.chooseRole}</Text>
           <Text style={styles.subMuted}>{copy.chooseRoleSub}</Text>
 
-          <View style={styles.yemen}>
-            <Text style={styles.yemenText}>🇾🇪 {copy.yemenOnly}</Text>
-          </View>
-
           <View style={styles.roleGrid}>
             {ROLES.map((r) => (
               <RoleCard key={r.key} role={r} selected={role === r.key} onPress={() => selectRole(r.key)} />
@@ -514,15 +510,6 @@ const styles = StyleSheet.create({
   sub: { fontSize: 17, fontFamily: fonts.bold, color: colors.ink, textAlign: 'center', marginTop: 2 },
   subMuted: { fontSize: 14, fontFamily: fonts.regular, color: colors.inkSoft, textAlign: 'center' },
   hint: { fontSize: 13, fontFamily: fonts.medium, color: colors.inkSoft, textAlign: 'center', marginTop: 4 },
-  yemen: {
-    alignSelf: 'center',
-    backgroundColor: colors.sand,
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    marginVertical: 4,
-  },
-  yemenText: { fontSize: 13, fontFamily: fonts.medium, color: colors.inkSoft },
   roleGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
   roleCard: {
     width: '48%',

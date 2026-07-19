@@ -49,4 +49,9 @@ The PNGs are not a solution; they exist only to keep this JS-only/OTA until the 
       (`vendor-forgot-password`) → auto sign-in (name persisted via `updateUser`, mirroring
       web `onVendorSignIn`). Blocked states (`not_authorized` / `rate_limited`) show the
       WhatsApp support button (`wa.me/967777184208`, the web `support_wa` default).
+- **[Deliberate divergence] Yemen-only notice removed from the register role picker.**
+      The web still shows the "🇾🇪 التسجيل متاح حالياً في اليمن فقط" banner on the role step;
+      the RN app intentionally omits it (owner decision 2026-07-19). This is a chosen
+      divergence, not an oversight — do not "restore for parity." The `copy.yemenOnly` string
+      is kept (still mirrors the web) but is now unused in the app.
 - (add more as the auth screens are built)
