@@ -6,13 +6,13 @@ import {
   type KeyboardTypeOptions,
   Linking,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 
+import { KeyboardAwareScreen, useKeyboardVisible, type InputFocusHandler } from '../../components/KeyboardAwareScreen';
 import { useAuth } from '../../lib/auth';
 import { copy, validate } from '../../lib/copy';
 import { normalizeDigits } from '../../lib/normalizeDigits';
@@ -38,6 +38,7 @@ const ROLES: RoleDef[] = [
 
 export default function Register() {
   const { customerSignUp, vendorSendOtp, vendorVerifyOtp, vendorSetPassword, vendorSignIn } = useAuth();
+  const kbVisible = useKeyboardVisible();
   const [step, setStep] = useState<Step>('role');
   const [role, setRole] = useState<PickRole | null>(null);
   const [kind, setKind] = useState<'almond' | 'raisin' | ''>('');
@@ -177,11 +178,13 @@ export default function Register() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScreen contentContainerStyle={styles.screen}>
+      {(onInputFocus) => (
+        <>
       {/* ── Step: role picker ─────────────────────────────────────────────── */}
       {step === 'role' && (
         <>
-          <LoziBadge />
+          {!kbVisible && <LoziBadge />}
           <Text style={styles.title}>{copy.welcome}</Text>
           <Text style={styles.sub}>{copy.chooseRole}</Text>
           <Text style={styles.subMuted}>{copy.chooseRoleSub}</Text>
@@ -216,12 +219,12 @@ export default function Register() {
           <BackLink onPress={() => { setStep('role'); resetMsgs(); }} />
           <Text style={styles.title}>{copy.roleCustomer}</Text>
 
-          <Field label={copy.fullName} value={name} onChangeText={setName} placeholder={copy.fullNamePlaceholder} />
-          <Field label={copy.email} value={email} onChangeText={setEmail} placeholder={copy.emailPlaceholder} keyboardType="email-address" ltr />
-          <PasswordField label={copy.password} value={password} onChangeText={setPassword} show={showPw} onToggle={() => setShowPw((v) => !v)} />
-          <PasswordField label={copy.passwordConfirm} value={password2} onChangeText={setPassword2} show={showPw} onToggle={() => setShowPw((v) => !v)} />
+          <Field label={copy.fullName} value={name} onChangeText={setName} placeholder={copy.fullNamePlaceholder} onFocus={onInputFocus} />
+          <Field label={copy.email} value={email} onChangeText={setEmail} placeholder={copy.emailPlaceholder} keyboardType="email-address" ltr onFocus={onInputFocus} />
+          <PasswordField label={copy.password} value={password} onChangeText={setPassword} show={showPw} onToggle={() => setShowPw((v) => !v)} onFocus={onInputFocus} />
+          <PasswordField label={copy.passwordConfirm} value={password2} onChangeText={setPassword2} show={showPw} onToggle={() => setShowPw((v) => !v)} onFocus={onInputFocus} />
           {pwMismatch && <Text style={styles.err}>{copy.errPwMismatch}</Text>}
-          <Field label={copy.phone} value={phone} onChangeText={(t) => setPhone(normalizeDigits(t))} placeholder={copy.phonePlaceholder} keyboardType="number-pad" ltr />
+          <Field label={copy.phone} value={phone} onChangeText={(t) => setPhone(normalizeDigits(t))} placeholder={copy.phonePlaceholder} keyboardType="number-pad" ltr onFocus={onInputFocus} />
 
           <Text style={styles.terms}>
             {copy.agreePre} {copy.termsLink}
@@ -238,7 +241,7 @@ export default function Register() {
       {step === 'vphone' && (
         <>
           <BackLink onPress={() => { setStep('role'); resetMsgs(); setBlocked(''); }} />
-          <LoziBadge />
+          {!kbVisible && <LoziBadge />}
           <Text style={styles.title}>{copy.vendorWelcomeTitle}</Text>
           <Text style={styles.subMuted}>{copy.vendorWelcomeSub}</Text>
 
@@ -258,13 +261,13 @@ export default function Register() {
             <>
               <Text style={styles.hint}>{copy.vendorNameHint}</Text>
               <View style={styles.nameGrid}>
-                <NameInput value={n1} onChangeText={setN1} placeholder={copy.nameFirst} />
-                <NameInput value={n2} onChangeText={setN2} placeholder={copy.nameSecond} />
-                <NameInput value={n3} onChangeText={setN3} placeholder={copy.nameThird} />
-                <NameInput value={n4} onChangeText={setN4} placeholder={copy.nameFourth} />
+                <NameInput value={n1} onChangeText={setN1} placeholder={copy.nameFirst} onFocus={onInputFocus} />
+                <NameInput value={n2} onChangeText={setN2} placeholder={copy.nameSecond} onFocus={onInputFocus} />
+                <NameInput value={n3} onChangeText={setN3} placeholder={copy.nameThird} onFocus={onInputFocus} />
+                <NameInput value={n4} onChangeText={setN4} placeholder={copy.nameFourth} onFocus={onInputFocus} />
               </View>
 
-              <PhoneField value={phone} onChangeText={(t) => setPhone(normalizeDigits(t))} />
+              <PhoneField value={phone} onChangeText={(t) => setPhone(normalizeDigits(t))} onFocus={onInputFocus} />
 
               <Pressable style={styles.agreeRow} onPress={() => setAgree((v) => !v)} hitSlop={6}>
                 <View style={[styles.checkbox, agree && styles.checkboxOn]}>
@@ -287,7 +290,7 @@ export default function Register() {
       {step === 'otp' && (
         <>
           <BackLink onPress={() => { setStep('vphone'); resetMsgs(); }} />
-          <LoziBadge />
+          {!kbVisible && <LoziBadge />}
           <Text style={styles.title}>{copy.otpTitle}</Text>
           <Text style={styles.subMuted}>
             {copy.otpSentPrefix}
@@ -306,6 +309,7 @@ export default function Register() {
               maxLength={6}
               autoCapitalize="none"
               autoCorrect={false}
+              onFocus={onInputFocus}
             />
           </View>
 
@@ -321,12 +325,12 @@ export default function Register() {
       {/* ── Step: set password + auto sign-in ─────────────────────────────── */}
       {step === 'setpw' && (
         <>
-          <LoziBadge />
+          {!kbVisible && <LoziBadge />}
           <Text style={styles.title}>{copy.setupPasswordTitle}</Text>
           <Text style={styles.subMuted}>{copy.setupPasswordSub}</Text>
 
-          <PasswordField label={copy.password} value={password} onChangeText={setPassword} show={showPw} onToggle={() => setShowPw((v) => !v)} />
-          <PasswordField label={copy.passwordConfirm} value={password2} onChangeText={setPassword2} show={showPw} onToggle={() => setShowPw((v) => !v)} />
+          <PasswordField label={copy.password} value={password} onChangeText={setPassword} show={showPw} onToggle={() => setShowPw((v) => !v)} onFocus={onInputFocus} />
+          <PasswordField label={copy.passwordConfirm} value={password2} onChangeText={setPassword2} show={showPw} onToggle={() => setShowPw((v) => !v)} onFocus={onInputFocus} />
           {pwMismatch && <Text style={styles.err}>{copy.errPwMismatch}</Text>}
 
           {!!err && <Text style={styles.err}>{err}</Text>}
@@ -338,7 +342,9 @@ export default function Register() {
           />
         </>
       )}
-    </ScrollView>
+        </>
+      )}
+    </KeyboardAwareScreen>
   );
 }
 
@@ -383,7 +389,7 @@ function SegButton({ label, active, onPress }: { label: string; active: boolean;
   );
 }
 
-function NameInput({ value, onChangeText, placeholder }: { value: string; onChangeText: (t: string) => void; placeholder: string }) {
+function NameInput({ value, onChangeText, placeholder, onFocus }: { value: string; onChangeText: (t: string) => void; placeholder: string; onFocus?: InputFocusHandler }) {
   return (
     <TextInput
       style={styles.nameInput}
@@ -392,11 +398,12 @@ function NameInput({ value, onChangeText, placeholder }: { value: string; onChan
       placeholder={placeholder}
       placeholderTextColor={colors.muted}
       autoCorrect={false}
+      onFocus={onFocus}
     />
   );
 }
 
-function PhoneField({ value, onChangeText }: { value: string; onChangeText: (t: string) => void }) {
+function PhoneField({ value, onChangeText, onFocus }: { value: string; onChangeText: (t: string) => void; onFocus?: InputFocusHandler }) {
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{copy.phone}</Text>
@@ -413,6 +420,7 @@ function PhoneField({ value, onChangeText }: { value: string; onChangeText: (t: 
           keyboardType="number-pad"
           autoCapitalize="none"
           autoCorrect={false}
+          onFocus={onFocus}
         />
       </View>
     </View>
@@ -426,6 +434,7 @@ function Field({
   placeholder,
   keyboardType,
   ltr,
+  onFocus,
 }: {
   label: string;
   value: string;
@@ -433,6 +442,7 @@ function Field({
   placeholder: string;
   keyboardType?: KeyboardTypeOptions;
   ltr?: boolean;
+  onFocus?: InputFocusHandler;
 }) {
   return (
     <View style={styles.field}>
@@ -446,6 +456,7 @@ function Field({
         keyboardType={keyboardType}
         autoCapitalize="none"
         autoCorrect={false}
+        onFocus={onFocus}
       />
     </View>
   );
@@ -457,12 +468,14 @@ function PasswordField({
   onChangeText,
   show,
   onToggle,
+  onFocus,
 }: {
   label: string;
   value: string;
   onChangeText: (t: string) => void;
   show: boolean;
   onToggle: () => void;
+  onFocus?: InputFocusHandler;
 }) {
   return (
     <View style={styles.field}>
@@ -477,6 +490,7 @@ function PasswordField({
           secureTextEntry={!show}
           autoCapitalize="none"
           autoCorrect={false}
+          onFocus={onFocus}
         />
         <Pressable onPress={onToggle} hitSlop={8} accessibilityLabel={show ? copy.hidePassword : copy.showPassword}>
           <Text style={styles.pwToggle}>{show ? 'إخفاء' : 'إظهار'}</Text>

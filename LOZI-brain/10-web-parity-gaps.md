@@ -26,6 +26,16 @@ We add native modules in ONE build, not one APK per dependency. The batch:
 - `react-native-svg` — render the web SVG icons as real vector components.
 - `expo-linear-gradient` — real gradient fills.
 - whatever **GPS / location** needs in Phase 1 (e.g. `expo-location`).
+- **`app.json` `android.softwareKeyboardLayoutMode: "resize"`** — perfects Android
+  keyboard avoidance (the auth screens already handle it JS-side; this native flag makes
+  the window itself resize). NOTE: it's an `app.json`/native-config change, so it changes
+  the EAS fingerprint — it MUST land in a build, not an `eas update` (adding it to
+  `app.json` before an OTA would drift the runtime off `ac845149…` and the OTA would never
+  reach build #5). Deferred here for exactly that reason.
+- **Android monochrome / themed icon** (`android.adaptiveIcon.monochromeImage`) — for the
+  Android 13+ themed-icon treatment.
+- **`react-native-keyboard-controller`** (optional) — smoother keyboard handling than the
+  built-in `KeyboardAvoidingView`; only if the JS approach proves insufficient on device.
 - (append any other native module that comes up before the batch ships).
 
 **Follow-up when the batch ships (do not forget):** the rasterized PNG role/brand icons
@@ -54,4 +64,11 @@ The PNGs are not a solution; they exist only to keep this JS-only/OTA until the 
       the RN app intentionally omits it (owner decision 2026-07-19). This is a chosen
       divergence, not an oversight — do not "restore for parity." The `copy.yemenOnly` string
       is kept (still mirrors the web) but is now unused in the app.
+- [x] **Keyboard avoidance on auth screens** (fixed 2026-07-19, JS-only). All auth screens
+      (login, register, vendor OTP, password reset) now wrap content in
+      `components/KeyboardAwareScreen` (`KeyboardAvoidingView` padding on iOS + `ScrollView`
+      with `keyboardShouldPersistTaps:'handled'`, `keyboardDismissMode:'on-drag'`, focused-input
+      auto-scroll) and shrink/hide the brand mark while the keyboard is up (`useKeyboardVisible`
+      via `Keyboard` listeners). The Android native `softwareKeyboardLayoutMode:'resize'` flag is
+      deferred to the native batch above (fingerprint reasons).
 - (add more as the auth screens are built)

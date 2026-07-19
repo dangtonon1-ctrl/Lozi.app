@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import { KeyboardAwareScreen, useKeyboardVisible, type InputFocusHandler } from '../../components/KeyboardAwareScreen';
 import { useAuth } from '../../lib/auth';
 import { copy, validate } from '../../lib/copy';
 import { normalizeDigits } from '../../lib/normalizeDigits';
@@ -21,6 +22,7 @@ type VForgot = 'off' | 'phone' | 'code' | 'newpw';
 export default function Login() {
   const { customerSignIn, vendorSignIn, customerForgot, vendorSendOtp, vendorVerifyOtp, vendorSetPassword } =
     useAuth();
+  const kbVisible = useKeyboardVisible();
   const [tab, setTab] = useState<Tab>('customer');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -135,8 +137,10 @@ export default function Login() {
   const sentToLabel = copy.otpSentPrefix + normalizeDigits(phone).replace(/[^0-9]/g, '');
 
   return (
-    <View style={styles.screen}>
-      <Text style={styles.brand}>لوزي</Text>
+    <KeyboardAwareScreen contentContainerStyle={styles.screen}>
+      {(onInputFocus) => (
+        <>
+      {!kbVisible && <Text style={styles.brand}>لوزي</Text>}
       <Text style={styles.title}>{copy.loginTitle}</Text>
 
       <View style={styles.tabs}>
@@ -146,8 +150,8 @@ export default function Login() {
 
       {tab === 'customer' && forgot === 'off' && (
         <>
-          <Field label={copy.email} value={email} onChangeText={setEmail} placeholder={copy.emailPlaceholder} keyboardType="email-address" />
-          <PasswordField value={password} onChangeText={setPassword} show={showPw} onToggle={() => setShowPw((v) => !v)} />
+          <Field label={copy.email} value={email} onChangeText={setEmail} placeholder={copy.emailPlaceholder} keyboardType="email-address" onFocus={onInputFocus} />
+          <PasswordField value={password} onChangeText={setPassword} show={showPw} onToggle={() => setShowPw((v) => !v)} onFocus={onInputFocus} />
           <ErrorText text={err} />
           <PrimaryButton label={busy ? copy.busy : copy.signIn} disabled={busy || !emailOk || !password} onPress={doCustomerLogin} />
           <Pressable onPress={() => { setErr(''); setForgot('on'); }} hitSlop={8}>
@@ -159,7 +163,7 @@ export default function Login() {
       {tab === 'customer' && forgot === 'on' && (
         <>
           <Text style={styles.sub}>{copy.customerForgotPrompt}</Text>
-          <Field label={copy.email} value={email} onChangeText={setEmail} placeholder={copy.emailPlaceholder} keyboardType="email-address" />
+          <Field label={copy.email} value={email} onChangeText={setEmail} placeholder={copy.emailPlaceholder} keyboardType="email-address" onFocus={onInputFocus} />
           <ErrorText text={err} />
           <PrimaryButton label={busy ? copy.busy : copy.cont} disabled={busy || !emailOk} onPress={doForgotSend} />
           <Pressable onPress={() => { setErr(''); setForgot('off'); }} hitSlop={8}>
@@ -175,8 +179,8 @@ export default function Login() {
       {/* ── Vendor: sign in ─────────────────────────────────────────────── */}
       {tab === 'vendor' && vforgot === 'off' && (
         <>
-          <Field label={copy.phone} value={phone} onChangeText={(t) => setPhone(normalizeDigits(t))} placeholder={copy.phonePlaceholder} keyboardType="number-pad" />
-          <PasswordField value={password} onChangeText={setPassword} show={showPw} onToggle={() => setShowPw((v) => !v)} />
+          <Field label={copy.phone} value={phone} onChangeText={(t) => setPhone(normalizeDigits(t))} placeholder={copy.phonePlaceholder} keyboardType="number-pad" onFocus={onInputFocus} />
+          <PasswordField value={password} onChangeText={setPassword} show={showPw} onToggle={() => setShowPw((v) => !v)} onFocus={onInputFocus} />
           <ErrorText text={err} />
           <PrimaryButton label={busy ? copy.busy : copy.signIn} disabled={busy || !phoneOk || !password} onPress={doVendorLogin} />
           <Pressable onPress={openVendorReset} hitSlop={8}>
@@ -189,7 +193,7 @@ export default function Login() {
       {tab === 'vendor' && vforgot === 'phone' && (
         <>
           <Text style={styles.sub}>{copy.vendorForgotPrompt}</Text>
-          <Field label={copy.phone} value={phone} onChangeText={(t) => setPhone(normalizeDigits(t))} placeholder={copy.phonePlaceholder} keyboardType="number-pad" />
+          <Field label={copy.phone} value={phone} onChangeText={(t) => setPhone(normalizeDigits(t))} placeholder={copy.phonePlaceholder} keyboardType="number-pad" onFocus={onInputFocus} />
           <ErrorText text={err} />
           <PrimaryButton label={busy ? copy.sending : copy.cont} disabled={busy || !phoneOk} onPress={vendorResetSend} />
           <Pressable onPress={() => { setErr(''); setVforgot('off'); }} hitSlop={8}>
@@ -214,6 +218,7 @@ export default function Login() {
               maxLength={6}
               autoCapitalize="none"
               autoCorrect={false}
+              onFocus={onInputFocus}
             />
           </View>
           <ErrorText text={err} />
@@ -240,6 +245,7 @@ export default function Login() {
                 secureTextEntry={!showPw}
                 autoCapitalize="none"
                 autoCorrect={false}
+                onFocus={onInputFocus}
               />
               <Pressable onPress={() => setShowPw((v) => !v)} hitSlop={8} accessibilityLabel={showPw ? copy.hidePassword : copy.showPassword}>
                 <Text style={styles.pwToggle}>{showPw ? 'إخفاء' : 'إظهار'}</Text>
@@ -254,7 +260,9 @@ export default function Login() {
       <Pressable onPress={() => router.replace('/register')} hitSlop={8}>
         <Text style={styles.registerLink}>{copy.createAccountLink}</Text>
       </Pressable>
-    </View>
+        </>
+      )}
+    </KeyboardAwareScreen>
   );
 }
 
@@ -272,12 +280,14 @@ function Field({
   onChangeText,
   placeholder,
   keyboardType,
+  onFocus,
 }: {
   label: string;
   value: string;
   onChangeText: (t: string) => void;
   placeholder: string;
   keyboardType?: KeyboardTypeOptions;
+  onFocus?: InputFocusHandler;
 }) {
   return (
     <View style={styles.field}>
@@ -291,6 +301,7 @@ function Field({
         keyboardType={keyboardType}
         autoCapitalize="none"
         autoCorrect={false}
+        onFocus={onFocus}
       />
     </View>
   );
@@ -301,11 +312,13 @@ function PasswordField({
   onChangeText,
   show,
   onToggle,
+  onFocus,
 }: {
   value: string;
   onChangeText: (t: string) => void;
   show: boolean;
   onToggle: () => void;
+  onFocus?: InputFocusHandler;
 }) {
   return (
     <View style={styles.field}>
@@ -320,6 +333,7 @@ function PasswordField({
           secureTextEntry={!show}
           autoCapitalize="none"
           autoCorrect={false}
+          onFocus={onFocus}
         />
         <Pressable onPress={onToggle} hitSlop={8} accessibilityLabel={show ? copy.hidePassword : copy.showPassword}>
           <Text style={styles.pwToggle}>{show ? 'إخفاء' : 'إظهار'}</Text>
@@ -343,7 +357,7 @@ function ErrorText({ text }: { text: string }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, justifyContent: 'center', padding: 24, gap: 14, backgroundColor: colors.cream },
+  screen: { justifyContent: 'center', padding: 24, gap: 14, backgroundColor: colors.cream },
   brand: { fontSize: 40, fontFamily: fonts.extraBold, color: colors.greenDeep, textAlign: 'center' },
   title: { fontSize: 22, fontFamily: fonts.bold, color: colors.ink, textAlign: 'center', marginBottom: 4 },
   sub: { fontSize: 14, fontFamily: fonts.regular, color: colors.inkSoft, textAlign: 'center' },
