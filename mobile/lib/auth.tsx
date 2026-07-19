@@ -121,7 +121,7 @@ type AuthContextValue = {
     phone: string;
   }) => Promise<AuthResult>;
   customerForgot: (a: { email: string }) => Promise<AuthResult>;
-  vendorSignIn: (a: { phone: string; password: string }) => Promise<AuthResult>;
+  vendorSignIn: (a: { phone: string; password: string; name?: string }) => Promise<AuthResult>;
   vendorSendOtp: (a: { phone: string; purpose?: string }) => Promise<AuthResult>;
   vendorVerifyOtp: (a: {
     phone: string;
@@ -244,12 +244,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error ? { ok: false, error: mapAuthError(error, { fallback: copy.errSendFailed }) } : { ok: true };
   }, []);
 
-  const vendorSignIn = useCallback<AuthContextValue['vendorSignIn']>(async ({ phone, password }) => {
+  const vendorSignIn = useCallback<AuthContextValue['vendorSignIn']>(async ({ phone, password, name }) => {
     const { data, error } = await supabase.auth.signInWithPassword({ phone: e164(phone), password });
     if (error) return { ok: false, error: mapAuthError(error, { creds: copy.errVendorCreds }) };
     if (data.user && (await isBanned(data.user.id))) {
       await supabase.auth.signOut();
       return { ok: false, error: copy.errAccountSuspended };
+    }
+    // Persist the ID name captured during registration (mirrors web onVendorSignIn):
+    // verify-otp creates the vendor with only {role}, so the name is set here.
+    const md = (data.user?.user_metadata ?? {}) as Record<string, string | undefined>;
+    if (name && name !== md.name) {
+      try {
+        await supabase.auth.updateUser({ data: { name } });
+      } catch {
+        /* non-fatal — sign-in already succeeded */
+      }
     }
     return { ok: true };
   }, []);

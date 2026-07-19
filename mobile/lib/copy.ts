@@ -57,15 +57,35 @@ export const copy = {
   termsLink: 'الشروط والأحكام',
   createAccountLink: 'ليس لديك حساب؟ إنشاء حساب',
   errPwMismatch: 'كلمتا المرور غير متطابقتين.',
-  // Temporary stub: vendor registration goes through the OTP flow, which ships in
-  // a later Task 1 sub-increment.
-  vendorRegSoon: 'تسجيل التجّار عبر رمز التحقق — قريباً.',
+
+  // ── Vendor register (name + phone → OTP) ──────────────────────────────────
+  vendorWelcomeTitle: 'مرحباً بك في لوزي',
+  vendorWelcomeSub: 'قم بإنشاء حسابك، لتجعل سوق المكسرات بين يديك',
+  vendorNameHint: 'قم بإدخال الاسم كما في الهوية',
+  nameFirst: 'الاسم الأول',
+  nameSecond: 'الاسم الثاني',
+  nameThird: 'الاسم الثالث',
+  nameFourth: 'الاسم الرابع',
+  agreeCheckbox: 'أوافق على',
+  sending: 'جارٍ الإرسال...',
+  errSendCodeFailed: 'تعذّر إرسال الرمز',
+  // Blocked states from request-otp (verbatim).
+  blockedNotAuthorized: 'رقمك غير مفعّل للتسجيل كمورد. تواصل مع الدعم لتفعيل حسابك.',
+  blockedRateLimited: 'تم إرسال رمز خلال آخر ٢٤ ساعة. حاول لاحقاً أو تواصل مع الدعم.',
+  supportWhatsapp: 'تواصل مع الدعم عبر واتساب',
+  back: 'رجوع',
 
   // ── Vendor OTP ───────────────────────────────────────────────────────────
   otpTitle: 'أدخل رمز التحقق',
   otpSentPrefix: 'أرسلنا رمزاً عبر SMS إلى ‎+967 ',
+  otpCodeLabel: 'رمز التحقق',
+  otpCodePlaceholder: '٦ أرقام',
+  otpVerify: 'تأكيد',
+  otpVerifying: 'جارٍ التحقق...',
+  otpResend: 'إعادة إرسال الرمز',
   setupPasswordTitle: 'إعداد كلمة المرور',
   setupPasswordSub: 'ستدخل لاحقاً برقم هاتفك وكلمة المرور هذه.',
+  setpwSave: 'حفظ ودخول',
 
   // ── Password recovery ────────────────────────────────────────────────────
   resetTitle: 'إعادة تعيين كلمة المرور',

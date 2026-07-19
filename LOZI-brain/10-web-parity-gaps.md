@@ -41,4 +41,12 @@ The PNGs are not a solution; they exist only to keep this JS-only/OTA until the 
 - [ ] **Role/brand iconography**: pending the icon-rendering decision (rasterized PNG of
       the web SVGs vs. a build with `react-native-svg`).
 - [ ] Transitions between auth steps are default stack pushes; revisit for polish.
+- [ ] **Terms & conditions modal**: the web's الشروط والأحكام link opens a terms modal
+      (`openTerms`). RN has no terms screen yet, so in the vendor register the words are
+      styled as a link but are non-actionable. Wire a terms screen/modal in the polish pass.
+- [x] **Vendor OTP registration** built (increment 3b): role → 4-part ID name + phone
+      (+967 chip) + terms → `request-otp` → 6-digit code → `verify-otp` → set password
+      (`vendor-forgot-password`) → auto sign-in (name persisted via `updateUser`, mirroring
+      web `onVendorSignIn`). Blocked states (`not_authorized` / `rate_limited`) show the
+      WhatsApp support button (`wa.me/967777184208`, the web `support_wa` default).
 - (add more as the auth screens are built)

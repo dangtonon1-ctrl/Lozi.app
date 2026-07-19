@@ -51,7 +51,12 @@ logged exception. This is not a loosening of the rule; each exception is enumera
   - Increment 2: gate + route groups `(auth)`/`(app)`, login (زبون/متجر·مزارع tabs,
     inline customer forgot), home placeholder. Shipped to preview.
   - Error-path + input fixes shipped (LTR inputs, keyboards, Arabic error mapping).
-  - **Increment 3 — NEXT:** register (customer form + vendor OTP) + vendor password reset.
+  - Increment 3a: customer registration. Shipped.
+  - Increment 3 (role picker): web-matched 2x2 role grid + LoziBadge + متابعة flow. Shipped.
+  - Increment 3b: vendor OTP registration (role → 4-part ID name + phone → `request-otp`
+    → code → `verify-otp` → set password → auto sign-in; blocked→WhatsApp support). Done.
+  - **Increment 3c — NEXT:** vendor password reset from the login screen (OTP `purpose:
+    'reset'` → `verify-otp` → `vendor-forgot-password`). Currently stubbed in `login.tsx`.
 - **Security fixes — APPLIED + verified** (see DEPLOYMENT_LOG.md):
   - `20260741` FIX 2 — wholesale visibility gate in SECURITY DEFINER catalog RPCs.
   - `20260742` FIX 1 — signup role is server-controlled (derived from
