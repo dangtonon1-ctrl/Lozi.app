@@ -69,6 +69,15 @@ logged exception. This is not a loosening of the rule; each exception is enumera
   functions `request-otp` / `verify-otp` / `vendor-forgot-password`.
 - **EAS**: preview channel; current Android runtime `ac845149…` = build #5 APK. Phone auth
   stored without `+`; `vendor_authorizations.phone` with `+` → compare digits only.
+- **EAS Update fingerprint depends on the Supabase env vars** (learned 2026-07-19). The
+  fingerprint runtime hashes the resolved `expo.extra`, and `app.config.ts` injects
+  `SUPABASE_URL`/`SUPABASE_ANON_KEY` (→ `''` when absent). So an `eas update` that runs
+  without those env set produces a DIFFERENT runtime (`5f3d65e1…`) that the installed
+  `ac845149…` APK will never pull — the update silently never arrives. `--environment
+  preview` loads the EAS **server** environment (not local `.env`), so those two vars are
+  now stored in the EAS `preview` environment (plaintext; publishable key + public URL,
+  mirroring `eas.json` `build.preview.env`). **Always publish with `--environment preview`
+  and confirm the printed Android runtime is `ac845149…` before considering an OTA shipped.**
 
 ## Test accounts (fresh, synthetic — created as NEW rows 2026-07-19)
 
