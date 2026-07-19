@@ -1,3 +1,5 @@
+import { normalizeDigits } from './normalizeDigits';
+
 // Arabic auth copy — lifted VERBATIM from the frozen web app (src/scripts:
 // app.data.js LOZI_T.ar + the hardcoded strings in app.catalog.js) so the two
 // clients speak identically. Do not paraphrase; if the web app changes a
@@ -100,8 +102,9 @@ export const copy = {
 // Validation rules mirrored from the web app.
 export const validate = {
   email: (v: string) => /\S+@\S+\.\S+/.test(v.trim()),
-  // digits only, at least 7 (web: phone.replace(/[^0-9]/g,'').length >= 7)
-  phone: (v: string) => v.trim().replace(/[^0-9]/g, '').length >= 7,
+  // digits only, at least 7 (web: phone.replace(/[^0-9]/g,'').length >= 7).
+  // normalizeDigits first so Arabic-Indic input validates correctly.
+  phone: (v: string) => normalizeDigits(v).replace(/[^0-9]/g, '').length >= 7,
   customerPassword: (v: string) => v.length >= 6,
   vendorPassword: (v: string) => v.length >= 4,
 };

@@ -12,6 +12,7 @@ import {
 
 import { useAuth } from '../../lib/auth';
 import { copy, validate } from '../../lib/copy';
+import { normalizeDigits } from '../../lib/normalizeDigits';
 import { colors, fonts } from '../../lib/theme';
 
 type Step = 'role' | 'customer';
@@ -109,7 +110,7 @@ export default function Register() {
           <PasswordField label={copy.password} value={password} onChangeText={setPassword} show={showPw} onToggle={() => setShowPw((v) => !v)} />
           <PasswordField label={copy.passwordConfirm} value={password2} onChangeText={setPassword2} show={showPw} onToggle={() => setShowPw((v) => !v)} />
           {pwMismatch && <Text style={styles.err}>{copy.errPwMismatch}</Text>}
-          <Field label={copy.phone} value={phone} onChangeText={setPhone} placeholder={copy.phonePlaceholder} keyboardType="number-pad" ltr />
+          <Field label={copy.phone} value={phone} onChangeText={(t) => setPhone(normalizeDigits(t))} placeholder={copy.phonePlaceholder} keyboardType="number-pad" ltr />
 
           <Text style={styles.terms}>
             {copy.agreePre} {copy.termsLink}

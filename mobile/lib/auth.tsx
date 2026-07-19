@@ -10,6 +10,7 @@ import {
 } from 'react';
 
 import { copy } from './copy';
+import { normalizeDigits } from './normalizeDigits';
 import { supabase } from './supabase';
 
 // Roles as stored in profiles.role (server-controlled since migration 20260742).
@@ -28,9 +29,11 @@ export type AuthResult = {
 
 type AuthStatus = 'checking' | 'authed' | 'signedOut';
 
-// Yemen +967 default, mirrors the web app's e164() exactly.
+// Yemen +967 default, mirrors the web app's e164(). normalizeDigits first so
+// Arabic-Indic / Persian numerals (from Yemeni keyboards) become Latin before the
+// [^0-9] strip — otherwise every digit is dropped and the phone breaks silently.
 export const e164 = (p: string) => {
-  const s = String(p);
+  const s = normalizeDigits(String(p));
   return s.charAt(0) === '+' ? s : '+967' + s.replace(/[^0-9]/g, '').replace(/^0+/, '');
 };
 

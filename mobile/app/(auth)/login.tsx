@@ -11,6 +11,7 @@ import {
 
 import { useAuth } from '../../lib/auth';
 import { copy, validate } from '../../lib/copy';
+import { normalizeDigits } from '../../lib/normalizeDigits';
 import { colors, fonts } from '../../lib/theme';
 
 type Tab = 'customer' | 'vendor';
@@ -108,7 +109,7 @@ export default function Login() {
 
       {tab === 'vendor' && (
         <>
-          <Field label={copy.phone} value={phone} onChangeText={setPhone} placeholder={copy.phonePlaceholder} keyboardType="number-pad" />
+          <Field label={copy.phone} value={phone} onChangeText={(t) => setPhone(normalizeDigits(t))} placeholder={copy.phonePlaceholder} keyboardType="number-pad" />
           <PasswordField value={password} onChangeText={setPassword} show={showPw} onToggle={() => setShowPw((v) => !v)} />
           <ErrorText text={err} />
           <PrimaryButton label={busy ? copy.busy : copy.signIn} disabled={busy || !phoneOk || !password} onPress={doVendorLogin} />

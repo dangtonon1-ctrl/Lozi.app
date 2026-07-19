@@ -18,6 +18,17 @@ deferred and what "done" looks like.
 - Note: fresh, purpose-built test accounts now exist (see LOZI-brain/README.md), so the
   two overwritten rows no longer need to be used for testing.
 
+## Web app bugs (frozen reference — LOG ONLY, do not fix here)
+
+- [ ] **Arabic-Indic digits break phone auth on the web app.** `app.main.js`'s `e164()`
+      does `String(p).replace(/[^0-9]/g,'')` with no digit normalization, and the
+      `app.catalog.js` phone input doesn't normalize either. A Yemeni user who types their
+      phone in ٠١٢٣٤٥٦٧٨٩ gets every digit stripped → login/register fails silently. The
+      web already has normalizers (`arDigits` in chat.js, `weightKg` in app.shop.js) but
+      never applied them to the auth path. **Fixed in the RN app** via
+      `mobile/lib/normalizeDigits.ts` (used in `e164`, `validate.phone`, and phone inputs).
+      Left unfixed on the frozen web app by instruction; owner should port the fix there.
+
 ## Before launch
 
 - [ ] **`lozi://reset` deep link for in-app customer password recovery.** Task 1 ships
