@@ -39,10 +39,17 @@ deferred and what "done" looks like.
       probed either. **Owner must check**: Dashboard → Project Settings → Edge Functions →
       Secrets (shows the name if set), or `supabase secrets list --project-ref
       niloddwnllhsvrmuxfxw`.
-    - **Recommended (owner action; nothing changed by the agent):** if `TEST_BYPASS_CODE`
-      is set, `supabase secrets unset TEST_BYPASS_CODE` (or delete it in the dashboard).
-      Longer term, remove/guard the bypass code path itself before GA so it can't be
-      re-enabled by setting one env var.
+    - **If set now (owner action; nothing changed by the agent):** `supabase secrets unset
+      TEST_BYPASS_CODE` (or delete it in the dashboard). Current set-state unconfirmed in
+      the 2026-07-19 thread (owner's dashboard result came through as an unfilled
+      placeholder) — but per owner decision this is treated as a hard blocker regardless.
+- [ ] **PRE-LAUNCH BLOCKER (owner-designated 2026-07-19): remove the `TEST_BYPASS_CODE`
+      code path entirely from `verify-otp` and `request-otp`.** Not a nice-to-have. Unsetting
+      the env var is not sufficient — while the branch exists, a single env var can re-arm a
+      full auth bypass. "Done" = the `bypass`/`testMode` branches are deleted from both
+      functions (OTP verification always goes through Twilio), redeployed, and the deploy is
+      logged in `supabase/DEPLOYMENT_LOG.md`. Must land before GA. If a test path is still
+      needed pre-GA, gate it on a non-production project ref rather than an env flag.
 
 ## Web app bugs (frozen reference — LOG ONLY, do not fix here)
 
