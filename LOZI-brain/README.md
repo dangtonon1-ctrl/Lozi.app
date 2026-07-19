@@ -25,6 +25,20 @@ LOZI (لوزي) — Yemeni nuts/dried-fruit marketplace, Arabic RTL, single mark
 7. Arabic copy is lifted **verbatim** from the web app; never surface a raw
    Supabase/error `message` to the user (map to Arabic, generic Arabic fallback).
 
+### Exceptions to rule #2 (frozen web app) — granted explicitly, logged here
+
+Rule #2 stands. The web app is edited ONLY where the owner grants a specific, scoped,
+logged exception. This is not a loosening of the rule; each exception is enumerated:
+
+- **2026-07-19 — Arabic-Indic digit normalization in the web auth path.** Owner-approved
+  scoped exception. A live production bug silently blocked login/registration for Yemeni
+  users whose keyboards emit ٠١٢٣… (see `09-open-items.md`). Fix limited to `app.main.js`
+  `e164()` and the four `app.catalog.js` phone inputs (`setPhone`), reusing chat.js's
+  existing `arDigits` normalization pattern. Nothing else in the web app was touched.
+  Rationale: one-pattern change, no new logic, auth-path only, stops real users being
+  locked out for the months until RN ships. NOTE: lives on the RN feature branch — to reach
+  production it must be deployed (cherry-pick to main / release), which is the owner's call.
+
 ---
 
 ## Where we are (2026-07-19)
