@@ -18,6 +18,32 @@ deferred and what "done" looks like.
 - Note: fresh, purpose-built test accounts now exist (see LOZI-brain/README.md), so the
   two overwritten rows no longer need to be used for testing.
 
+## Security — OTP bypass backdoor in production edge functions
+
+- [ ] **`TEST_BYPASS_CODE` backdoor path is deployed in production.** Confirmed 2026-07-19
+      via MCP `get_edge_function`: `verify-otp` (v8, ACTIVE) contains
+      `const bypass = Deno.env.get("TEST_BYPASS_CODE") || ""; if (bypass.length>0 &&
+      String(code)===bypass) approved = true;` — i.e. **if that secret is set, its value is
+      a master OTP** that passes verification for any phone with no SMS. `request-otp` also
+      keys its whole test mode off the same var (skips the 24h rate limit, tolerates Twilio
+      failures). Impact **if set**: anyone who knows the value can (a) `purpose:reset` →
+      obtain a `setup_token` for **any existing account** → `vendor-forgot-password` → take
+      it over; (b) `purpose:register` → claim **any phone that's in `vendor_authorizations`**
+      without SMS. The SMS is the only possession factor, so this is a full auth bypass for
+      those accounts. (Note: it still can't touch a phone that is neither authorized nor
+      already an account.)
+    - **SET-state / value NOT verifiable from the agent environment**: no MCP secrets
+      endpoint; no Supabase CLI or Management-API PAT on the box; Supabase never returns a
+      secret's plaintext (only name + SHA-256 digest via the Management API); and the agent
+      proxy denies CONNECT to `niloddwnllhsvrmuxfxw.supabase.co`, so the endpoint can't be
+      probed either. **Owner must check**: Dashboard → Project Settings → Edge Functions →
+      Secrets (shows the name if set), or `supabase secrets list --project-ref
+      niloddwnllhsvrmuxfxw`.
+    - **Recommended (owner action; nothing changed by the agent):** if `TEST_BYPASS_CODE`
+      is set, `supabase secrets unset TEST_BYPASS_CODE` (or delete it in the dashboard).
+      Longer term, remove/guard the bypass code path itself before GA so it can't be
+      re-enabled by setting one env var.
+
 ## Web app bugs (frozen reference — LOG ONLY, do not fix here)
 
 - [ ] **Arabic-Indic digits break phone auth on the web app.** `app.main.js`'s `e164()`
