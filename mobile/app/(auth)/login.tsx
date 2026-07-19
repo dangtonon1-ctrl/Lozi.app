@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   Pressable,
@@ -114,6 +115,10 @@ export default function Login() {
           {/* Vendor password reset is OTP-based and ships with the register flow (increment 3). */}
         </>
       )}
+
+      <Pressable onPress={() => router.replace('/register')} hitSlop={8}>
+        <Text style={styles.registerLink}>{copy.createAccountLink}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -268,6 +273,7 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.45 },
   btnText: { fontSize: 17, fontFamily: fonts.bold, color: '#fff' },
   link: { fontSize: 14, fontFamily: fonts.medium, color: colors.greenDeep, textAlign: 'center', marginTop: 4 },
+  registerLink: { fontSize: 15, fontFamily: fonts.bold, color: colors.greenDeep, textAlign: 'center', marginTop: 16 },
   err: { fontSize: 13, fontFamily: fonts.medium, color: colors.danger, textAlign: 'center' },
   sent: { fontSize: 16, fontFamily: fonts.bold, color: colors.greenDeep, textAlign: 'center' },
 });

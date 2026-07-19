@@ -53,6 +53,11 @@ export const copy = {
   creating: 'جارٍ الإنشاء...',
   agreePre: 'بالمتابعة فأنت توافق على',
   termsLink: 'الشروط والأحكام',
+  createAccountLink: 'ليس لديك حساب؟ إنشاء حساب',
+  errPwMismatch: 'كلمتا المرور غير متطابقتين.',
+  // Temporary stub: vendor registration goes through the OTP flow, which ships in
+  // a later Task 1 sub-increment.
+  vendorRegSoon: 'تسجيل التجّار عبر رمز التحقق — قريباً.',
 
   // ── Vendor OTP ───────────────────────────────────────────────────────────
   otpTitle: 'أدخل رمز التحقق',
