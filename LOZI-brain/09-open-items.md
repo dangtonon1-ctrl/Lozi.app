@@ -62,6 +62,23 @@ deferred and what "done" looks like.
       `mobile/lib/normalizeDigits.ts` (used in `e164`, `validate.phone`, and phone inputs).
       Left unfixed on the frozen web app by instruction; owner should port the fix there.
 
+## Testing / verification
+
+- [ ] **Vendor OTP end-to-end test (register 3b + reset 3c) — PENDING a clean SIM.** The RN
+      vendor registration and password-reset flows shipped and typecheck/build clean, but the
+      full OTP round-trip (`request-otp` → real SMS → `verify-otp` → set password via
+      `vendor-forgot-password` → auto sign-in) has **not** been exercised on a device.
+      Blocked: no unused phone number available to the owner right now. The one candidate given
+      (`+967777184208`) turned out to be a real, active **wholesale** account
+      (أحمد محمد يحيى القعاري, user `8ddffebf-…`) — **not usable**, left untouched. Owner is
+      testing the vendor UI **up to the send-code step only** for now; do the full round when a
+      clean SIM exists. When that happens: create a NEW `vendor_authorizations` row
+      (`status='active'`, `role='farmer'`) for the genuinely-unused number only — never reuse
+      or overwrite a real row (standing rule #1); re-verify the number is absent from
+      `auth.users` / `vendor_authorizations` / `farmers` / `retail_stores` / `wholesale_stores`
+      first (phones are stored without `+` in `auth.users`, with `+967` in
+      `vendor_authorizations`).
+
 ## Before launch
 
 - [ ] **`lozi://reset` deep link for in-app customer password recovery.** Task 1 ships
