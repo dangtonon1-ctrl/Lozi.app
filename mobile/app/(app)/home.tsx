@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
@@ -87,12 +88,23 @@ export default function Home() {
             </Pressable>
           </View>
           {canSeeWholesale && (
-            <Pressable style={styles.wholesaleCard} onPress={soon}>
+            <Pressable
+              style={styles.wholesaleCard}
+              onPress={() => router.push({ pathname: '/catalog/[section]', params: { section: 'wholesale' } })}
+            >
               <Text style={styles.wholesaleText}>{copy.secWholesale}</Text>
               <Text style={styles.wholesaleArrow}>‹</Text>
             </Pressable>
           )}
-          <Text style={styles.title}>{copy.catalogTitle}</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{copy.catalogTitle}</Text>
+            <Pressable
+              onPress={() => router.push({ pathname: '/catalog/[section]', params: { section: 'all' } })}
+              hitSlop={8}
+            >
+              <Text style={styles.seeAll}>{copy.browseAll} ‹</Text>
+            </Pressable>
+          </View>
         </View>
       }
       renderItem={({ item }) => (
@@ -137,5 +149,7 @@ const styles = StyleSheet.create({
   },
   wholesaleText: { fontSize: 16, fontFamily: fonts.bold, color: colors.greenDeep },
   wholesaleArrow: { fontSize: 20, fontFamily: fonts.bold, color: colors.greenDeep },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 18, fontFamily: fonts.bold, color: colors.ink },
+  seeAll: { fontSize: 14, fontFamily: fonts.bold, color: colors.greenDeep },
 });

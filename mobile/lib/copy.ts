@@ -122,6 +122,25 @@ export const copy = {
   // ── Catalog ──────────────────────────────────────────────────────────────
   catalogTitle: 'المنتجات',
   secWholesale: 'سوق الجملة', // wholesale section (web sec_wholesale)
+  browseAll: 'كل المنتجات',
+  // Sort (verbatim option labels from the web select; rating added per owner).
+  sortTitle: 'الترتيب',
+  sortBest: 'الأنسب',
+  sortPriceAsc: 'السعر: الأرخص أولاً',
+  sortPriceDesc: 'السعر: الأغلى أولاً',
+  sortRating: 'الأعلى تقييماً',
+  sortNewest: 'الأحدث',
+  // Filters (verbatim from the web filter sheet).
+  filterTitle: 'الفلاتر',
+  filterVariety: 'الصنف',
+  filterPriceFrom: 'من',
+  filterPriceTo: 'إلى',
+  filterFreeDelivery: 'توصيل مجاني',
+  filterShahti: 'خالٍ من المرارة',
+  filterDiscount: 'خصم عام',
+  filterBundle: 'عروض المشكّل',
+  filterApply: 'تطبيق',
+  filterClear: 'مسح الفلاتر',
   // Card badges/states (verbatim from the web where a string exists).
   productImage: 'صورة المنتج', // image placeholder alt
   soldOut: 'نفد', // stock <= 0 overlay
