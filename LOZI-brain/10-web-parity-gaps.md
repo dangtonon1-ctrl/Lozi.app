@@ -97,8 +97,55 @@ re-litigated. They belong to the **cart task**, not Task 2 (catalog browsing):
       current store count, but it does not scale. Future fix: compute the discount inside the
       `browse_products` RPC (return the effective price + `old`), OR fetch offers only for the
       vendors of the products actually on screen. Do NOT solve now — logged so it isn't lost.
-- Note (data reality, 2026-07-19): production has **20 `retail` + 2 `wholesale`** products and
-      **zero `almond`/`raisin`** rows, yet the web home hardcodes almond/raisin section cards.
-      So those section grids are empty today; the real content is the retail catalog
-      (`p_section=null`) + the gated wholesale pair. Revisit the section model for the home
-      (Increment 4) rather than shipping dead section cards.
+### Home section model — CORRECTED 2026-07-19 (earlier note was wrong on a partial sample)
+
+- **The web home has FOUR section tiles + a gated wholesale tile, not two.** The `cats`
+  array is `[savings, retail, raisin, almond]` → RTL-rendered **اللوز / الزبيب / التجزئة /
+  التوفير**, plus a separate `showWholesale && …` tile → **سوق الجملة** (when
+  `can_see_wholesale`). My increment-4 home wrongly dropped the whole row believing sections
+  meant only almond/raisin. **`retail`/التجزئة is the section that holds all 20 products.**
+  The home rebuild MUST restore the full row: اللوز / الزبيب / التجزئة / التوفير (+ سوق الجملة).
+  Each tile → `go("sections",{section})` except التوفير → the separate Savings screen.
+  (Standing rule from this miss: investigate the *complete* web model before dropping any
+  element, never a partial sample.)
+
+### Home data-loading — DELIBERATE DIVERGENCE from the web (owner decision 2026-07-19)
+
+- **The web home loads the ENTIRE visible catalog** via a raw `from("products").select("*")`
+  into a client `dbProducts` array + realtime, and derives everything client-side (savings =
+  `cat==="savings"`, `عروض اليوم` = almond/raisin top-8, `متاجر مميّزة` = products grouped by
+  vendor). `browse_products` is used ONLY for the section browse screens.
+- **RN does NOT copy this** — weak-network conditions make a full-catalog fetch on every open
+  the wrong default. Instead:
+  - Home fetches only a **small capped set** for what it renders (rail + featured stores) — not
+    the whole catalog.
+  - Each **section loads on entry, 24/page via `browse_products`**.
+  - **التوفير/savings gets its own query when its tab opens** (not preloaded). browse_products
+    excludes savings, so savings needs a dedicated fetch (raw select filtered to
+    `category='savings'`, or a savings RPC).
+  - **متاجر مميّزة** and **التوفير** therefore need **their own queries** — they can't be
+    derived from a preloaded array the way the web does.
+  - **`عروض اليوم` rail stays almond/raisin-only** (empty today), exactly like the web.
+- **BUT keep realtime** (owner wants live updates): subscribe to `products` `postgres_changes`
+  and update whatever is currently on screen; **pause/unsubscribe when the app is backgrounded**
+  (`AppState`) to save battery/data. Realtime is independent of the initial-load strategy —
+  lazy load + live updates coexist. (Supabase realtime is JS-only websocket; no native module.)
+
+### Bottom tab shell — SHIPPED 2026-07-19
+
+- `app/(app)/(tabs)` Tabs layout: **home / sections / [savings|dashboard] / cart / profile**.
+  3rd tab swaps by role (customer → التوفير, seller → الطلبات) via `href:null`. Cart will show
+  a `cartCount` badge (cart task). Unimplemented tabs render `ComingSoon` (قريباً); sign-out
+  moved to the profile tab. `catalog/[section]` + `product/[id]` are Stack siblings that push
+  OVER the tabs.
+- [ ] **Tab icons are emoji placeholders** (🏠🗂️💰🚚🛒👤) — `@expo/vector-icons` isn't
+      installed and `react-native-svg` is deferred. Replace with tinted monochrome glyphs
+      (rasterized PNG + `tintColor`, or vector in the native batch) so active/inactive tint
+      properly. Brand-identity follow-up, same spirit as the rasterized role icons.
+
+### Home content still to build (after the tab shell)
+- [ ] Search bar (`ابحث عن لوز، زبيب، متجر…`) — client filter over the fetched set + stores.
+- [ ] `الطلب المسبق` (RFQ / pre-order) banner — separate RFQ feature, later.
+- [ ] Product weight on the card: render a unified value from `weight_grams` (19/20 populated,
+      all 1000 = «1 كجم»; 1 null → fall back to the free-text `weight.ar`). The free-text field
+      is seller-entered and inconsistent («1» / «1 كيلو» / «1 كجم» / «500» / «عرض مشكّل»).

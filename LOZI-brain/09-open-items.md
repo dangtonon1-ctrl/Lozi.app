@@ -105,3 +105,13 @@ deferred and what "done" looks like.
       user). Recovery today is a manual admin `profiles.role` update
       (`profiles_admin_update`). Admin panel should expose a "set/correct role" action.
       The email-signup→`customer` outcome is the intended invariant, not a bug.
+
+## Vendor app / data quality (later task)
+
+- [ ] **Structured weight selector in the vendor product form (the real fix for weight).**
+      `data.weight` is free text and inconsistent across products («1» / «1 كيلو» / «1 كجم» /
+      «500» / «عرض مشكّل»); both the web and RN show it verbatim. The structured `weight_grams`
+      column is reliable (19/20 populated, all 1000), so the RN catalog renders a unified value
+      from it (1000→«1 كجم», 500→«500 جم») and only falls back to the free text when
+      `weight_grams` is null. The durable fix is the **vendor app entering weight via a
+      structured selector** (grams/kg), not free text — deferred to the vendor-app work.

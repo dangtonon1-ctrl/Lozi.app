@@ -123,6 +123,14 @@ export const copy = {
   catalogTitle: 'المنتجات',
   secWholesale: 'سوق الجملة', // wholesale section (web sec_wholesale)
   browseAll: 'كل المنتجات',
+  // Bottom tab bar (verbatim nav_* labels). 3rd tab swaps by role: customer → التوفير,
+  // seller → الطلبات.
+  navHome: 'الرئيسية',
+  navSections: 'الأقسام',
+  navSavings: 'التوفير',
+  navDashboard: 'الطلبات',
+  navCart: 'السلة',
+  navProfile: 'حسابي',
   // Sort (verbatim option labels from the web select; rating added per owner).
   sortTitle: 'الترتيب',
   sortBest: 'الأنسب',

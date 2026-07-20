@@ -2,26 +2,23 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-import { SkeletonGrid } from '../../components/CatalogSkeleton';
-import { EmptyState, ErrorRetry } from '../../components/CatalogStates';
-import { ProductCard } from '../../components/ProductCard';
-import { useToast } from '../../components/Toast';
-import { useAuth } from '../../lib/auth';
-import { browseProducts, loadSectionVarieties, loadStores, type ErrKind, type Product } from '../../lib/catalog';
-import { copy } from '../../lib/copy';
-import { colors, fonts } from '../../lib/theme';
+import { SkeletonGrid } from '../../../components/CatalogSkeleton';
+import { EmptyState, ErrorRetry } from '../../../components/CatalogStates';
+import { ProductCard } from '../../../components/ProductCard';
+import { useToast } from '../../../components/Toast';
+import { useAuth } from '../../../lib/auth';
+import { browseProducts, loadSectionVarieties, loadStores, type ErrKind, type Product } from '../../../lib/catalog';
+import { copy } from '../../../lib/copy';
+import { colors, fonts } from '../../../lib/theme';
 
 type Phase = 'loading' | 'ready' | 'error';
 
-// Catalog home. Primary content is the retail catalog (browse-all), which doubles
-// as the DB + image connectivity check. Wholesale is a gated entry. The
-// almond/raisin section cards are intentionally dropped — production has no such
-// products yet (see 10-web-parity-gaps.md); sections return once data is
-// categorized. Sort/filter/infinite-scroll live on the dedicated browse screen
-// (increment 3); product detail and cart/favorites wiring come later (5 / cart),
-// so open/add/fav currently flash قريباً.
+// Interim home (moved under the tab shell). NOTE: this is rebuilt next with the
+// restored section row (اللوز/الزبيب/التجزئة/التوفير + gated سوق الجملة), lazy
+// capped fetches, and realtime — see 10-web-parity-gaps.md. Sign-out now lives on
+// the profile tab.
 export default function Home() {
-  const { role, logout } = useAuth();
+  const { role } = useAuth();
   const toast = useToast();
   const [phase, setPhase] = useState<Phase>('loading');
   const [errKind, setErrKind] = useState<ErrKind>('server');
@@ -76,21 +73,11 @@ export default function Home() {
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={colors.greenDeep}
-          colors={[colors.greenDeep]}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.greenDeep} colors={[colors.greenDeep]} />
       }
       ListHeaderComponent={
         <View style={styles.header}>
-          <View style={styles.topbar}>
-            <Text style={styles.brand}>لوزي</Text>
-            <Pressable onPress={logout} hitSlop={8} style={styles.logout}>
-              <Text style={styles.logoutText}>{copy.signOut}</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.brand}>لوزي</Text>
           {canSeeWholesale && (
             <Pressable
               style={styles.wholesaleCard}
@@ -138,10 +125,7 @@ const styles = StyleSheet.create({
   list: { padding: 16, paddingBottom: 40, backgroundColor: colors.cream },
   column: { justifyContent: 'space-between', marginBottom: 12 },
   header: { paddingTop: 40, gap: 14, marginBottom: 4 },
-  topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: { fontSize: 30, fontFamily: fonts.extraBold, color: colors.greenDeep },
-  logout: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1.5, borderColor: colors.line },
-  logoutText: { fontSize: 13, fontFamily: fonts.bold, color: colors.danger },
   wholesaleCard: {
     flexDirection: 'row',
     alignItems: 'center',
