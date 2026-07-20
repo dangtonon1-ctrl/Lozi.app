@@ -89,3 +89,16 @@ re-litigated. They belong to the **cart task**, not Task 2 (catalog browsing):
       went `stock ≤ 0` after being added must show a clear state (not silently priced/ordered).
 - [ ] **Same treatment in «طلباتي» (My Orders)** — thumbnails, per-store grouping, and
       deleted/out-of-stock handling apply to the order history screens too.
+
+### Catalog — tech debt (owner-agreed 2026-07-19)
+
+- [ ] **`loadStores` fetches every store + its offers in one query** (mirrors the web).
+      Discounts are then computed client-side from that map (`withDiscount`). Fine at the
+      current store count, but it does not scale. Future fix: compute the discount inside the
+      `browse_products` RPC (return the effective price + `old`), OR fetch offers only for the
+      vendors of the products actually on screen. Do NOT solve now — logged so it isn't lost.
+- Note (data reality, 2026-07-19): production has **20 `retail` + 2 `wholesale`** products and
+      **zero `almond`/`raisin`** rows, yet the web home hardcodes almond/raisin section cards.
+      So those section grids are empty today; the real content is the retail catalog
+      (`p_section=null`) + the gated wholesale pair. Revisit the section model for the home
+      (Increment 4) rather than shipping dead section cards.
