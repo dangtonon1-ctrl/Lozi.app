@@ -72,3 +72,20 @@ The PNGs are not a solution; they exist only to keep this JS-only/OTA until the 
       via `Keyboard` listeners). The Android native `softwareKeyboardLayoutMode:'resize'` flag is
       deferred to the native batch above (fingerprint reasons).
 - (add more as the auth screens are built)
+
+### Cart / checkout — deferred to the cart task (owner-agreed 2026-07-19)
+
+These were agreed earlier but never written down; recording them here so they aren't
+re-litigated. They belong to the **cart task**, not Task 2 (catalog browsing):
+- [ ] **Product image gallery / lightbox modal** — the web `LoziCarousel` supports
+      full-screen zoom (`ImageLightbox`). RN detail page gets the swipe carousel now; the
+      zoom/lightbox modal is deferred.
+- [ ] **Product name as a `Pressable` link** — tapping the product name opens the detail
+      page (web makes the whole card + name clickable). Wire when the detail route lands.
+- [ ] **Thumbnails in the cart** — each cart line shows the product image.
+- [ ] **Group cart by store** — cart items grouped per vendor (matches the web's
+      per-seller order grouping / `order_seller_groups`).
+- [ ] **Deleted / out-of-stock states in the cart** — a line whose product was removed or
+      went `stock ≤ 0` after being added must show a clear state (not silently priced/ordered).
+- [ ] **Same treatment in «طلباتي» (My Orders)** — thumbnails, per-store grouping, and
+      deleted/out-of-stock handling apply to the order history screens too.
