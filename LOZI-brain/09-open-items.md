@@ -86,6 +86,14 @@ deferred and what "done" looks like.
       Auth → URL Configuration → Redirect URLs, then handle the deep link (expo-linking)
       to route into the reset screen on `PASSWORD_RECOVERY`. Dashboard setting + client
       wiring; no schema change.
+- [ ] **LAUNCH BLOCKER: purge test products from the production DB before Google Play
+      release.** The live catalog is currently almost all test data («تجربة…», «Test…»,
+      «تعديل السعر», the `mine-retail`/`Test` stores, etc. — see the 2026-07-19 retail
+      audit). These must NOT ship to real users. **Do NOT delete now — we still need them
+      for RN testing.** Pre-release: identify test rows (test stores/vendors + obvious test
+      names) and remove them (or hide via `status`), with before/after evidence in
+      `DEPLOYMENT_LOG.md`. Coordinate with the test-account cleanup so real seed data (if any)
+      is preserved.
 
 ## Admin panel (backend)
 

@@ -118,6 +118,21 @@ export const copy = {
   // Generic fallback — shown for any auth error we haven't explicitly mapped, so
   // a raw Supabase message never reaches the user.
   errGeneric: 'حدث خطأ، حاول مرة أخرى.',
+
+  // ── Catalog ──────────────────────────────────────────────────────────────
+  // Card badges/states (verbatim from the web where a string exists).
+  productImage: 'صورة المنتج', // image placeholder alt
+  soldOut: 'نفد', // stock <= 0 overlay
+  savePrice: 'سعر التوفير', // special_price save tag (discounted)
+  shahtiTag: 'خالي من الشحطي', // shahti_badge on the card (filter uses خالٍ من المرارة)
+  bundleTag: 'عرض مشكّل',
+  pinnedTitle: 'مثبّت',
+  comingSoon: 'قريباً', // + / ♥ tap → not yet wired
+  // List states. The web returned a bare null on error; RN distinguishes network vs server.
+  catalogEmpty: 'لا توجد نتائج مطابقة',
+  errNetwork: 'تعذّر الاتصال بالإنترنت. تحقق من اتصالك وأعد المحاولة.',
+  errServerLoad: 'تعذّر تحميل المنتجات. حاول مرة أخرى.',
+  retry: 'إعادة المحاولة',
 } as const;
 
 // Validation rules mirrored from the web app.
