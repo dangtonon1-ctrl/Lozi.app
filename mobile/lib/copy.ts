@@ -154,6 +154,9 @@ export const copy = {
   errNetwork: 'تعذّر الاتصال بالإنترنت. تحقق من اتصالك وأعد المحاولة.',
   errServerLoad: 'تعذّر تحميل المنتجات. حاول مرة أخرى.',
   retry: 'إعادة المحاولة',
+  // Product detail
+  addToCart: 'أضف إلى السلة',
+  productNotFound: 'المنتج غير موجود',
 } as const;
 
 // Validation rules mirrored from the web app.

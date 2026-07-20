@@ -234,34 +234,72 @@ type StoreRow = {
   free_delivery: boolean | null;
 };
 
+const STORE_COLUMNS =
+  'vendor_id,name,image_path,offers,trusted_badge,badge_source,average_rating,ratings_count,shahti_free,free_delivery';
+
+function mapStoreRow(r: StoreRow): StoreInfo {
+  return {
+    name: r.name ?? '',
+    image: r.image_path ?? undefined,
+    trustedBadge: r.trusted_badge === true,
+    badgeSource: r.badge_source ?? undefined,
+    rating: toNum(r.average_rating),
+    ratingsCount: r.ratings_count ?? 0,
+    shahtiFree: r.shahti_free === true,
+    freeDelivery: r.free_delivery === true,
+    offers: r.offers ?? null,
+  };
+}
+
 // Loads every store's public info + offers in one query, building the vendorId→store
 // and vendorId→offers maps (mirrors the web loader). See 10-web-parity-gaps.md:
 // this "load all" is logged tech debt — fine at the current store count, doesn't scale.
 export async function loadStores(): Promise<StoresResult> {
   try {
-    const { data, error } = await supabase
-      .from('stores')
-      .select(
-        'vendor_id,name,image_path,offers,trusted_badge,badge_source,average_rating,ratings_count,shahti_free,free_delivery',
-      );
+    const { data, error } = await supabase.from('stores').select(STORE_COLUMNS);
     if (error) return { ok: false, kind: classifyError(error) };
     const storesMap: StoresMap = {};
     const storeOffers: StoreOffers = {};
     for (const r of (data ?? []) as StoreRow[]) {
       if (r.offers) storeOffers[r.vendor_id] = r.offers;
-      storesMap[r.vendor_id] = {
-        name: r.name ?? '',
-        image: r.image_path ?? undefined,
-        trustedBadge: r.trusted_badge === true,
-        badgeSource: r.badge_source ?? undefined,
-        rating: toNum(r.average_rating),
-        ratingsCount: r.ratings_count ?? 0,
-        shahtiFree: r.shahti_free === true,
-        freeDelivery: r.free_delivery === true,
-        offers: r.offers ?? null,
-      };
+      storesMap[r.vendor_id] = mapStoreRow(r);
     }
     return { ok: true, storesMap, storeOffers };
+  } catch (e) {
+    return { ok: false, kind: classifyError(e) };
+  }
+}
+
+export type ProductDetail = { product: Product; store: StoreInfo | null };
+export type ProductResult = { ok: true; detail: ProductDetail } | { ok: false; kind: ErrKind | 'not_found' };
+
+// Loads one available product by id (RLS still gates wholesale visibility on a
+// direct table read) plus its store, for the detail screen. Applies the store
+// discount so the price/old match the catalog.
+export async function loadProduct(id: string): Promise<ProductResult> {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .eq('status', 'available')
+      .maybeSingle();
+    if (error) return { ok: false, kind: classifyError(error) };
+    if (!data) return { ok: false, kind: 'not_found' };
+    const row = data as ProductRow;
+
+    let store: StoreInfo | null = null;
+    const offers: StoreOffers = {};
+    if (row.vendor_id) {
+      const { data: s } = await supabase.from('stores').select(STORE_COLUMNS).eq('vendor_id', row.vendor_id).maybeSingle();
+      if (s) {
+        const sr = s as StoreRow;
+        if (sr.offers) offers[sr.vendor_id] = sr.offers;
+        store = mapStoreRow(sr);
+      }
+    }
+    const product = withDiscount(rowToProduct(row), offers);
+    return { ok: true, detail: { product, store } };
   } catch (e) {
     return { ok: false, kind: classifyError(e) };
   }

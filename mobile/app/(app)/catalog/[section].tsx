@@ -133,6 +133,10 @@ export default function CatalogBrowse() {
   }, [phase, hasMore, loadingMore, refreshing, fetchPage]);
 
   const soon = useCallback(() => toast.show(copy.comingSoon), [toast]);
+  const openProduct = useCallback(
+    (prod: Product) => router.push({ pathname: '/product/[id]', params: { id: prod.id } }),
+    [],
+  );
   const fcount = activeFilterCount(filters);
   const title = sectionKey === 'all' ? copy.browseAll : sectionKey === 'wholesale' ? copy.secWholesale : sectionKey;
 
@@ -177,7 +181,7 @@ export default function CatalogBrowse() {
             product={item}
             fav={false}
             varietyLabel={item.variety ? varLabels[item.variety] : undefined}
-            onOpen={soon}
+            onOpen={openProduct}
             onAdd={soon}
             onFav={soon}
           />

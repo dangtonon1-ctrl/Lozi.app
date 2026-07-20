@@ -61,6 +61,10 @@ export default function Home() {
   }, [load]);
 
   const soon = useCallback(() => toast.show(copy.comingSoon), [toast]);
+  const openProduct = useCallback(
+    (prod: Product) => router.push({ pathname: '/product/[id]', params: { id: prod.id } }),
+    [],
+  );
   const canSeeWholesale = !!role && role !== 'customer';
 
   return (
@@ -112,7 +116,7 @@ export default function Home() {
           product={item}
           fav={false}
           varietyLabel={item.variety ? varLabels[item.variety] : undefined}
-          onOpen={soon}
+          onOpen={openProduct}
           onAdd={soon}
           onFav={soon}
         />
