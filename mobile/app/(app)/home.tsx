@@ -1,98 +1,141 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-import { useAuth, type Role } from '../../lib/auth';
+import { SkeletonGrid } from '../../components/CatalogSkeleton';
+import { EmptyState, ErrorRetry } from '../../components/CatalogStates';
+import { ProductCard } from '../../components/ProductCard';
+import { useToast } from '../../components/Toast';
+import { useAuth } from '../../lib/auth';
+import { browseProducts, loadSectionVarieties, loadStores, type ErrKind, type Product } from '../../lib/catalog';
 import { copy } from '../../lib/copy';
-import { supabase } from '../../lib/supabase';
 import { colors, fonts } from '../../lib/theme';
 
-const ROLE_LABEL: Record<Role, string> = {
-  customer: copy.roleCustomer,
-  farmer: copy.roleFarmer,
-  farmer_almond: copy.roleFarmer,
-  retail: copy.roleRetail,
-  wholesale: copy.roleWholesale,
-};
+type Phase = 'loading' | 'ready' | 'error';
 
-type ConnState = { kind: 'checking' } | { kind: 'ok' } | { kind: 'fail'; reason: string };
-
-// Placeholder authed screen for Task 1: proves session restore, the
-// server-derived role badge, connectivity, and sign-out. Real app shell lands
-// in later Phase 1 tasks.
+// Catalog home. Primary content is the retail catalog (browse-all), which doubles
+// as the DB + image connectivity check. Wholesale is a gated entry. The
+// almond/raisin section cards are intentionally dropped — production has no such
+// products yet (see 10-web-parity-gaps.md); sections return once data is
+// categorized. Sort/filter/infinite-scroll live on the dedicated browse screen
+// (increment 3); product detail and cart/favorites wiring come later (5 / cart),
+// so open/add/fav currently flash قريباً.
 export default function Home() {
-  const { role, person, logout } = useAuth();
-  const [conn, setConn] = useState<ConnState>({ kind: 'checking' });
+  const { role, logout } = useAuth();
+  const toast = useToast();
+  const [phase, setPhase] = useState<Phase>('loading');
+  const [errKind, setErrKind] = useState<ErrKind>('server');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [varLabels, setVarLabels] = useState<Record<string, string>>({});
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { error } = await supabase.from('products').select('id').limit(1);
-      if (cancelled) return;
-      setConn(error ? { kind: 'fail', reason: error.message } : { kind: 'ok' });
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const load = useCallback(async () => {
+    const [storesRes, vars] = await Promise.all([loadStores(), loadSectionVarieties()]);
+    const offers = storesRes.ok ? storesRes.storeOffers : {};
+    const res = await browseProducts({ section: null, sort: 'best', limit: 24 }, offers);
+    if (!res.ok) {
+      setErrKind(res.kind);
+      setPhase('error');
+      return;
+    }
+    const vmap: Record<string, string> = {};
+    for (const v of vars) vmap[v.variety_id] = v.label_ar;
+    setVarLabels(vmap);
+    setProducts(res.products);
+    setPhase('ready');
   }, []);
 
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
+  const retry = useCallback(() => {
+    setPhase('loading');
+    void load();
+  }, [load]);
+
+  const soon = useCallback(() => toast.show(copy.comingSoon), [toast]);
+  const canSeeWholesale = !!role && role !== 'customer';
+
   return (
-    <View style={styles.screen}>
-      <Text style={styles.brand}>لوزي</Text>
-
-      <Text style={styles.greeting}>
-        {copy.welcome}
-        {person.name ? ` · ${person.name}` : ''}
-      </Text>
-
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>{role ? (ROLE_LABEL[role] ?? role) : '—'}</Text>
-      </View>
-
-      {conn.kind === 'checking' && <ActivityIndicator color={colors.greenDeep} />}
-      {conn.kind === 'ok' && <Text style={[styles.status, styles.ok]}>نجح الاتصال</Text>}
-      {conn.kind === 'fail' && (
-        <>
-          <Text style={[styles.status, styles.fail]}>فشل الاتصال</Text>
-          <Text style={styles.reason}>{conn.reason}</Text>
-        </>
+    <FlatList
+      data={phase === 'ready' ? products : []}
+      keyExtractor={(p) => p.id}
+      numColumns={2}
+      columnWrapperStyle={styles.column}
+      contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.greenDeep}
+          colors={[colors.greenDeep]}
+        />
+      }
+      ListHeaderComponent={
+        <View style={styles.header}>
+          <View style={styles.topbar}>
+            <Text style={styles.brand}>لوزي</Text>
+            <Pressable onPress={logout} hitSlop={8} style={styles.logout}>
+              <Text style={styles.logoutText}>{copy.signOut}</Text>
+            </Pressable>
+          </View>
+          {canSeeWholesale && (
+            <Pressable style={styles.wholesaleCard} onPress={soon}>
+              <Text style={styles.wholesaleText}>{copy.secWholesale}</Text>
+              <Text style={styles.wholesaleArrow}>‹</Text>
+            </Pressable>
+          )}
+          <Text style={styles.title}>{copy.catalogTitle}</Text>
+        </View>
+      }
+      renderItem={({ item }) => (
+        <ProductCard
+          product={item}
+          fav={false}
+          varietyLabel={item.variety ? varLabels[item.variety] : undefined}
+          onOpen={soon}
+          onAdd={soon}
+          onFav={soon}
+        />
       )}
-
-      <Pressable style={styles.logout} onPress={logout} accessibilityRole="button">
-        <Text style={styles.logoutText}>{copy.signOut}</Text>
-      </Pressable>
-    </View>
+      ListEmptyComponent={
+        phase === 'loading' ? (
+          <SkeletonGrid />
+        ) : phase === 'error' ? (
+          <ErrorRetry kind={errKind} onRetry={retry} />
+        ) : (
+          <EmptyState />
+        )
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
+  list: { padding: 16, paddingBottom: 40, backgroundColor: colors.cream },
+  column: { justifyContent: 'space-between', marginBottom: 12 },
+  header: { paddingTop: 40, gap: 14, marginBottom: 4 },
+  topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  brand: { fontSize: 30, fontFamily: fonts.extraBold, color: colors.greenDeep },
+  logout: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1.5, borderColor: colors.line },
+  logoutText: { fontSize: 13, fontFamily: fonts.bold, color: colors.danger },
+  wholesaleCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 16,
-    backgroundColor: colors.cream,
-  },
-  brand: { fontSize: 40, fontFamily: fonts.extraBold, color: colors.greenDeep },
-  greeting: { fontSize: 18, fontFamily: fonts.medium, color: colors.ink, textAlign: 'center' },
-  badge: {
+    justifyContent: 'space-between',
     backgroundColor: colors.greenSoft,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-  },
-  badgeText: { fontSize: 15, fontFamily: fonts.bold, color: colors.greenDeep },
-  status: { fontSize: 20, fontFamily: fonts.bold },
-  ok: { color: colors.greenDeep },
-  fail: { color: colors.danger },
-  reason: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, textAlign: 'center' },
-  logout: {
-    marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 28,
     borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: colors.line,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  logoutText: { fontSize: 16, fontFamily: fonts.bold, color: colors.danger },
+  wholesaleText: { fontSize: 16, fontFamily: fonts.bold, color: colors.greenDeep },
+  wholesaleArrow: { fontSize: 20, fontFamily: fonts.bold, color: colors.greenDeep },
+  title: { fontSize: 18, fontFamily: fonts.bold, color: colors.ink },
 });

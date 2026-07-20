@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
-import { Animated, StyleSheet, Text } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { fonts } from '../lib/theme';
 
@@ -28,10 +28,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   return (
     <ToastContext.Provider value={{ show }}>
-      {children}
-      <Animated.View pointerEvents="none" style={[styles.toast, { opacity }]}>
-        <Text style={styles.text}>{message}</Text>
-      </Animated.View>
+      <View style={styles.root}>
+        {children}
+        <Animated.View pointerEvents="none" style={[styles.toast, { opacity }]}>
+          <Text style={styles.text}>{message}</Text>
+        </Animated.View>
+      </View>
     </ToastContext.Provider>
   );
 }
@@ -43,6 +45,7 @@ export function useToast(): ToastContextValue {
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   toast: {
     position: 'absolute',
     left: 24,

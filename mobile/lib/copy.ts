@@ -120,6 +120,8 @@ export const copy = {
   errGeneric: 'حدث خطأ، حاول مرة أخرى.',
 
   // ── Catalog ──────────────────────────────────────────────────────────────
+  catalogTitle: 'المنتجات',
+  secWholesale: 'سوق الجملة', // wholesale section (web sec_wholesale)
   // Card badges/states (verbatim from the web where a string exists).
   productImage: 'صورة المنتج', // image placeholder alt
   soldOut: 'نفد', // stock <= 0 overlay

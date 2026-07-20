@@ -108,7 +108,9 @@ function CardImage({ uri, soldOut, children }: { uri?: string; soldOut: boolean;
 
 const styles = StyleSheet.create({
   card: {
-    flex: 1,
+    // 2-column grid: consumers use space-between (FlatList columnWrapperStyle or a
+    // flexWrap row), so the card owns its column width. Odd last item sits at 48%.
+    width: '48%',
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: 16,
