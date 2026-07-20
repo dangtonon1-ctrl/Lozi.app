@@ -59,6 +59,21 @@ logged exception. This is not a loosening of the rule; each exception is enumera
     OTP `purpose:'reset'` → `verify-otp` → new password via `vendor-forgot-password` →
     auto sign-in). Done.
   - **Task 1 (auth) — feature-complete** pending device testing of the vendor flows.
+  - Keyboard-avoidance fix on all auth screens (JS-only; `components/KeyboardAwareScreen`,
+    logo shrink). Android `softwareKeyboardLayoutMode:'resize'` deferred to the native batch.
+- **Phase 1, Task 2 — Product browsing (customer catalog) — SHIPPED (all increments).**
+  - `lib/catalog.ts`: `browseProducts` (browse_products RPC, 24/page, rowToProduct +
+    withDiscount), `loadStores`/`loadSectionVarieties`/`loadProduct`, network-vs-server error
+    classification (fixes the web's silent `null`), `fmtMoney`/`CURRENCY_YER` ('ر.ي').
+  - Components: `ProductCard` (thumb, fixed image box, badges, ♥/+ → قريباً), `Money`,
+    `Toast`, `SortSheet`, `FilterSheet`, `ImageCarousel`, skeleton/empty/error-retry/footer.
+  - Screens: catalog home (retail grid + gated wholesale + كل المنتجات entry), browse
+    `catalog/[section]` (sort + filters + infinite scroll 24/page + pull-to-refresh),
+    product `product/[id]` (carousel + fields). Images are full public URLs (RN Image direct).
+  - **Data reality:** prod is all `retail`/`wholesale`, no `almond`/`raisin` — almond/raisin
+    section cards dropped (see 10-web-parity-gaps.md); sections return when data is categorized.
+  - Cart + favorites wiring deferred to the **cart task** (see 10-web-parity-gaps.md Cart
+    section); +/♥/add flash قريباً for now. Product detail carousel zoom/lightbox deferred.
 - **Security fixes — APPLIED + verified** (see DEPLOYMENT_LOG.md):
   - `20260741` FIX 2 — wholesale visibility gate in SECURITY DEFINER catalog RPCs.
   - `20260742` FIX 1 — signup role is server-controlled (derived from
