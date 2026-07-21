@@ -74,7 +74,7 @@ export default function Home() {
     void load();
   }, [load]);
 
-  useProductsRealtime(load); // live updates; pauses on background
+  const rt = useProductsRealtime(load); // live updates; pauses on background
 
   const soon = useCallback(() => toast.show(copy.comingSoon), [toast]);
   const openProduct = useCallback((p: Product) => router.push({ pathname: '/product/[id]', params: { id: p.id } }), []);
@@ -100,6 +100,13 @@ export default function Home() {
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 10 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* TEMP realtime diagnostic pill — remove once the cause is confirmed */}
+        <View style={styles.rtDebug}>
+          <Text style={styles.rtDebugText}>
+            RT: {rt.status} · events:{rt.events} · last:{rt.lastAt ? new Date(rt.lastAt).toLocaleTimeString() : '—'} · token:{rt.hasToken ? 'yes' : 'no'}
+          </Text>
+        </View>
+
         {/* 1 — search + notifications */}
         <View style={styles.searchRow}>
           <Pressable style={styles.searchBox} onPress={soon}>
@@ -259,6 +266,9 @@ function RowLoader() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.cream },
   scroll: { paddingHorizontal: 16, paddingBottom: 96, gap: 6 },
+  // TEMP realtime diagnostic pill styles — remove with the pill.
+  rtDebug: { backgroundColor: '#1c1c1c', borderRadius: 8, paddingVertical: 5, paddingHorizontal: 10, marginBottom: 4 },
+  rtDebugText: { color: '#7CFC9A', fontSize: 11, fontFamily: fonts.regular, textAlign: 'left' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
   searchBox: {
     flex: 1,
