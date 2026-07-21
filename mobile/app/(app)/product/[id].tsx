@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState, ErrorRetry } from '../../../components/CatalogStates';
 import { ImageCarousel } from '../../../components/ImageCarousel';
@@ -18,6 +19,7 @@ export default function ProductScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
   const toast = useToast();
+  const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>('loading');
   const [errKind, setErrKind] = useState<ErrKind>('server');
   const [notFound, setNotFound] = useState(false);
@@ -48,7 +50,7 @@ export default function ProductScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.topbar}>
+      <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={8} style={styles.iconBtn}>
           <Text style={styles.back}>‹</Text>
         </Pressable>
@@ -86,7 +88,7 @@ export default function ProductScreen() {
             </View>
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
             <Pressable style={[styles.addBtn, soldOut && styles.addBtnDisabled]} disabled={soldOut} onPress={soon}>
               <Text style={styles.addText}>{soldOut ? copy.soldOut : copy.addToCart}</Text>
             </Pressable>

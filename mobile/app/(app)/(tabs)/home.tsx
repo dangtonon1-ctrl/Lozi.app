@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SkeletonGrid } from '../../../components/CatalogSkeleton';
 import { EmptyState, ErrorRetry } from '../../../components/CatalogStates';
@@ -20,6 +21,7 @@ type Phase = 'loading' | 'ready' | 'error';
 export default function Home() {
   const { role } = useAuth();
   const toast = useToast();
+  const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>('loading');
   const [errKind, setErrKind] = useState<ErrKind>('server');
   const [products, setProducts] = useState<Product[]>([]);
@@ -76,7 +78,7 @@ export default function Home() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.greenDeep} colors={[colors.greenDeep]} />
       }
       ListHeaderComponent={
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <Text style={styles.brand}>لوزي</Text>
           {canSeeWholesale && (
             <Pressable

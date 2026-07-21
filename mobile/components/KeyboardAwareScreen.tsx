@@ -9,6 +9,7 @@ import {
   type TargetedEvent,
   type ViewStyle,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // True while the software keyboard is on screen. Auth screens use it to shrink
 // or hide the brand mark so the focused field isn't pushed under the keyboard.
@@ -43,6 +44,7 @@ export function KeyboardAwareScreen({
   contentContainerStyle?: StyleProp<ViewStyle>;
 }) {
   const scrollRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
 
   const onInputFocus = useCallback<InputFocusHandler>((e) => {
     const node = e?.nativeEvent?.target;
@@ -63,7 +65,7 @@ export function KeyboardAwareScreen({
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={[{ flexGrow: 1, paddingBottom: 40 }, contentContainerStyle]}
+        contentContainerStyle={[{ flexGrow: 1 }, contentContainerStyle, { paddingBottom: insets.bottom + 40 }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >

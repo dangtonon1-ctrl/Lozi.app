@@ -1,14 +1,25 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { type ComponentProps } from 'react';
+import { type ColorValue } from 'react-native';
 
 import { useAuth } from '../../../lib/auth';
 import { copy } from '../../../lib/copy';
 import { colors, fonts } from '../../../lib/theme';
 
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
+// Ionicons line icons (single-color, tinted by active state) — OTA-safe (JS + font
+// asset over expo-font, no native module, fingerprint unchanged). Outline when
+// inactive, filled when focused.
+function tabIcon(outline: IoniconName, filled: IoniconName) {
+  return ({ color, size, focused }: { color: ColorValue; size: number; focused: boolean }) => (
+    <Ionicons name={focused ? filled : outline} size={size ?? 22} color={color} />
+  );
+}
+
 // Bottom tab shell. Five tabs; the 3rd swaps by role — customer → التوفير (savings),
-// seller → الطلبات (dashboard) — via href:null to hide the inactive one. Icons are
-// emoji placeholders for now (tinted vector/rasterized icons are a logged parity
-// gap — @expo/vector-icons isn't installed and react-native-svg is deferred).
+// seller → الطلبات (dashboard) — via href:null to hide the inactive one.
 export default function TabsLayout() {
   const { role } = useAuth();
   const isSeller = !!role && role !== 'customer';
@@ -24,22 +35,18 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
       }}
     >
-      <Tabs.Screen name="home" options={{ title: copy.navHome, tabBarIcon: () => <Ico e="🏠" /> }} />
-      <Tabs.Screen name="sections" options={{ title: copy.navSections, tabBarIcon: () => <Ico e="🗂️" /> }} />
+      <Tabs.Screen name="home" options={{ title: copy.navHome, tabBarIcon: tabIcon('home-outline', 'home') }} />
+      <Tabs.Screen name="sections" options={{ title: copy.navSections, tabBarIcon: tabIcon('grid-outline', 'grid') }} />
       <Tabs.Screen
         name="savings"
-        options={{ href: isSeller ? null : '/savings', title: copy.navSavings, tabBarIcon: () => <Ico e="💰" /> }}
+        options={{ href: isSeller ? null : '/savings', title: copy.navSavings, tabBarIcon: tabIcon('pricetags-outline', 'pricetags') }}
       />
       <Tabs.Screen
         name="dashboard"
-        options={{ href: isSeller ? '/dashboard' : null, title: copy.navDashboard, tabBarIcon: () => <Ico e="🚚" /> }}
+        options={{ href: isSeller ? '/dashboard' : null, title: copy.navDashboard, tabBarIcon: tabIcon('receipt-outline', 'receipt') }}
       />
-      <Tabs.Screen name="cart" options={{ title: copy.navCart, tabBarIcon: () => <Ico e="🛒" /> }} />
-      <Tabs.Screen name="profile" options={{ title: copy.navProfile, tabBarIcon: () => <Ico e="👤" /> }} />
+      <Tabs.Screen name="cart" options={{ title: copy.navCart, tabBarIcon: tabIcon('cart-outline', 'cart') }} />
+      <Tabs.Screen name="profile" options={{ title: copy.navProfile, tabBarIcon: tabIcon('person-outline', 'person') }} />
     </Tabs>
   );
-}
-
-function Ico({ e }: { e: string }) {
-  return <Text style={{ fontSize: 20 }}>{e}</Text>;
 }

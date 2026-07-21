@@ -5,6 +5,7 @@ import {
   Tajawal_800ExtraBold,
   useFonts,
 } from '@expo-google-fonts/tajawal';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
@@ -22,6 +23,9 @@ export default function RootLayout() {
     Tajawal_500Medium,
     Tajawal_700Bold,
     Tajawal_800ExtraBold,
+    // Icon font ships as a JS-bundled asset via OTA (expo-font is already native);
+    // load it up front so tab icons don't flash in.
+    ...Ionicons.font,
   });
 
   if (!fontsLoaded) return null;

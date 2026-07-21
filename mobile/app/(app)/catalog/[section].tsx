@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SkeletonGrid } from '../../../components/CatalogSkeleton';
 import { EmptyState, ErrorRetry, ListFooterLoader } from '../../../components/CatalogStates';
@@ -31,6 +32,7 @@ export default function CatalogBrowse() {
   const params = useLocalSearchParams<{ section?: string }>();
   const sectionKey = typeof params.section === 'string' ? params.section : 'all';
   const toast = useToast();
+  const insets = useSafeAreaInsets();
 
   const [sort, setSort] = useState<Sort>('best');
   const [filters, setFilters] = useState<CatalogFilters>(EMPTY_FILTERS);
@@ -142,7 +144,7 @@ export default function CatalogBrowse() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
           <Text style={styles.back}>‹</Text>
         </Pressable>
@@ -169,7 +171,7 @@ export default function CatalogBrowse() {
         keyExtractor={(p) => p.id}
         numColumns={2}
         columnWrapperStyle={styles.column}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
