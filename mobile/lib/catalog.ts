@@ -305,6 +305,84 @@ export async function loadProduct(id: string): Promise<ProductResult> {
   }
 }
 
+// A store as returned by browse_stores (aggregated, wholesale-gated server-side).
+export type StoreCard = {
+  vendorId: string;
+  name: string;
+  image?: string;
+  description?: string;
+  trustedBadge: boolean;
+  rating: number | null;
+  ratingsCount: number;
+  productCount: number;
+  inStockCount: number;
+  minPrice: number | null;
+  offers: StoreOffer | null;
+};
+
+type StoreCardRow = {
+  vendor_id: string;
+  name: string | null;
+  image_path: string | null;
+  description: string | null;
+  offers: StoreOffer | null;
+  trusted_badge: boolean | null;
+  average_rating: number | string | null;
+  ratings_count: number | null;
+  product_count: number | null;
+  in_stock_count: number | null;
+  min_price: number | string | null;
+};
+
+function mapStoreCard(r: StoreCardRow): StoreCard {
+  return {
+    vendorId: r.vendor_id,
+    name: r.name ?? '',
+    image: r.image_path ?? undefined,
+    description: r.description ?? undefined,
+    trustedBadge: r.trusted_badge === true,
+    rating: toNum(r.average_rating),
+    ratingsCount: r.ratings_count ?? 0,
+    productCount: r.product_count ?? 0,
+    inStockCount: r.in_stock_count ?? 0,
+    minPrice: toNum(r.min_price),
+    offers: r.offers ?? null,
+  };
+}
+
+// Build a vendorId→offers map from already-fetched store cards, so the home can
+// apply discounts to the rail without a separate load-all-stores query.
+export function offersFromStores(stores: StoreCard[]): StoreOffers {
+  const m: StoreOffers = {};
+  for (const s of stores) if (s.offers) m[s.vendorId] = s.offers;
+  return m;
+}
+
+// Capped featured-stores fetch (browse_stores RPC). The home uses this instead of
+// loading the whole store table (per the lazy-load decision, see 10-web-parity-gaps).
+export async function browseStores(o: {
+  section?: string | null;
+  sort?: Sort;
+  limit?: number;
+}): Promise<{ ok: true; stores: StoreCard[] } | { ok: false; kind: ErrKind }> {
+  try {
+    const { data, error } = await supabase.rpc('browse_stores', {
+      p_section: o.section ?? null,
+      p_sort: o.sort ?? 'best',
+      p_varieties: null,
+      p_shahti_only: false,
+      p_free_delivery_only: false,
+      p_limit: o.limit ?? 6,
+      p_offset: 0,
+    });
+    if (error) return { ok: false, kind: classifyError(error) };
+    const rows = (data ?? []) as StoreCardRow[];
+    return { ok: true, stores: rows.map(mapStoreCard) };
+  } catch (e) {
+    return { ok: false, kind: classifyError(e) };
+  }
+}
+
 export async function loadSectionVarieties(): Promise<SectionVariety[]> {
   try {
     const { data, error } = await supabase

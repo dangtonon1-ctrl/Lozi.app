@@ -138,14 +138,32 @@ re-litigated. They belong to the **cart task**, not Task 2 (catalog browsing):
   a `cartCount` badge (cart task). Unimplemented tabs render `ComingSoon` (قريباً); sign-out
   moved to the profile tab. `catalog/[section]` + `product/[id]` are Stack siblings that push
   OVER the tabs.
-- [ ] **Tab icons are emoji placeholders** (🏠🗂️💰🚚🛒👤) — `@expo/vector-icons` isn't
-      installed and `react-native-svg` is deferred. Replace with tinted monochrome glyphs
-      (rasterized PNG + `tintColor`, or vector in the native batch) so active/inactive tint
-      properly. Brand-identity follow-up, same spirit as the rasterized role icons.
+- [x] **Tab icons** now use **Ionicons** (`@expo/vector-icons`), outline/filled + tinted by
+      state. Confirmed OTA-safe: no native module (uses the already-native `expo-font`),
+      fingerprint unchanged (`ac845149`), `Ionicons.ttf` ships as a bundled asset.
 
-### Home content still to build (after the tab shell)
-- [ ] Search bar (`ابحث عن لوز، زبيب، متجر…`) — client filter over the fetched set + stores.
-- [ ] `الطلب المسبق` (RFQ / pre-order) banner — separate RFQ feature, later.
-- [ ] Product weight on the card: render a unified value from `weight_grams` (19/20 populated,
-      all 1000 = «1 كجم»; 1 null → fall back to the free-text `weight.ar`). The free-text field
-      is seller-entered and inconsistent («1» / «1 كيلو» / «1 كجم» / «500» / «عرض مشكّل»).
+### Home — REBUILT 2026-07-19 (web-faithful, on the tab shell)
+
+Full web structure, top→bottom: search + bell, تسوّق حسب / الأقسام (4 scrollable section
+tiles savings/retail/raisin/almond + gated سوق الجملة is a banner, not a tile), طازج اليوم /
+عروض اليوم rail (almond/raisin, empty today), the three banners (الطلب المسبق / أضف منتجك /
+سوق الجملة) with web order + gating + subtitles, الأعلى تقييماً / متاجر مميّزة, floating chat
+FAB. Lazy/capped fetches (`browseStores` limit 6 + almond/raisin rail), realtime with
+background pause (`lib/realtime.ts`), verbatim weight text.
+
+- [ ] **Gradients need a build — NOT OTA-shippable** (confirmed 2026-07-19: installing
+      `expo-linear-gradient` changes the fingerprint → new APK). Banner backgrounds use the
+      first gradient stop as a solid now (`backgroundColor: colors[0]`); each `Banner` is
+      structured so swapping in `<LinearGradient colors={c}>` is a one-line change. Exact
+      gradients recorded: rfq `#2F5E3E→#C08A43`, farmer `#8a5a78→#6b3f5a`, wholesale
+      `#5e4a30→#42321e`; tile circles rfq… see TILES in home.tsx.
+- [ ] **`react-native-svg` needs a build** (same fingerprint proof). Section tiles use the
+      **exact web CatGlyph shapes rasterized to PNG** (`cat-almond/raisin/retail/savings.png`)
+      — a deliberate, more-faithful choice than Ionicons for the tiles (Ionicons has no
+      almond/raisin). Swap to real `react-native-svg` CatGlyph components in the native batch.
+- [ ] **Search** is a tap-target styled like the web search bar → `قريباً` (real search =
+      later). **Notifications bell**, **الطلب المسبق (RFQ)**, **أضف منتجك**, and the **chat FAB**
+      are rendered in place, visually complete, → `قريباً` (features not built in RN yet).
+- Weight on the card stays **verbatim free text** — `weight_grams` is a stale backfill (all
+  1000, contradicts `"500"`/`"عرض مشكّل"`), NOT wired; real fix = vendor structured selector
+  (09-open-items).

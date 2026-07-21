@@ -131,6 +131,28 @@ export const copy = {
   navDashboard: 'الطلبات',
   navCart: 'السلة',
   navProfile: 'حسابي',
+  // Home (verbatim from the web home render).
+  searchPlaceholder: 'ابحث عن لوز، زبيب، متجر…',
+  homeShopBy: 'تسوّق حسب',
+  homeFreshToday: 'طازج اليوم',
+  homeOffersTitle: 'عروض اليوم',
+  homeTopRated: 'الأعلى تقييماً',
+  homeFeaturedStores: 'متاجر مميّزة',
+  seeAll: 'عرض الكل',
+  homeNoOffers: 'لا توجد عروض حالياً',
+  // Section tiles.
+  secAlmond: 'اللوز',
+  secRaisin: 'الزبيب',
+  secRetail: 'التجزئة',
+  secSavings: 'التوفير',
+  // Feature banners.
+  rfqTitle: 'الطلب المسبق',
+  rfqSub: 'اطلب عرض سعر من عدة بائعين',
+  addProductTitle: 'أضف منتجك',
+  addProductSubFarmer: 'انشر محصولك ليصل إلى الزبائن',
+  addProductSubRetail: 'انشر منتجك في قسم التجزئة',
+  addProductSubWholesale: 'انشر منتجك في قسم الجملة',
+  wholesaleBannerSub: 'أسعار الجملة لمحلات التجزئة',
   // Sort (verbatim option labels from the web select; rating added per owner).
   sortTitle: 'الترتيب',
   sortBest: 'الأنسب',

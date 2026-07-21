@@ -1,5 +1,5 @@
 import { memo, useState, type ReactNode } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { type DimensionValue, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { cardImage, fmtMoney, type Product } from '../lib/catalog';
 import { copy } from '../lib/copy';
@@ -13,18 +13,19 @@ type Props = {
   onFav: (p: Product) => void;
   fav?: boolean;
   varietyLabel?: string; // resolved section_varieties label_ar; falls back to the raw id
+  width?: DimensionValue; // '48%' in the 2-col grid; a fixed px width in a horizontal rail
 };
 
 // Grid card: single (thumbnail) image with a fixed square area (no layout jump on
 // weak networks) + a clear placeholder before load / on error. Badges, price, and
 // a mini + button mirror the web ProductCard. Best-seller / limited-offer badges are
 // omitted here because browse_products doesn't return sold counts.
-export const ProductCard = memo(function ProductCard({ product, onOpen, onAdd, onFav, fav, varietyLabel }: Props) {
+export const ProductCard = memo(function ProductCard({ product, onOpen, onAdd, onFav, fav, varietyLabel, width = '48%' }: Props) {
   const p = product;
   const soldOut = p.stock != null && p.stock <= 0;
   const variety = varietyLabel ?? p.variety;
   return (
-    <Pressable style={styles.card} onPress={() => onOpen(p)}>
+    <Pressable style={[styles.card, { width }]} onPress={() => onOpen(p)}>
       <CardImage uri={cardImage(p)} soldOut={soldOut}>
         {soldOut && (
           <View style={styles.soldTag}>
@@ -108,9 +109,7 @@ function CardImage({ uri, soldOut, children }: { uri?: string; soldOut: boolean;
 
 const styles = StyleSheet.create({
   card: {
-    // 2-column grid: consumers use space-between (FlatList columnWrapperStyle or a
-    // flexWrap row), so the card owns its column width. Odd last item sits at 48%.
-    width: '48%',
+    // Width comes from the `width` prop ('48%' in the 2-col grid; a fixed px in a rail).
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: 16,

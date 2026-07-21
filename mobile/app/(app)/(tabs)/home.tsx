@@ -1,46 +1,72 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { type ComponentProps, useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Image, type ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SkeletonGrid } from '../../../components/CatalogSkeleton';
-import { EmptyState, ErrorRetry } from '../../../components/CatalogStates';
+import { ErrorRetry } from '../../../components/CatalogStates';
 import { ProductCard } from '../../../components/ProductCard';
 import { useToast } from '../../../components/Toast';
 import { useAuth } from '../../../lib/auth';
-import { browseProducts, loadSectionVarieties, loadStores, type ErrKind, type Product } from '../../../lib/catalog';
+import {
+  browseProducts,
+  browseStores,
+  offersFromStores,
+  withDiscount,
+  type ErrKind,
+  type Product,
+  type StoreCard,
+} from '../../../lib/catalog';
 import { copy } from '../../../lib/copy';
+import { useProductsRealtime } from '../../../lib/realtime';
 import { colors, fonts } from '../../../lib/theme';
 
 type Phase = 'loading' | 'ready' | 'error';
 
-// Interim home (moved under the tab shell). NOTE: this is rebuilt next with the
-// restored section row (اللوز/الزبيب/التجزئة/التوفير + gated سوق الجملة), lazy
-// capped fetches, and realtime — see 10-web-parity-gaps.md. Sign-out now lives on
-// the profile tab.
+// Section tiles (web `cats` order savings/retail/raisin/almond → RTL renders
+// almond…savings left-to-right). Colors are the two gradient stops of each web
+// .cat-ic; the icon circle uses the first stop solid now — swap the View for a
+// LinearGradient(colors) once the native batch lands (one line). Glyphs are the
+// exact web CatGlyph shapes rasterized to PNG (Ionicons has no almond/raisin).
+type Tile = { key: string; label: string; colors: [string, string]; icon: ImageSourcePropType; savingsTab?: boolean };
+const TILES: Tile[] = [
+  { key: 'savings', label: copy.secSavings, colors: ['#D9A85E', '#B9822F'], icon: require('../../../assets/cat-savings.png'), savingsTab: true },
+  { key: 'retail', label: copy.secRetail, colors: ['#3C6B4A', '#26492F'], icon: require('../../../assets/cat-retail.png') },
+  { key: 'raisin', label: copy.secRaisin, colors: ['#7E4A69', '#5A3049'], icon: require('../../../assets/cat-raisin.png') },
+  { key: 'almond', label: copy.secAlmond, colors: ['#C89B54', '#9A6E2F'], icon: require('../../../assets/cat-almond.png') },
+];
+
 export default function Home() {
   const { role } = useAuth();
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>('loading');
   const [errKind, setErrKind] = useState<ErrKind>('server');
-  const [products, setProducts] = useState<Product[]>([]);
-  const [varLabels, setVarLabels] = useState<Record<string, string>>({});
-  const [refreshing, setRefreshing] = useState(false);
+  const [rail, setRail] = useState<Product[]>([]);
+  const [featured, setFeatured] = useState<StoreCard[]>([]);
+
+  const isVendor = !!role && role !== 'customer';
 
   const load = useCallback(async () => {
-    const [storesRes, vars] = await Promise.all([loadStores(), loadSectionVarieties()]);
-    const offers = storesRes.ok ? storesRes.storeOffers : {};
-    const res = await browseProducts({ section: null, sort: 'best', limit: 24 }, offers);
-    if (!res.ok) {
-      setErrKind(res.kind);
+    // Lazy/capped (not load-all): featured stores + the almond/raisin عروض اليوم
+    // rail. Rail is empty today (no almond/raisin products) — kept web-faithful.
+    const [storesRes, almondRes, raisinRes] = await Promise.all([
+      browseStores({ limit: 6 }),
+      browseProducts({ section: 'almond', sort: 'best', limit: 8 }),
+      browseProducts({ section: 'raisin', sort: 'best', limit: 8 }),
+    ]);
+    if (!storesRes.ok) {
+      setErrKind(storesRes.kind);
       setPhase('error');
       return;
     }
-    const vmap: Record<string, string> = {};
-    for (const v of vars) vmap[v.variety_id] = v.label_ar;
-    setVarLabels(vmap);
-    setProducts(res.products);
+    const offers = offersFromStores(storesRes.stores);
+    const railRaw = [
+      ...(almondRes.ok ? almondRes.products : []),
+      ...(raisinRes.ok ? raisinRes.products : []),
+    ];
+    setFeatured(storesRes.stores);
+    setRail(railRaw.map((p) => withDiscount(p, offers)).slice(0, 8));
     setPhase('ready');
   }, []);
 
@@ -48,98 +74,276 @@ export default function Home() {
     void load();
   }, [load]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
-
-  const retry = useCallback(() => {
-    setPhase('loading');
-    void load();
-  }, [load]);
+  useProductsRealtime(load); // live updates; pauses on background
 
   const soon = useCallback(() => toast.show(copy.comingSoon), [toast]);
-  const openProduct = useCallback(
-    (prod: Product) => router.push({ pathname: '/product/[id]', params: { id: prod.id } }),
+  const openProduct = useCallback((p: Product) => router.push({ pathname: '/product/[id]', params: { id: p.id } }), []);
+  const openTile = useCallback(
+    (tile: Tile) => {
+      if (tile.savingsTab) router.navigate('/savings');
+      else router.push({ pathname: '/catalog/[section]', params: { section: tile.key } });
+    },
     [],
   );
-  const canSeeWholesale = !!role && role !== 'customer';
+  const openAll = useCallback(() => router.push({ pathname: '/catalog/[section]', params: { section: 'all' } }), []);
+
+  const farmerSub =
+    role === 'retail'
+      ? copy.addProductSubRetail
+      : role === 'wholesale'
+        ? copy.addProductSubWholesale
+        : copy.addProductSubFarmer;
 
   return (
-    <FlatList
-      data={phase === 'ready' ? products : []}
-      keyExtractor={(p) => p.id}
-      numColumns={2}
-      columnWrapperStyle={styles.column}
-      contentContainerStyle={styles.list}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.greenDeep} colors={[colors.greenDeep]} />
-      }
-      ListHeaderComponent={
-        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <Text style={styles.brand}>لوزي</Text>
-          {canSeeWholesale && (
-            <Pressable
-              style={styles.wholesaleCard}
-              onPress={() => router.push({ pathname: '/catalog/[section]', params: { section: 'wholesale' } })}
-            >
-              <Text style={styles.wholesaleText}>{copy.secWholesale}</Text>
-              <Text style={styles.wholesaleArrow}>‹</Text>
-            </Pressable>
-          )}
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>{copy.catalogTitle}</Text>
-            <Pressable
-              onPress={() => router.push({ pathname: '/catalog/[section]', params: { section: 'all' } })}
-              hitSlop={8}
-            >
-              <Text style={styles.seeAll}>{copy.browseAll} ‹</Text>
-            </Pressable>
-          </View>
+    <View style={styles.root}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 10 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 1 — search + notifications */}
+        <View style={styles.searchRow}>
+          <Pressable style={styles.searchBox} onPress={soon}>
+            <Ionicons name="search" size={18} color={colors.muted} />
+            <Text style={styles.searchPlaceholder}>{copy.searchPlaceholder}</Text>
+          </Pressable>
+          <Pressable style={styles.bell} onPress={soon} hitSlop={6}>
+            <Ionicons name="notifications-outline" size={22} color={colors.greenDeep} />
+          </Pressable>
         </View>
-      }
-      renderItem={({ item }) => (
-        <ProductCard
-          product={item}
-          fav={false}
-          varietyLabel={item.variety ? varLabels[item.variety] : undefined}
-          onOpen={openProduct}
-          onAdd={soon}
-          onFav={soon}
-        />
-      )}
-      ListEmptyComponent={
-        phase === 'loading' ? (
-          <SkeletonGrid />
-        ) : phase === 'error' ? (
-          <ErrorRetry kind={errKind} onRetry={retry} />
+
+        {/* 2 — تسوّق حسب / الأقسام */}
+        <SecHead eyebrow={copy.homeShopBy} title={copy.navSections} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tileRow}>
+          {TILES.map((t) => (
+            <Pressable key={t.key} style={styles.tile} onPress={() => openTile(t)}>
+              <View style={[styles.tileIc, { backgroundColor: t.colors[0] }]}>
+                <Image source={t.icon} style={styles.tileIcImg} resizeMode="contain" />
+              </View>
+              <Text style={styles.tileLabel}>{t.label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        {/* 3 — طازج اليوم / عروض اليوم + عرض الكل */}
+        <SecHead eyebrow={copy.homeFreshToday} title={copy.homeOffersTitle} action={copy.seeAll} onAction={openAll} />
+        {phase === 'loading' ? (
+          <RowLoader />
+        ) : rail.length ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+            {rail.map((p) => (
+              <ProductCard key={p.id} product={p} width={158} onOpen={openProduct} onAdd={soon} onFav={soon} />
+            ))}
+          </ScrollView>
         ) : (
-          <EmptyState />
-        )
-      }
-    />
+          <Text style={styles.emptyRow}>{copy.homeNoOffers}</Text>
+        )}
+
+        {/* 4 — feature banners (order + gating mirror the web) */}
+        <Banner colors={['#2F5E3E', '#C08A43']} icon="pricetag-outline" title={copy.rfqTitle} subtitle={copy.rfqSub} onPress={soon} />
+        {isVendor && (
+          <Banner colors={['#8a5a78', '#6b3f5a']} icon="add-circle-outline" title={copy.addProductTitle} subtitle={farmerSub} onPress={soon} />
+        )}
+        {isVendor && (
+          <Banner
+            colors={['#5e4a30', '#42321e']}
+            icon="business-outline"
+            title={copy.secWholesale}
+            subtitle={copy.wholesaleBannerSub}
+            onPress={() => router.push({ pathname: '/catalog/[section]', params: { section: 'wholesale' } })}
+          />
+        )}
+
+        {/* 5 — الأعلى تقييماً / متاجر مميّزة + عرض الكل */}
+        <SecHead eyebrow={copy.homeTopRated} title={copy.homeFeaturedStores} action={copy.seeAll} onAction={openAll} />
+        {phase === 'loading' ? (
+          <RowLoader />
+        ) : phase === 'error' ? (
+          <ErrorRetry kind={errKind} onRetry={() => { setPhase('loading'); void load(); }} />
+        ) : featured.length ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+            {featured.map((s) => (
+              <StoreCardView key={s.vendorId} store={s} onPress={soon} />
+            ))}
+          </ScrollView>
+        ) : (
+          <Text style={styles.emptyRow}>{copy.homeNoOffers}</Text>
+        )}
+      </ScrollView>
+
+      {/* 6 — floating chat button (bottom-left) → قريباً */}
+      <Pressable style={[styles.chatFab, { bottom: insets.bottom + 16 }]} onPress={soon}>
+        <Ionicons name="chatbubble-ellipses" size={26} color="#fff" />
+      </Pressable>
+    </View>
+  );
+}
+
+function SecHead({ eyebrow, title, action, onAction }: { eyebrow: string; title: string; action?: string; onAction?: () => void }) {
+  return (
+    <View style={styles.secHead}>
+      <View style={styles.secHeadText}>
+        <Text style={styles.secEyebrow}>{eyebrow}</Text>
+        <Text style={styles.secTitle}>{title}</Text>
+      </View>
+      {action && onAction && (
+        <Pressable onPress={onAction} hitSlop={8}>
+          <Text style={styles.secAction}>{action}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+function Banner({
+  colors: c,
+  icon,
+  title,
+  subtitle,
+  onPress,
+}: {
+  colors: [string, string];
+  icon: ComponentProps<typeof Ionicons>['name'];
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}) {
+  // backgroundColor: c[0] solid now → swap to <LinearGradient colors={c}> later (one line).
+  return (
+    <Pressable style={[styles.banner, { backgroundColor: c[0] }]} onPress={onPress}>
+      <View style={styles.bannerIc}>
+        <Ionicons name={icon} size={22} color="#fff" />
+      </View>
+      <View style={styles.bannerTxt}>
+        <Text style={styles.bannerTitle}>{title}</Text>
+        <Text style={styles.bannerSub}>{subtitle}</Text>
+      </View>
+      <Ionicons name="chevron-back" size={20} color="#fff" />
+    </Pressable>
+  );
+}
+
+function StoreCardView({ store, onPress }: { store: StoreCard; onPress: () => void }) {
+  return (
+    <Pressable style={styles.storeCard} onPress={onPress}>
+      <View style={styles.storeImg}>
+        {store.image ? (
+          <Image source={{ uri: store.image }} style={styles.storeImgFill} resizeMode="cover" />
+        ) : (
+          <Text style={styles.storeImgIcon}>🥜</Text>
+        )}
+      </View>
+      <Text style={styles.storeName} numberOfLines={1}>
+        {store.name}
+      </Text>
+      <View style={styles.storeMeta}>
+        {store.rating != null && (
+          <>
+            <Ionicons name="star" size={12} color={colors.goldDeep} />
+            <Text style={styles.storeRating}>{store.rating.toFixed(1)}</Text>
+          </>
+        )}
+        {store.trustedBadge && <Ionicons name="shield-checkmark" size={12} color={colors.greenDeep} />}
+      </View>
+    </Pressable>
+  );
+}
+
+function RowLoader() {
+  return (
+    <View style={styles.rowLoader}>
+      <ActivityIndicator color={colors.greenDeep} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 16, paddingBottom: 40, backgroundColor: colors.cream },
-  column: { justifyContent: 'space-between', marginBottom: 12 },
-  header: { paddingTop: 40, gap: 14, marginBottom: 4 },
-  brand: { fontSize: 30, fontFamily: fonts.extraBold, color: colors.greenDeep },
-  wholesaleCard: {
+  root: { flex: 1, backgroundColor: colors.cream },
+  scroll: { paddingHorizontal: 16, paddingBottom: 96, gap: 6 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
+  searchBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.greenSoft,
+    gap: 8,
+    height: 46,
     borderRadius: 14,
+    paddingHorizontal: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  searchPlaceholder: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, flex: 1 },
+  bell: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  secHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 14, marginBottom: 8 },
+  secHeadText: { gap: 1 },
+  secEyebrow: { fontSize: 12, fontFamily: fonts.medium, color: colors.goldDeep },
+  secTitle: { fontSize: 18, fontFamily: fonts.bold, color: colors.ink },
+  secAction: { fontSize: 13, fontFamily: fonts.bold, color: colors.greenDeep },
+  tileRow: { flexDirection: 'row', gap: 12, paddingVertical: 2 },
+  tile: { alignItems: 'center', gap: 6, width: 76 },
+  tileIc: { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  tileIcImg: { width: 30, height: 30 },
+  tileLabel: { fontSize: 13, fontFamily: fonts.bold, color: colors.ink },
+  rail: { flexDirection: 'row', gap: 12, paddingVertical: 2 },
+  emptyRow: { fontSize: 14, fontFamily: fonts.medium, color: colors.inkSoft, textAlign: 'center', paddingVertical: 24 },
+  rowLoader: { paddingVertical: 28, alignItems: 'center' },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    borderRadius: 20,
     paddingVertical: 14,
     paddingHorizontal: 16,
+    marginTop: 10,
   },
-  wholesaleText: { fontSize: 16, fontFamily: fonts.bold, color: colors.greenDeep },
-  wholesaleArrow: { fontSize: 20, fontFamily: fonts.bold, color: colors.greenDeep },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontSize: 18, fontFamily: fonts.bold, color: colors.ink },
-  seeAll: { fontSize: 14, fontFamily: fonts.bold, color: colors.greenDeep },
+  bannerIc: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerTxt: { flex: 1, gap: 2 },
+  bannerTitle: { fontSize: 16, fontFamily: fonts.bold, color: '#fff' },
+  bannerSub: { fontSize: 12, fontFamily: fonts.regular, color: 'rgba(255,255,255,0.9)' },
+  storeCard: { width: 130, gap: 6 },
+  storeImg: {
+    width: 130,
+    height: 90,
+    borderRadius: 14,
+    backgroundColor: colors.sand,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  storeImgFill: { width: '100%', height: '100%' },
+  storeImgIcon: { fontSize: 30, opacity: 0.5 },
+  storeName: { fontSize: 14, fontFamily: fonts.bold, color: colors.ink },
+  storeMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  storeRating: { fontSize: 12, fontFamily: fonts.medium, color: colors.inkSoft },
+  chatFab: {
+    position: 'absolute',
+    left: 16,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: colors.greenDeep,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
 });
